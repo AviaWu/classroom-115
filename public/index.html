@@ -96,6 +96,16 @@ input[type="number"]{width:85px}
 .student-list{font-size:13px;line-height:1.6;padding:6px 8px;background:#f8f8f8;border-radius:8px;margin-top:6px;word-break:break-all}
 .edit-item-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .edit-item-row input{flex:1;min-width:120px}
+.lottery-ticket{font-size:20px;font-weight:800;margin-top:4px;display:inline-block;margin-left:8px;color:#8b4e9f}
+.lottery-page{text-align:center;max-width:720px;margin:auto}
+.gacha-machine{position:relative;width:min(330px,82vw);margin:18px auto;padding:24px 22px 28px;background:#e95b62;border:6px solid #20263a;box-shadow:9px 9px 0 #172033}
+.gacha-globe{width:210px;aspect-ratio:1;margin:auto;border:6px solid #20263a;border-radius:50%;background:linear-gradient(145deg,#dff7ff,#fff);display:flex;align-items:center;justify-content:center;font-size:82px;overflow:hidden}
+.gacha-globe img{width:86%;height:86%;object-fit:contain}
+.gacha-slot{width:120px;height:48px;margin:20px auto 0;background:#fff4d6;border:5px solid #20263a;display:flex;align-items:center;justify-content:center;font-weight:900}
+.gacha-machine.drawing .gacha-globe{animation:gachaShake .55s ease}
+@keyframes gachaShake{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg) scale(1.03)}40%{transform:rotate(8deg)}60%{transform:rotate(-6deg)}80%{transform:rotate(5deg)}}
+.lottery-rules{padding:14px;text-align:left;background:#fff4d6;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;line-height:1.8}
+.lottery-result{margin:14px 0;padding:12px;font-size:18px;font-weight:900;min-height:28px}
 .dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
 .backend-nav{position:relative;z-index:1;display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px;padding:12px;background:#34405c;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
 .backend-nav button{padding:8px 10px;font-size:13px}
@@ -289,7 +299,7 @@ if(!state){
     state = {
         students: Array.from({length:26}, (_,i)=>({
             id:i+1, gender: i<12 ? "M" : "F",
-            tokens:0, doneTasks:[],
+            tokens:0, lotteryTickets:0, doneTasks:[],
             ownedClothes:[], equippedClothes:null,
             ownedLayout:[], equippedLayout:[],
             ownedBg:[], equippedBg:null
@@ -320,6 +330,8 @@ if(!state){
     });
     state.students.forEach(s=>{
         if(!s.gender) s.gender = s.id<=12?"M":"F";
+        if(!Number.isFinite(Number(s.lotteryTickets))) s.lotteryTickets = 0;
+        else s.lotteryTickets = Math.max(0,Number(s.lotteryTickets));
         if(!Array.isArray(s.equippedLayout)) s.equippedLayout = [];
         if(!Array.isArray(s.ownedClothes)) s.ownedClothes = [];
         if(!Array.isArray(s.ownedLayout)) s.ownedLayout = [];
@@ -585,6 +597,7 @@ function render(){
             <div>
                 <span class="num">${s.id}</span>
                 <span class="tokens">🪙 ${s.tokens}</span>
+                <span class="lottery-ticket">🎟️ ${s.lotteryTickets||0}</span>
             </div>
             <div class="actions">
                 <button onclick="tasks(${s.id})" style="position:relative">${hasTodo?'<span class="task-new" aria-label="有新的未完成任務">NEW</span>':''}任務</button>
@@ -677,7 +690,7 @@ function openCoopTask(taskId, taskButtons=""){
                     <div class="coop-hp" aria-label="怪獸HP"><div class="coop-hp-fill" style="width:${hpPercent}%"></div></div>
                     <b>HP ${state.students.length-completed.length} / ${state.students.length}</b>
                     <div>${esc(task.content)}</div>
-                    <div class="small">全員完成後，每位成員獲得 🪙 ${task.reward}</div>
+                    <div class="small">全員完成後，每位成員獲得 ${task.rewardType==="ticket"?"🎟️":"🪙"} ${task.reward}</div>
                 </div>
             </div>
             <div class="coop-side coop-side-members">
@@ -692,10 +705,15 @@ function completeCoopMember(taskId,studentId){
     if(task.completedBy.includes(studentId)) return;
     task.completedBy.push(studentId);
     if(task.completedBy.length >= state.students.length){
-        state.students.forEach(s=>s.tokens += Number(task.reward)||0);
+        const reward = Number(task.reward)||0;
+        const rewardType = task.rewardType==="ticket" ? "ticket" : "token";
+        state.students.forEach(s=>{
+            if(rewardType==="ticket") s.lotteryTickets = (s.lotteryTickets||0) + reward;
+            else s.tokens += reward;
+        });
         task.claimed = true;
         markChanged(); save(); render();
-        alert(`恭喜同心協力打敗「${task.monsterName}」！每位成員獲得 ${task.reward} 代幣！`);
+        alert(`恭喜同心協力打敗「${task.monsterName}」！每位成員獲得 ${reward} ${rewardType==="ticket"?"張樂透券":"代幣"}！`);
         openCoopTasks();
         return;
     }
@@ -753,6 +771,7 @@ function shop(id){
         <button class="tab" onclick="switchShopTab(${id},'clothes')">服裝</button>
         <button class="tab" onclick="switchShopTab(${id},'layouts')">佈置</button>
         <button class="tab" onclick="switchShopTab(${id},'bgs')">背景</button>
+        <button class="tab" onclick="switchShopTab(${id},'lottery')">🎟️ 樂透</button>
     </div>
     <div id="shopTabContent"></div>`);
     switchShopTab(id, lastShopTab);
@@ -765,10 +784,72 @@ function switchShopTab(id,tab){
     if(tab==="clothes") html=groupedShopCards(id,clothPool,clothCard);
     if(tab==="layouts") html=groupedShopCards(id,state.layouts,layCard);
     if(tab==="bgs") html=groupedShopCards(id,state.backgrounds,bgCard);
+    if(tab==="lottery") html=`
+        <div class="lottery-page">
+            <div class="gacha-machine" id="gachaMachine">
+                <div class="gacha-globe" id="gachaGlobe">🎁</div>
+                <div class="gacha-slot">扭蛋出口</div>
+            </div>
+            <h3>持有樂透券：🎟️ ${s.lotteryTickets||0}</h3>
+            <button class="primary" onclick="drawLottery(${id})" ${(s.lotteryTickets||0)<1?"disabled":""}>使用 1 張樂透券抽一次</button>
+            <div class="lottery-result" id="lotteryResult"></div>
+            <div class="lottery-rules">
+                <b>樂透規則與機率</b><br>
+                🎟️ 每次抽獎消耗 1 張樂透券。<br>
+                可抽到該成員性別的服裝，以及商店中的佈置、背景商品。<br>
+                R 商品：75%｜SR 商品：15%｜SSR 商品：7%｜UR 商品：3%。<br>
+                若抽到已購買的商品，商品不重複加入衣櫃，改為返還 🪙 20 代幣。<br>
+                若抽中的等級目前沒有商品，會從其他有商品的等級重新抽取。
+            </div>
+        </div>`;
     document.getElementById("shopTabContent").innerHTML = html;
     document.querySelectorAll(".tab").forEach((el,i)=>{
-        el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
+        el.classList.toggle("active", ["clothes","layouts","bgs","lottery"][i]===tab);
     });
+}
+
+function drawLottery(id){
+    const s = state.students[id-1];
+    if(!s || (s.lotteryTickets||0)<1) return alert("樂透券不足！");
+    const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
+    const prizes = [
+        ...clothPool.map(item=>({item,type:"clothes"})),
+        ...state.layouts.map(item=>({item,type:"layout"})),
+        ...state.backgrounds.map(item=>({item,type:"background"}))
+    ];
+    if(!prizes.length) return alert("商店目前沒有可抽取的商品！");
+    const roll = Math.random()*100;
+    const wantedLevel = roll<75 ? "R" : roll<90 ? "SR" : roll<97 ? "SSR" : "UR";
+    const levelPrizes = prizes.filter(prize=>(prize.item.level||"R")===wantedLevel);
+    const pool = levelPrizes.length ? levelPrizes : prizes;
+    const prize = pool[Math.floor(Math.random()*pool.length)];
+    s.lotteryTickets -= 1;
+    let duplicate = false;
+    if(prize.type==="clothes"){
+        duplicate = s.ownedClothes.includes(prize.item.id);
+        if(!duplicate) s.ownedClothes.push(prize.item.id);
+    }else if(prize.type==="layout"){
+        duplicate = s.ownedLayout.includes(prize.item.id);
+        if(!duplicate) s.ownedLayout.push(prize.item.id);
+    }else{
+        duplicate = s.ownedBg.includes(prize.item.id);
+        if(!duplicate) s.ownedBg.push(prize.item.id);
+    }
+    if(duplicate) s.tokens += 20;
+    markChanged(); save(); render();
+    const machine = document.getElementById("gachaMachine");
+    const globe = document.getElementById("gachaGlobe");
+    const result = document.getElementById("lotteryResult");
+    machine?.classList.add("drawing");
+    if(globe) globe.innerHTML = prize.item.image ? `<img src="${esc(prize.item.image)}" alt="${esc(prize.item.name)}">` : "🎁";
+    if(result) result.innerHTML = duplicate
+        ? `抽中 <span class="warn">${esc(prize.item.level||"R")}｜${esc(prize.item.name)}</span>，已擁有此商品，返還 🪙 20 代幣！`
+        : `恭喜抽中 <span class="info">${esc(prize.item.level||"R")}｜${esc(prize.item.name)}</span>！`;
+    setTimeout(()=>machine?.classList.remove("drawing"),600);
+    const ticketTitle = document.querySelector(".lottery-page h3");
+    if(ticketTitle) ticketTitle.textContent = `持有樂透券：🎟️ ${s.lotteryTickets}`;
+    const drawButton = document.querySelector(".lottery-page > button");
+    if(drawButton) drawButton.disabled = s.lotteryTickets<1;
 }
 
 function buyCloth(id,pid){
@@ -980,6 +1061,7 @@ async function backend(){
         <button onclick="jumpBackend('backend-overview')">存檔</button>
         <button onclick="jumpBackend('backend-tasks')">任務</button>
         <button onclick="jumpBackend('backend-tokens')">代幣</button>
+        <button onclick="jumpBackend('backend-lottery')">樂透</button>
         <button onclick="jumpBackend('backend-members')">成員</button>
         <button onclick="jumpBackend('backend-clothes-m')">男生服裝</button>
         <button onclick="jumpBackend('backend-clothes-f')">女生服裝</button>
@@ -1018,7 +1100,13 @@ async function backend(){
         <div class="grow">
             <input id="coopMonsterName" placeholder="怪獸名稱">
             <textarea id="coopContent" placeholder="任務內容" rows="3" style="width:100%;margin-top:8px"></textarea>
-            <input id="coopReward" type="number" min="0" value="50" placeholder="每位成員獎勵代幣" style="margin-top:8px">
+            <div style="margin-top:8px">
+                <select id="coopRewardType">
+                    <option value="token">🪙 代幣</option>
+                    <option value="ticket">🎟️ 樂透券</option>
+                </select>
+                <input id="coopReward" type="number" min="0" value="50" placeholder="每位成員獎勵數量">
+            </div>
             <label style="display:block;margin-top:8px">選擇怪獸圖片：</label>
             <div class="monster-choice-grid">
                 <button type="button" class="monster-choice none active" onclick="selectCoopMonster(this,'')">不使用圖片</button>
@@ -1030,7 +1118,7 @@ async function backend(){
     </div>
     ${state.coopTasks.map(t=>`
         <div class="row">
-            <div class="grow"><b>${esc(t.monsterName)}</b><div class="small">${esc(t.content)}｜獎勵 ${t.reward} 🪙｜進度 ${(t.completedBy||[]).length}/${state.students.length}${t.claimed?"｜已完成":""}</div></div>
+            <div class="grow"><b>${esc(t.monsterName)}</b><div class="small">${esc(t.content)}｜獎勵 ${t.reward} ${t.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}｜進度 ${(t.completedBy||[]).length}/${state.students.length}${t.claimed?"｜已完成":""}</div></div>
             <button class="danger" onclick="deleteCoopTask('${esc(t.id)}')">刪除</button>
         </div>`).join("") || `<div class="empty">尚無協力任務</div>`}
     </section>
@@ -1043,6 +1131,21 @@ async function backend(){
         <button class="danger" onclick="subTokenOne()">➖扣除代幣</button>
     </div>
 
+    </section>
+    <section id="backend-lottery" class="backend-page">
+    <h3>樂透券管理</h3>
+    <div class="row">
+        <label>學生號碼：<input id="lotteryStuId" type="number" min="1" max="${state.students.length}"></label>
+        <label>張數：<input id="lotteryDelta" type="number" min="0" value="1"></label>
+        <button class="primary" onclick="addLotteryTicketOne()">➕給予樂透券</button>
+        <button class="danger" onclick="subLotteryTicketOne()">➖移除樂透券</button>
+    </div>
+    <div class="row">
+        <button class="warning" onclick="resetAllLotteryTickets()">重置全體成員樂透券為 0</button>
+    </div>
+    <div class="row" style="display:block">
+        ${state.students.map(s=>`<div class="row"><b class="grow">${s.id}號</b><span>🎟️ ${s.lotteryTickets||0}</span></div>`).join("")}
+    </div>
     </section>
     <section id="backend-members" class="backend-page">
     <h3>成員管理</h3>
@@ -1061,7 +1164,7 @@ async function backend(){
                     <option value="F" ${s.gender==="F"?"selected":""}>女生</option>
                 </select>
             </label>
-            <span class="grow">🪙 ${s.tokens}</span>
+            <span class="grow">🪙 ${s.tokens}　🎟️ ${s.lotteryTickets||0}</span>
             <button onclick="editToken(${s.id})">設定代幣</button>
             <button class="warning" onclick="resetStudentCloset(${s.id})">重置衣櫃</button>
         </div>`).join("")}
@@ -1189,7 +1292,7 @@ function resetGame(){
     state = {
         students: Array.from({length:26}, (_,i)=>({
             id:i+1, gender: i<12 ? "M" : "F",
-            tokens:0, doneTasks:[],
+            tokens:0, lotteryTickets:0, doneTasks:[],
             ownedClothes:[], equippedClothes:null,
             ownedLayout:[], equippedLayout:[],
             ownedBg:[], equippedBg:null
@@ -1275,9 +1378,10 @@ async function publishCoopTask(){
     const monsterName = document.getElementById("coopMonsterName").value.trim();
     const content = document.getElementById("coopContent").value.trim();
     const reward = Number(document.getElementById("coopReward").value);
+    const rewardType = document.getElementById("coopRewardType").value;
     const monsterImage = document.getElementById("coopMonsterImage").value;
     if(!monsterName || !content || !Number.isFinite(reward) || reward<0) return alert("請完整填寫怪獸名稱、任務內容與獎勵");
-    state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,monsterImage,completedBy:[],claimed:false});
+    state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,rewardType,monsterImage,completedBy:[],claimed:false});
     markChanged(); save(); refreshBackendPage("backend-coop");
 }
 function deleteCoopTask(taskId){
@@ -1421,6 +1525,26 @@ function subTokenOne(){
     state.students[sid-1].tokens -= delta;
     markChanged(); save(); render(); refreshBackendPage("backend-tokens");
 }
+function addLotteryTicketOne(){
+    const sid = Number(document.getElementById("lotteryStuId").value);
+    const delta = Math.floor(Number(document.getElementById("lotteryDelta").value));
+    if(!sid || sid<1 || sid>state.students.length || !Number.isFinite(delta) || delta<0) return alert("輸入不正確");
+    state.students[sid-1].lotteryTickets = (state.students[sid-1].lotteryTickets||0) + delta;
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+function subLotteryTicketOne(){
+    const sid = Number(document.getElementById("lotteryStuId").value);
+    const delta = Math.floor(Number(document.getElementById("lotteryDelta").value));
+    if(!sid || sid<1 || sid>state.students.length || !Number.isFinite(delta) || delta<0) return alert("輸入不正確");
+    const student = state.students[sid-1];
+    student.lotteryTickets = Math.max(0,(student.lotteryTickets||0)-delta);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+function resetAllLotteryTickets(){
+    if(!confirm("確定將全體成員的樂透券重置為 0？")) return;
+    state.students.forEach(s=>s.lotteryTickets=0);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
 
 function resizeStudentList(){
     const n = Number(document.getElementById("stuCount").value);
@@ -1429,7 +1553,7 @@ function resizeStudentList(){
         for(let i=state.students.length;i<n;i++){
             state.students.push({
                 id:i+1, gender:i%2===0?"M":"F",
-                tokens:0, doneTasks:[],
+                tokens:0, lotteryTickets:0, doneTasks:[],
                 ownedClothes:[], equippedClothes:null,
                 ownedLayout:[], equippedLayout:[],
                 ownedBg:[], equippedBg:null
