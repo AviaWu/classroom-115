@@ -401,8 +401,16 @@ async function shareGame(){
 
 // 內建男生服裝：直接使用 public/images/boy/ 的圖片，避免每次載入重複建立商品
 function seedBuiltinBoyClothes(){
+    const removedIds = state.clothesM.filter(item=>item.image==="/images/boy/b0.png").map(item=>item.id);
+    let changed = removedIds.length>0;
+    if(changed){
+        state.clothesM = state.clothesM.filter(item=>item.image!=="/images/boy/b0.png");
+        state.students.forEach(s=>{
+            s.ownedClothes = s.ownedClothes.filter(id=>!removedIds.includes(id));
+            if(removedIds.includes(s.equippedClothes)) s.equippedClothes = null;
+        });
+    }
     const filenames = [
-        "b0.png",
         "b (1).png", "b (2).png", "b (3).png", "b (4).png", "b (5).png",
         "b (6).png", "b (7).png", "b (8).png", "b (9).png", "b (10).png",
         "b (11).png", "b (12).png", "b (13).png", "b (14).png", "b (15).png",
@@ -413,7 +421,6 @@ function seedBuiltinBoyClothes(){
         "b (37).png", "b (38).png", "b (39).png", "b (40).png", "b (41).png",
         "b (42).png", "b (43).png", "b (44).png"
     ];
-    let changed = false;
     filenames.forEach((filename, index)=>{
         const image = `/images/boy/${encodeURIComponent(filename)}`;
         if(!state.clothesM.some(item=>item.image===image)){
@@ -434,8 +441,16 @@ seedBuiltinBoyClothes();
 
 // 內建女生服裝：直接使用 public/images/girl/ 的圖片，避免每次載入重複建立商品
 function seedBuiltinGirlClothes(){
+    const removedIds = state.clothesF.filter(item=>item.image==="/images/girl/g0.png").map(item=>item.id);
+    let changed = removedIds.length>0;
+    if(changed){
+        state.clothesF = state.clothesF.filter(item=>item.image!=="/images/girl/g0.png");
+        state.students.forEach(s=>{
+            s.ownedClothes = s.ownedClothes.filter(id=>!removedIds.includes(id));
+            if(removedIds.includes(s.equippedClothes)) s.equippedClothes = null;
+        });
+    }
     const filenames = [
-        "g0.png",
         "g (1).png", "g (2).png", "g (3).png", "g (4).png", "g (5).png",
         "g (6).png", "g (7).png", "g (8).png", "g (9).png", "g (10).png",
         "g (11).png", "g (12).png", "g (13).png", "g (14).png", "g (15).png",
@@ -446,7 +461,6 @@ function seedBuiltinGirlClothes(){
         "g (36).png", "g (37).png", "g (38).png", "g (39).png", "g (40).png",
         "g (41).png", "g (42).png"
     ];
-    let changed = false;
     filenames.forEach((filename, index)=>{
         const image = `/images/girl/${encodeURIComponent(filename)}`;
         if(!state.clothesF.some(item=>item.image===image)){
