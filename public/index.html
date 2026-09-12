@@ -475,7 +475,8 @@ function closeModal(){
 //學生端任務
 function tasks(id){
     const s = state.students[id-1];
-    const todo = state.tasks.filter(t=>!s.doneTasks.includes(t.id));
+    const now = Date.now();
+    const todo = state.tasks.filter(t=>!s.doneTasks.includes(t.id) && (!t.dueAt || now <= t.dueAt));
     openModal(`
         <h2>${id}號｜任務</h2>
         ${todo.length ? todo.map(t=>`
@@ -677,10 +678,13 @@ async function backend(){
         const undoneStudents = state.students.filter(s=>!s.doneTasks.includes(t.id));
         const doneIds = doneStudents.map(s=>s.id+"號").join("、");
         const undoneIds = undoneStudents.map(s=>s.id+"號").join("、");
+        const expired = t.dueAt && Date.now() > t.dueAt;
+        const dueText = t.dueAt ? new Date(t.dueAt).toLocaleString() : "無期限";
         return `
         <div class="row">
             <div class="grow">
                 <b>${esc(t.title)}</b> <span class="small">(獎勵 ${t.reward} 🪙)</span>
+                <div class="task-stat">期限：${esc(dueText)} ${expired?'<span class="warn">｜已到期</span>':''}</div>
                 <div class="task-stat">✅已完成：${doneStudents.length} / ${state.students.length}</div>
                 <div class="student-list">已完成：${doneIds||"無"}</div>
                 <div class="student-list">未完成：${undoneIds||"全部完成"}</div>
@@ -767,6 +771,7 @@ async function backend(){
         <div class="grow">
             <input id="newTaskTitle" placeholder="新任務名稱">
             <input id="newTaskReward" type="number" placeholder="代幣" style="width:90px">
+            <label>完成期限：<input id="newTaskDueAt" type="datetime-local"></label>
         </div>
         <button class="primary" onclick="addTask()">新增任務</button>
     </div>
@@ -1009,11 +1014,15 @@ async function batchAddBg(){
 function addTask(){
     const title = document.getElementById("newTaskTitle").value.trim();
     const reward = Number(document.getElementById("newTaskReward").value)||0;
+    const dueValue = document.getElementById("newTaskDueAt").value;
+    const dueAt = dueValue ? new Date(dueValue).getTime() : null;
     if(!title){alert("請輸入任務名稱");return;}
+    if(dueAt && dueAt<=Date.now()){alert("完成期限必須晚於現在");return;}
     state.tasks.push({
         id: makeTaskId(),
         title: title,
-        reward: reward
+        reward: reward,
+        dueAt: dueAt
     });
     markChanged(); save(); backend();
 }
