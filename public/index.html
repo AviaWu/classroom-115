@@ -212,6 +212,38 @@ function seedBuiltinBoyClothes(){
 
 seedBuiltinBoyClothes();
 
+// 內建女生服裝：直接使用 public/images/girl/ 的圖片，避免每次載入重複建立商品
+function seedBuiltinGirlClothes(){
+    const filenames = [
+        "g0.png",
+        "g (1).png", "g (2).png", "g (3).png", "g (4).png", "g (5).png",
+        "g (6).png", "g (7).png", "g (8).png", "g (9).png", "g (10).png",
+        "g (11).png", "g (12).png", "g (13).png", "g (14).png", "g (15).png",
+        "g (16).png", "g (17).png", "g (18).png", "g (19).png", "g (20).png",
+        "g (21).png", "g (22).png", "g (23).png", "g (24).png", "g (25).png",
+        "g (26).png", "g (27).png", "g (28).png", "g (29).png", "g (30).png",
+        "g (31).png", "g (32).png", "g (33).png", "g (34).png", "g (35).png",
+        "g (36).png", "g (37).png", "g (38).png", "g (39).png", "g (40).png",
+        "g (41).png", "g (42).png"
+    ];
+    let changed = false;
+    filenames.forEach((filename, index)=>{
+        const image = `/images/girl/${encodeURIComponent(filename)}`;
+        if(!state.clothesF.some(item=>item.image===image)){
+            state.clothesF.push({
+                id: `builtin_girl_${index}`,
+                name: `女生服裝 ${index+1}`,
+                price: 50,
+                image
+            });
+            changed = true;
+        }
+    });
+    if(changed) save();
+}
+
+seedBuiltinGirlClothes();
+
 function markChanged(){
     unsavedChange = true;
     document.getElementById("saveStatus").textContent = "⚠️有未儲存變更";
