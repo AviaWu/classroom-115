@@ -180,6 +180,38 @@ if(!state){
     });
 }
 
+// 內建男生服裝：直接使用 public/images/boy/ 的圖片，避免每次載入重複建立商品
+function seedBuiltinBoyClothes(){
+    const filenames = [
+        "b0.png",
+        "b (1).png", "b (2).png", "b (3).png", "b (4).png", "b (5).png",
+        "b (6).png", "b (7).png", "b (8).png", "b (9).png", "b (10).png",
+        "b (11).png", "b (12).png", "b (13).png", "b (14).png", "b (15).png",
+        "b (16).png", "b (17).png", "b (18).png", "b (20).png", "b (21).png",
+        "b (22).png", "b (23).png", "b (24).png", "b (25).png", "b (26).png",
+        "b (27).png", "b (28).png", "b (29).png", "b (30).png", "b (31).png",
+        "b (32).png", "b (33).png", "b (34).png", "b (35).png", "b (36).png",
+        "b (37).png", "b (38).png", "b (39).png", "b (40).png", "b (41).png",
+        "b (42).png", "b (43).png", "b (44).png"
+    ];
+    let changed = false;
+    filenames.forEach((filename, index)=>{
+        const image = `/images/boy/${encodeURIComponent(filename)}`;
+        if(!state.clothesM.some(item=>item.image===image)){
+            state.clothesM.push({
+                id: `builtin_boy_${index}`,
+                name: `男生服裝 ${index+1}`,
+                price: 50,
+                image
+            });
+            changed = true;
+        }
+    });
+    if(changed) save();
+}
+
+seedBuiltinBoyClothes();
+
 function markChanged(){
     unsavedChange = true;
     document.getElementById("saveStatus").textContent = "⚠️有未儲存變更";
