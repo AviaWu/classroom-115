@@ -333,26 +333,34 @@ function readSharedState(){
 }
 
 async function shareGame(){
-    const shareButton = document.querySelector("button[onclick=\"shareGame()\"]");
     try{
         save();
         const encoded = encodeURIComponent(JSON.stringify(state));
         const url = `${location.origin}${location.pathname}#game=${encoded}`;
         const shareData = {title:"班級換裝遊戲",text:"一起加入班級換裝遊戲！",url};
-        if(navigator.share && location.protocol !== "file:"){
-            await navigator.share(shareData);
-            return;
+        const canUseNativeShare = typeof navigator.share === "function" &&
+            window.isSecureContext && location.protocol !== "file:";
+
+        if(canUseNativeShare){
+            try{
+                await navigator.share(shareData);
+                return;
+            }catch(error){
+                if(error.name === "AbortError") return;
+                console.warn("原生分享被拒絕，改用複製連結",error);
+            }
         }
+
         if(navigator.clipboard && window.isSecureContext){
             await navigator.clipboard.writeText(url);
-            alert("分享連結已複製！連結包含目前所有遊戲進度。");
+            alert("原生分享未獲得瀏覽器許可，分享連結已複製！");
             return;
         }
-        const copied = window.prompt("目前環境無法直接分享，請複製以下完整連結：",url);
-        if(copied !== null) alert("請將連結貼到通訊軟體或瀏覽器分享。");
+
+        window.prompt("瀏覽器未授權原生分享，請手動複製以下完整連結：",url);
     }catch(error){
         console.error("分享失敗",error);
-        alert(`分享失敗：${error.message||"目前瀏覽器不支援此功能"}`);
+        alert(`分享失敗：${error.message||"請改用複製連結"}`);
     }
 }
 
