@@ -270,6 +270,11 @@ const BUILTIN_MONSTERS = [
 ];
 
 let raw = localStorage.getItem(STORAGE_KEY);
+const sharedState = readSharedState();
+if(sharedState){
+    raw = JSON.stringify(sharedState);
+    localStorage.setItem(STORAGE_KEY, raw);
+}
 let state = raw ? JSON.parse(raw) : null;
 let unsavedChange = false;
 let autoSaveTimer = null;
@@ -312,6 +317,41 @@ if(!state){
         if(!Array.isArray(s.ownedBg)) s.ownedBg = [];
         if(!Array.isArray(s.doneTasks)) s.doneTasks = [];
     });
+}
+
+function readSharedState(){
+    const prefix = "#game=";
+    if(!location.hash.startsWith(prefix)) return null;
+    try{
+        const data = JSON.parse(decodeURIComponent(location.hash.slice(prefix.length)));
+        history.replaceState(null,"",location.pathname+location.search);
+        return data;
+    }catch(error){
+        console.warn("分享資料無法讀取", error);
+        return null;
+    }
+}
+
+async function shareGame(){
+    try{
+        const encoded = encodeURIComponent(JSON.stringify(state));
+        const url = `${location.origin}${location.pathname}#game=${encoded}`;
+        const shareData = {
+            title:"班級換裝遊戲",
+            text:"一起加入班級換裝遊戲！",
+            url
+        };
+        if(navigator.share){
+            await navigator.share(shareData);
+        }else if(navigator.clipboard){
+            await navigator.clipboard.writeText(url);
+            alert("分享連結已複製！連結包含目前所有遊戲進度。");
+        }else{
+            prompt("請複製以下分享連結：", url);
+        }
+    }catch(error){
+        if(error.name!=="AbortError") alert("分享失敗，請稍後再試。");
+    }
 }
 
 // 內建男生服裝：直接使用 public/images/boy/ 的圖片，避免每次載入重複建立商品
@@ -915,6 +955,7 @@ async function backend(){
         </div>
         <button onclick="exportData()">匯出備份</button>
         <button class="warning" onclick="document.getElementById('importFile').click()">匯入備份</button>
+        <button class="primary" onclick="shareGame()">分享此頁面</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
       </div>
     </div>
