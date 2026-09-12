@@ -623,7 +623,7 @@ function completeCoopMember(taskId,studentId){
         state.students.forEach(s=>s.tokens += Number(task.reward)||0);
         task.claimed = true;
         markChanged(); save(); render();
-        alert(`全員完成「${task.monsterName}」！每位成員獲得 ${task.reward} 代幣！`);
+        alert(`恭喜同心協力打敗「${task.monsterName}」！每位成員獲得 ${task.reward} 代幣！`);
         openCoopTasks();
         return;
     }
