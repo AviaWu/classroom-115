@@ -85,6 +85,10 @@ input[type="number"]{width:85px}
 .backend-nav button{padding:8px 10px;font-size:13px}
 .backend-page{display:none}
 .backend-page.active{display:block}
+.monster-list{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px}
+.monster-list button.active{background:#f3d98b;color:#20263a}
+.monster-choice-preview{text-align:center;margin-top:8px}
+.monster-choice-preview img{display:none;width:140px;height:100px;object-fit:contain;margin:auto;background:#fff4d6;border:2px solid #a88d5f}
 .task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
@@ -539,15 +543,17 @@ function finishTask(id,tid){
 }
 
 //協力任務：每位成員點選自己的角色縮圖完成，全部完成後全班獲得獎勵
-function openCoopTasks(){
+function openCoopTasks(selectedId){
     const active = state.coopTasks.filter(t=>!t.claimed);
     if(!active.length){
         openModal(`<h2>協力任務</h2><div class="empty">目前沒有進行中的協力任務。</div>`);
         return;
     }
-    openCoopTask(active[0].id);
+    const taskId = active.some(t=>t.id===selectedId) ? selectedId : active[0].id;
+    const taskButtons = active.map(t=>`<button class="${t.id===taskId?"active":""}" onclick="openCoopTasks('${esc(t.id)}')">${esc(t.monsterName)}</button>`).join("");
+    openCoopTask(taskId, taskButtons);
 }
-function openCoopTask(taskId){
+function openCoopTask(taskId, taskButtons=""){
     const task = state.coopTasks.find(t=>t.id===taskId);
     if(!task) return openCoopTasks();
     const completed = Array.isArray(task.completedBy) ? task.completedBy : [];
@@ -562,6 +568,7 @@ function openCoopTask(taskId){
         </button>`;
     }).join("");
     openModal(`<h2>協力任務</h2>
+        <div class="monster-list">${taskButtons}</div>
         <div class="coop-monster">
             <h3>${esc(task.monsterName)}</h3>
             ${task.monsterImage?`<img src="${esc(task.monsterImage)}" alt="${esc(task.monsterName)}">`:""}
