@@ -32,6 +32,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;padding:18px;z-index:30}
 .modal.open{display:flex}
 .panel{width:min(1100px,100%);max-height:92vh;overflow:auto;padding:22px;background:#fff;border-radius:22px}
+.coop-monster{text-align:center;margin:8px auto 18px;padding:14px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
+.coop-monster img{display:block;width:min(220px,70vw);height:180px;object-fit:contain;margin:8px auto}
+.coop-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:12px}
+.coop-member{border:3px solid #20263a;background:#fff;padding:6px;text-align:center;box-shadow:3px 3px 0 #172033}
+.coop-member.done{border-color:#3d9b68;background:#d5f1df}
+.coop-member img{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#F0ECE9}
+.coop-member span{display:block;font-weight:900;margin-top:4px}
 .close{float:right;background:#eee}
 .small{font-size:13px;color:#777}
 .empty{text-align:center;padding:30px;color:#777}
@@ -210,8 +217,8 @@ input[type="number"]{width:85px}
 <header>
 <h1>Great teamwork makes the dream work</h1>
 <div>
+<button onclick="openCoopTasks()">協力</button>
 <button onclick="openBackend()">老師後台</button>
-<button onclick="save()">儲存</button>
 <span class="small" id="saveStatus"></span>
 </div>
 </header>
@@ -258,6 +265,7 @@ if(!state){
         clothesF:[],
         layouts:[],
         backgrounds:[],
+        coopTasks:[],
         globalBgImage:"",
         lastSaved:null
     };
@@ -266,6 +274,7 @@ if(!state){
     if(!state.clothesF) state.clothesF=[];
     if(!Array.isArray(state.layouts)) state.layouts=[];
     if(!Array.isArray(state.backgrounds)) state.backgrounds=[];
+    if(!Array.isArray(state.coopTasks)) state.coopTasks=[];
     if(!state.tasks) state.tasks = [];
     state.students.forEach(s=>{
         if(!s.gender) s.gender = s.id<=12?"M":"F";
@@ -521,6 +530,56 @@ function finishTask(id,tid){
     s.doneTasks.push(tid);
     s.tokens += t.reward;
     markChanged(); save();render();tasks(id);
+}
+
+//協力任務：每位成員點選自己的角色縮圖完成，全部完成後全班獲得獎勵
+function openCoopTasks(){
+    const active = state.coopTasks.filter(t=>!t.claimed);
+    if(!active.length){
+        openModal(`<h2>協力任務</h2><div class="empty">目前沒有進行中的協力任務。</div>`);
+        return;
+    }
+    openCoopTask(active[0].id);
+}
+function openCoopTask(taskId){
+    const task = state.coopTasks.find(t=>t.id===taskId);
+    if(!task) return openCoopTasks();
+    const completed = Array.isArray(task.completedBy) ? task.completedBy : [];
+    const members = state.students.map(s=>{
+        const done = completed.includes(s.id);
+        const pool = s.gender==="M" ? state.clothesM : state.clothesF;
+        const equipped = pool.find(x=>x.id===s.equippedClothes);
+        const image = equipped?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
+        return `<button class="coop-member ${done?"done":""}" ${done?"disabled":""} onclick="completeCoopMember('${esc(task.id)}',${s.id})">
+            <img src="${esc(image)}" alt="${s.id}號">
+            <span>${s.id}號${done?" ✓":""}</span>
+        </button>`;
+    }).join("");
+    openModal(`<h2>協力任務</h2>
+        <div class="coop-monster">
+            <h3>${esc(task.monsterName)}</h3>
+            ${task.monsterImage?`<img src="${esc(task.monsterImage)}" alt="${esc(task.monsterName)}">`:""}
+            <div>${esc(task.content)}</div>
+            <div class="small">全員完成後，每位成員獲得 🪙 ${task.reward}</div>
+            <div class="task-stat">目前進度：${completed.length} / ${state.students.length}</div>
+        </div>
+        <div class="coop-members">${members}</div>`);
+}
+function completeCoopMember(taskId,studentId){
+    const task = state.coopTasks.find(t=>t.id===taskId);
+    if(!task || task.claimed) return;
+    if(!Array.isArray(task.completedBy)) task.completedBy=[];
+    if(task.completedBy.includes(studentId)) return;
+    task.completedBy.push(studentId);
+    if(task.completedBy.length >= state.students.length){
+        state.students.forEach(s=>s.tokens += Number(task.reward)||0);
+        task.claimed = true;
+        markChanged(); save(); render();
+        alert(`全員完成「${task.monsterName}」！每位成員獲得 ${task.reward} 代幣！`);
+        openCoopTasks();
+        return;
+    }
+    markChanged(); save(); openCoopTask(taskId);
 }
 
 //商店
@@ -794,6 +853,7 @@ async function backend(){
         <button onclick="jumpBackend('backend-layouts')">佈置</button>
         <button onclick="jumpBackend('backend-backgrounds')">背景</button>
         <button onclick="jumpBackend('backend-settings')">設定</button>
+        <button onclick="jumpBackend('backend-coop')">協力任務</button>
     </nav>
     <div id="backend-overview" class="backend-page active">
       <div class="row">
@@ -818,6 +878,23 @@ async function backend(){
     </div>
     ${taskListHtml}
 
+    </section>
+    <section id="backend-coop" class="backend-page">
+    <h3>發布協力任務</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="coopMonsterName" placeholder="怪獸名稱">
+            <textarea id="coopContent" placeholder="任務內容" rows="3" style="width:100%;margin-top:8px"></textarea>
+            <input id="coopReward" type="number" min="0" value="50" placeholder="每位成員獎勵代幣" style="margin-top:8px">
+            <label style="display:block;margin-top:8px">怪獸圖片：<input type="file" id="coopMonsterImage" accept="image/*"></label>
+        </div>
+        <button class="primary" onclick="publishCoopTask()">發布協力任務</button>
+    </div>
+    ${state.coopTasks.map(t=>`
+        <div class="row">
+            <div class="grow"><b>${esc(t.monsterName)}</b><div class="small">${esc(t.content)}｜獎勵 ${t.reward} 🪙｜進度 ${(t.completedBy||[]).length}/${state.students.length}${t.claimed?"｜已完成":""}</div></div>
+            <button class="danger" onclick="deleteCoopTask('${esc(t.id)}')">刪除</button>
+        </div>`).join("") || `<div class="empty">尚無協力任務</div>`}
     </section>
     <section id="backend-tokens" class="backend-page">
     <h3>單號代幣調整｜給予 / 扣除</h3>
@@ -979,7 +1056,7 @@ function resetGame(){
             {id:"t2", title:"完成數學練習", reward:30},
             {id:"t3", title:"幫助同學一次", reward:40}
         ],
-        clothesM:[], clothesF:[], layouts:[], backgrounds:[],
+        clothesM:[], clothesF:[], layouts:[], backgrounds:[], coopTasks:[],
         globalBgImage:"", lastSaved:null
     };
     save();
@@ -1014,6 +1091,23 @@ function jumpBackend(targetId){
         target.classList.add("active");
         target.scrollIntoView({behavior:"smooth",block:"start"});
     }
+}
+
+async function publishCoopTask(){
+    const monsterName = document.getElementById("coopMonsterName").value.trim();
+    const content = document.getElementById("coopContent").value.trim();
+    const reward = Number(document.getElementById("coopReward").value);
+    const file = document.getElementById("coopMonsterImage").files[0];
+    if(!monsterName || !content || !Number.isFinite(reward) || reward<0) return alert("請完整填寫怪獸名稱、任務內容與獎勵");
+    let monsterImage = "";
+    if(file) monsterImage = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,monsterImage,completedBy:[],claimed:false});
+    markChanged(); save(); backend();
+}
+function deleteCoopTask(taskId){
+    if(!confirm("確定刪除此協力任務？")) return;
+    state.coopTasks = state.coopTasks.filter(t=>t.id!==taskId);
+    markChanged(); save(); backend();
 }
 
 function moveItem(listName,id,direction){
