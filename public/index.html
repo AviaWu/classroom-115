@@ -33,7 +33,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .modal.open{display:flex}
 .panel{width:min(1100px,100%);max-height:92vh;overflow:auto;padding:22px;background:#fff;border-radius:22px}
 .coop-ing{position:absolute;top:-13px;right:2px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap}
-.coop-layout{display:grid;grid-template-columns:minmax(260px, .85fr) minmax(0,1.5fr);gap:18px;align-items:start;min-height:0}
+.coop-layout{display:grid;grid-template-columns:minmax(220px, .65fr) minmax(0,1.85fr);gap:14px;align-items:start;min-height:0}
 .coop-side{min-width:0}
 .coop-side-monster{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;padding:14px;min-height:520px}
 .coop-side-monster img{display:block;width:min(100%,300px);height:260px;object-fit:contain;margin:8px auto}
@@ -42,10 +42,10 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .coop-hit{animation:coopHit .45s ease}
 @keyframes coopHit{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-8px) rotate(-2deg);filter:brightness(1.8) saturate(1.8)}50%{transform:translateX(8px) rotate(2deg);filter:brightness(2.2) saturate(2)}75%{transform:translateX(-5px);filter:brightness(1.5)}}
 .coop-side-members{min-width:0}
-.coop-side-members .coop-members{grid-template-columns:repeat(6,minmax(58px,1fr));gap:8px}
+.coop-side-members .coop-members{grid-template-columns:repeat(8,minmax(48px,1fr));gap:6px}
 .coop-side-members .coop-member{padding:4px;box-shadow:2px 2px 0 #172033}
 .coop-side-members .coop-member span{font-size:12px;margin-top:2px}
-@media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0}.coop-side-members .coop-members{grid-template-columns:repeat(5,minmax(52px,1fr));gap:6px}.panel{padding:14px}}
+@media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0}.coop-side-members .coop-members{grid-template-columns:repeat(8,minmax(34px,1fr));gap:4px}.panel{padding:14px}}
 .coop-monster{text-align:center;margin:8px auto 18px;padding:14px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
 .coop-monster img{display:block;width:min(220px,70vw);height:180px;object-fit:contain;margin:8px auto}
 .coop-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:12px}
@@ -580,10 +580,17 @@ function openCoopTask(taskId, taskButtons=""){
         const done = completed.includes(s.id);
         const pool = s.gender==="M" ? state.clothesM : state.clothesF;
         const equipped = pool.find(x=>x.id===s.equippedClothes);
+        const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
+        const activeLayouts = state.layouts.filter(x=>s.equippedLayout.includes(x.id));
         const image = equipped?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
+        const bgImage = eqBg?.image || "";
+        const bgHtml = bgImage ? `<div class="bg-layer" style="background-image:url('${esc(bgImage)}')"></div>` : "";
+        const layoutHtml = activeLayouts.map((item,index)=>
+            `<div class="layout-item" style="z-index:${3+index};background-image:url('${esc(item.image)}')"></div>`
+        ).join("");
         return `<button class="coop-member ${done?"done":""}" ${done?"disabled":""} onclick="completeCoopMember('${esc(task.id)}',${s.id})">
-            <img src="${esc(image)}" alt="${s.id}號">
-            <span>${s.id}號${done?" ✓":""}</span>
+            <div class="coop-avatar"><div class="avatar">${bgHtml}<div class="character" style="background-image:url('${esc(image)}')"></div>${layoutHtml}</div></div>
+            <span>${s.id}${done?" ✓":""}</span>
         </button>`;
     }).join("");
     openModal(`<h2>協力任務</h2>
@@ -598,7 +605,6 @@ function openCoopTask(taskId, taskButtons=""){
                 <div class="small">全員完成後，每位成員獲得 🪙 ${task.reward}</div>
             </div>
             <div class="coop-side coop-side-members">
-                <h3>成員出擊</h3>
                 <div class="coop-members">${members}</div>
             </div>
         </div>`);
