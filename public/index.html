@@ -45,7 +45,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .coop-side-members .coop-members{grid-template-columns:repeat(10,minmax(80px,1fr));gap:8px}
 .coop-side-members .coop-member{padding:6px;box-shadow:3px 3px 0 #172033}
 .coop-side-members .coop-member span{font-size:13px;margin-top:3px}
-@media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0;height:auto}.coop-side-members{display:block}.coop-side-members .coop-members{grid-template-columns:repeat(10,minmax(36px,1fr));gap:5px}.panel{padding:14px}}
+@media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0;height:auto}.coop-side-members{display:block}.coop-side-members .coop-members{grid-template-columns:repeat(7,minmax(42px,1fr));gap:6px}.panel{padding:14px}}
 .coop-monster{text-align:center;margin:8px auto 18px;padding:14px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
 .coop-monster img{display:block;width:min(220px,70vw);height:180px;object-fit:contain;margin:8px auto}
 .coop-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:12px}
@@ -357,7 +357,15 @@ async function shareGame(){
             return;
         }
 
-        window.prompt("瀏覽器未授權原生分享，請手動複製以下完整連結：",url);
+        const copyBox = document.createElement("textarea");
+        copyBox.value = url;
+        copyBox.style.position = "fixed";
+        copyBox.style.opacity = "0";
+        document.body.appendChild(copyBox);
+        copyBox.select();
+        document.execCommand("copy");
+        copyBox.remove();
+        alert("分享連結已複製，請貼到通訊軟體分享。");
     }catch(error){
         console.error("分享失敗",error);
         alert(`分享失敗：${error.message||"請改用複製連結"}`);
