@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>We are 5 甲</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans TC",system-ui,sans-serif;background:#f8f4ff;color:#403b4d}
+.bg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;background-repeat:no-repeat}
+header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #eee;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1,h2,h3{margin-top:0}
+.wrap{max-width:1450px;margin:auto;padding:20px}
+button{border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;background:#eadfff;color:#44375f}
+button:hover{filter:brightness(0.97)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{background:#d5f1df}
+.danger{background:#ffdede}
+.warning{background:#fff4cc}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px}
+.card{padding:0;background:transparent;border:none;box-shadow:none;text-align:center}
+.avatar{width:100%;aspect-ratio:9/16;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:64px;overflow:hidden;position:relative;background:#f3eff8}
+.avatar .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center;pointer-events:none}
+.avatar .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
+.avatar .layout-item{position:absolute;inset:0;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
+
+.num{font-size:22px;font-weight:800;margin-top:10px;display:inline-block}
+.tokens{font-size:20px;font-weight:800;margin-top:4px;display:inline-block;margin-left:8px;color:#b58835}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:12px}
+.actions button{padding:9px 4px;font-size:13px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;padding:18px;z-index:30}
+.modal.open{display:flex}
+.panel{width:min(1100px,100%);max-height:92vh;overflow:auto;padding:22px;background:#fff;border-radius:22px}
+.close{float:right;background:#eee}
+.small{font-size:13px;color:#777}
+.empty{text-align:center;padding:30px;color:#777}
+.shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:13px}
+.product{border:1px solid #eee;border-radius:17px;padding:10px;text-align:center;background:#fff}
+
+/* 已移除棋盤格，背景設透明 */
+.pic{
+    height:155px;
+    border-radius:13px;
+    background:transparent;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    margin-bottom:9px;
+}
+.pic img{
+    max-width:100%;
+    max-height:100%;
+    object-fit:contain;
+    background:transparent;
+}
+
+.price{font-weight:900;margin:7px 0;color:#b58835}
+.owned{font-size:13px}
+.row{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid #eee;border-radius:14px;margin:8px 0;flex-wrap:wrap}
+.row .grow{flex:1;min-width:180px}
+input{border:1px solid #ddd;border-radius:9px;padding:9px}
+input[type="file"]{padding:4px}
+label{font-weight:700}
+input[type="number"]{width:85px}
+.tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.tab{background:#eee;border:0;border-radius:10px;padding:8px 14px;cursor:pointer}
+.tab.active{background:#d5f1df}
+.warn{color:#c23030;font-weight:bold}
+.info{color:#3078c2}
+.task-stat{font-size:14px;margin:4px 0;color:#555}
+.student-list{font-size:13px;line-height:1.6;padding:6px 8px;background:#f8f8f8;border-radius:8px;margin-top:6px;word-break:break-all}
+.edit-item-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.edit-item-row input{flex:1;min-width:120px}
+.dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
+</style>
+<!-- update the version number as needed -->
+    <script defer src="/__/firebase/12.19.0/firebase-app-compat.js"></script>
+    <!-- include only the Firebase features as you need -->
+    <script defer src="/__/firebase/12.19.0/firebase-auth-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-database-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-firestore-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-functions-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-messaging-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-storage-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-analytics-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-remote-config-compat.js"></script>
+    <script defer src="/__/firebase/12.19.0/firebase-performance-compat.js"></script>
+    <!-- 
+      initialize the SDK after all desired features are loaded, set useEmulator to false
+      to avoid connecting the SDK to running emulators.
+    -->
+    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+
+    <style media="screen">
+      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
+      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
+      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
+      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
+      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
+      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
+      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
+      @media (max-width: 600px) {
+        body, #message { margin-top: 0; background: white; box-shadow: none; }
+        body { border-top: 16px solid #ffa100; }
+      }
+    </style>
+</head>
+<body>
+<div class="bg" id="userBg"></div>
+
+<header>
+<h1>We are 5 甲</h1>
+<div>
+<button onclick="openBackend()">老師後台</button>
+<button onclick="save()">儲存</button>
+<span class="small" id="saveStatus"></span>
+</div>
+</header>
+
+<div class="wrap">
+<div id="students" class="grid"></div>
+</div>
+
+<div id="modal" class="modal">
+<div class="panel">
+<button class="close" onclick="closeModal()">關閉</button>
+<div id="body"></div>
+</div>
+</div>
+
+<script>
+const STORAGE_KEY = "growth26_v18_full";
+const MAX_IMG_SIZE = 800;
+const IMG_QUALITY = 0.7;
+const STORAGE_LIMIT = 5 * 1024 * 1024;
+const DEFAULT_PRICE = 50;
+
+let raw = localStorage.getItem(STORAGE_KEY);
+let state = raw ? JSON.parse(raw) : null;
+let unsavedChange = false;
+let autoSaveTimer = null;
+let lastShopTab = "clothes"; //記錄商店頁籤
+
+if(!state){
+    state = {
+        students: Array.from({length:26}, (_,i)=>({
+            id:i+1, gender: i<12 ? "M" : "F",
+            tokens:0, doneTasks:[],
+            ownedClothes:[], equippedClothes:null,
+            ownedLayout:[], equippedLayout:[],
+            ownedBg:[], equippedBg:null
+        })),
+        tasks: [
+            {id:"t1", title:"完成今日作業", reward:20},
+            {id:"t2", title:"完成數學練習", reward:30},
+            {id:"t3", title:"幫助同學一次", reward:40}
+        ],
+        clothesM:[],
+        clothesF:[],
+        layouts:[],
+        backgrounds:[],
+        globalBgImage:"",
+        lastSaved:null
+    };
+}else{
+    if(!state.clothesM) state.clothesM=[];
+    if(!state.clothesF) state.clothesF=[];
+    if(!Array.isArray(state.layouts)) state.layouts=[];
+    if(!Array.isArray(state.backgrounds)) state.backgrounds=[];
+    if(!state.tasks) state.tasks = [];
+    state.students.forEach(s=>{
+        if(!s.gender) s.gender = s.id<=12?"M":"F";
+        if(!Array.isArray(s.equippedLayout)) s.equippedLayout = [];
+        if(!Array.isArray(s.ownedClothes)) s.ownedClothes = [];
+        if(!Array.isArray(s.ownedLayout)) s.ownedLayout = [];
+        if(!Array.isArray(s.ownedBg)) s.ownedBg = [];
+        if(!Array.isArray(s.doneTasks)) s.doneTasks = [];
+    });
+}
+
+function markChanged(){
+    unsavedChange = true;
+    document.getElementById("saveStatus").textContent = "⚠️有未儲存變更";
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(()=>{ save(); },5000);
+}
+
+window.addEventListener("beforeunload", e=>{
+    if(unsavedChange){
+        e.preventDefault();
+        e.returnValue = "尚有未儲存的資料！建議先儲存再離開。";
+        return e.returnValue;
+    }
+});
+
+function makeItemId(){
+    return "item_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+}
+function makeTaskId(){
+    return "t_"+Date.now()+"_"+Math.random().toString(36).slice(2,6);
+}
+
+async function compressImage(file, maxSize, quality){
+    return new Promise((resolve,reject)=>{
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = ()=>{
+            URL.revokeObjectURL(url);
+            let w = img.width, h = img.height;
+            if(w>maxSize || h>maxSize){
+                const scale = maxSize / Math.max(w,h);
+                w = Math.round(w*scale);
+                h = Math.round(h*scale);
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0,0,w,h);
+            ctx.drawImage(img,0,0,w,h);
+            if(file.type==="image/png" || file.name.toLowerCase().endsWith(".png")){
+                resolve(canvas.toDataURL("image/png"));
+            }else{
+                resolve(canvas.toDataURL("image/jpeg", quality));
+            }
+        };
+        img.onerror = ()=>{
+            URL.revokeObjectURL(url);
+            reject(new Error("圖片解碼失敗"));
+        };
+        img.src = url;
+    });
+}
+
+function getStorageUsage(){
+    const json = JSON.stringify(state);
+    return new Blob([json]).size;
+}
+
+function save(){
+    try{
+        state.lastSaved = new Date().toLocaleString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        unsavedChange = false;
+        document.getElementById("saveStatus").textContent = "✅已儲存";
+        return true;
+    }catch(e){
+        if(e.name === "QuotaExceededError"){
+            alert("⚠️ 儲存空間已滿！無法儲存新項目。\n請刪除一些舊商品或匯出備份後重置。");
+        }else{
+            alert("儲存失敗："+e.message);
+        }
+        return false;
+    }
+}
+
+function esc(x){
+    return String(x).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function applyGlobalBg(){
+    const el = document.getElementById("userBg");
+    if(state.globalBgImage){
+        el.style.backgroundImage = `url(${esc(state.globalBgImage)})`;
+    }else{
+        el.style.backgroundImage = "";
+    }
+}
+
+function render(){
+    const html = state.students.map(s=>{
+        const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
+        const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
+        const eqCloth = clothPool.find(x=>x.id===s.equippedClothes);
+        const activeLayouts = state.layouts.filter(x=>s.equippedLayout.includes(x.id));
+
+        let bgHtml = eqBg ? `<div class="bg-layer" style="background-image:url('${esc(eqBg.image)}')"></div>` : "";
+        let charHtml;
+        if(eqCloth?.image){
+            charHtml = `<div class="character" style="background-image:url('${esc(eqCloth.image)}')"></div>`;
+        }else{
+            charHtml = s.gender==="M" ? "👦" : "👧";
+        }
+        const layHtml = activeLayouts.map((p,i)=>
+            `<div class="layout-item" style="z-index:${3+i};background-image:url('${esc(p.image)}')"></div>`
+        ).join("");
+
+        return `<div class="card">
+            <div class="avatar">${bgHtml}${charHtml}${layHtml}</div>
+            <div>
+                <span class="num">${s.id}號 ${s.gender==="M"?"♂":"♀"}</span>
+                <span class="tokens">🪙 ${s.tokens}</span>
+            </div>
+            <div class="actions">
+                <button onclick="tasks(${s.id})">任務</button>
+                <button onclick="shop(${s.id})">商店</button>
+                <button onclick="closet(${s.id})">衣櫃</button>
+            </div>
+        </div>`;
+    }).join("");
+    document.getElementById("students").innerHTML = html;
+    applyGlobalBg();
+}
+
+function openModal(content){
+    document.getElementById("body").innerHTML = content||"";
+    document.getElementById("modal").classList.add("open");
+}
+
+function closeModal(){
+    document.getElementById("body").innerHTML = "";
+    document.getElementById("modal").classList.remove("open");
+}
+
+//學生端任務
+function tasks(id){
+    const s = state.students[id-1];
+    const todo = state.tasks.filter(t=>!s.doneTasks.includes(t.id));
+    openModal(`
+        <h2>${id}號｜任務</h2>
+        ${todo.length ? todo.map(t=>`
+        <div class="row">
+            <div class="grow"><b>${esc(t.title)}</b><div class="small">完成可獲得 ${t.reward} 代幣</div></div>
+            <button class="primary" onclick="finishTask(${id},'${esc(t.id)}')">完成</button>
+        </div>`).join("") : `<div class="empty">🎉 全部任務已完成！</div>`}
+    `);
+}
+function finishTask(id,tid){
+    const s = state.students[id-1];
+    const t = state.tasks.find(x=>x.id===tid);
+    if(!t || s.doneTasks.includes(tid)) return;
+    s.doneTasks.push(tid);
+    s.tokens += t.reward;
+    markChanged(); save();render();tasks(id);
+}
+
+//商店
+function clothCard(id,p){
+    const s = state.students[id-1];
+    const own = s.ownedClothes.includes(p.id);
+    return `<div class="product">
+        <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"👗"}</div>
+        <b>${esc(p.name)}</b>
+        <div class="price">🪙 ${p.price}</div>
+        <div class="owned">${own?"✓已擁有":`<button onclick="buyCloth(${id},'${esc(p.id)}')">購買</button>`}</div>
+    </div>`;
+}
+function layCard(id,p){
+    const s = state.students[id-1];
+    const own = s.ownedLayout.includes(p.id);
+    return `<div class="product">
+        <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"✨"}</div>
+        <b>${esc(p.name)}</b>
+        <div class="price">🪙 ${p.price}</div>
+        <div class="owned">${own?"✓已擁有":`<button onclick="buyLayout(${id},'${esc(p.id)}')">購買</button>`}</div>
+    </div>`;
+}
+function bgCard(id,p){
+    const s = state.students[id-1];
+    const own = s.ownedBg.includes(p.id);
+    return `<div class="product">
+        <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"🖼"}</div>
+        <b>${esc(p.name)}</b>
+        <div class="price">🪙 ${p.price}</div>
+        <div class="owned">${own?"✓已擁有":`<button onclick="buyBg(${id},'${esc(p.id)}')">購買</button>`}</div>
+    </div>`;
+}
+
+function shop(id){
+    openModal(`<h2>${id}號｜商店</h2>
+    <div class="tabs">
+        <button class="tab" onclick="switchShopTab(${id},'clothes')">服裝</button>
+        <button class="tab" onclick="switchShopTab(${id},'layouts')">佈置</button>
+        <button class="tab" onclick="switchShopTab(${id},'bgs')">背景</button>
+    </div>
+    <div id="shopTabContent"></div>`);
+    switchShopTab(id, lastShopTab);
+}
+function switchShopTab(id,tab){
+    lastShopTab = tab;
+    const s = state.students[id-1];
+    const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
+    let html="";
+    if(tab==="clothes") html=`<div class="shopgrid">${clothPool.map(p=>clothCard(id,p)).join("")||`<div class="empty">尚無服裝</div>`}</div>`;
+    if(tab==="layouts") html=`<div class="shopgrid">${state.layouts.map(p=>layCard(id,p)).join("")||`<div class="empty">尚無佈置</div>`}</div>`;
+    if(tab==="bgs") html=`<div class="shopgrid">${state.backgrounds.map(p=>bgCard(id,p)).join("")||`<div class="empty">尚無背景</div>`}</div>`;
+    document.getElementById("shopTabContent").innerHTML = html;
+    document.querySelectorAll(".tab").forEach((el,i)=>{
+        el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
+    });
+}
+
+function buyCloth(id,pid){
+    const s = state.students[id-1];
+    const pool = s.gender==="M"?state.clothesM:state.clothesF;
+    const item = pool.find(x=>x.id===pid);
+    if(!item || s.ownedClothes.includes(pid)) return;
+    if(s.tokens < item.price){ alert("代幣不足！"); return; }
+    s.tokens -= item.price; s.ownedClothes.push(pid);
+    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+}
+function buyLayout(id,pid){
+    const s = state.students[id-1];
+    const item = state.layouts.find(x=>x.id===pid);
+    if(!item || s.ownedLayout.includes(pid)) return;
+    if(s.tokens < item.price){ alert("代幣不足！"); return; }
+    s.tokens -= item.price; s.ownedLayout.push(pid);
+    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+}
+function buyBg(id,pid){
+    const s = state.students[id-1];
+    const item = state.backgrounds.find(x=>x.id===pid);
+    if(!item || s.ownedBg.includes(pid)) return;
+    if(s.tokens < item.price){ alert("代幣不足！"); return; }
+    s.tokens -= item.price; s.ownedBg.push(pid);
+    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+}
+
+//衣櫃
+function closet(id){
+    openModal(`<h2>${id}號｜衣櫃</h2>
+    <div class="tabs">
+        <button class="tab active" onclick="switchClosetTab(${id},'clothes')">服裝</button>
+        <button class="tab" onclick="switchClosetTab(${id},'layouts')">佈置</button>
+        <button class="tab" onclick="switchClosetTab(${id},'bgs')">背景</button>
+    </div>
+    <div id="closetTabContent"></div>`);
+    switchClosetTab(id,"clothes");
+}
+function switchClosetTab(id,tab){
+    const s = state.students[id-1];
+    const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
+    let html="";
+    if(tab==="clothes"){
+        const list = clothPool.filter(x=>s.ownedClothes.includes(x.id));
+        html = `<div class="shopgrid">${list.map(p=>`<div class="product">
+            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"👗"}</div>
+            <b>${esc(p.name)}</b>
+            <div><button onclick="equipClothes(${id},'${esc(p.id)}')">${s.equippedClothes===p.id?"脫下":"穿上"}</button></div>
+        </div>`).join("")||`<div class="empty">還沒有服裝</div>`}</div>`;
+    }
+    if(tab==="layouts"){
+        const list = state.layouts.filter(x=>s.ownedLayout.includes(x.id));
+        html = `<div class="shopgrid">${list.map(p=>`<div class="product">
+            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"✨"}</div>
+            <b>${esc(p.name)}</b>
+            <div><button onclick="toggleEquipLayout(${id},'${esc(p.id)}')">${s.equippedLayout.includes(p.id)?"卸下":"配戴"}</button></div>
+        </div>`).join("")||`<div class="empty">還沒有佈置</div>`}</div>`;
+    }
+    if(tab==="bgs"){
+        const list = state.backgrounds.filter(x=>s.ownedBg.includes(x.id));
+        html = `<div class="shopgrid">${list.map(p=>`<div class="product">
+            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🖼"}</div>
+            <b>${esc(p.name)}</b>
+            <div><button onclick="equipBg(${id},'${esc(p.id)}')">${s.equippedBg===p.id?"移除":"設為背景"}</button></div>
+        </div>`).join("")||`<div class="empty">還沒有背景</div>`}</div>`;
+    }
+    document.getElementById("closetTabContent").innerHTML = html;
+    document.querySelectorAll(".tab").forEach((el,i)=>{
+        el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
+    });
+}
+function equipClothes(id,pid){
+    const s = state.students[id-1];
+    s.equippedClothes = (s.equippedClothes===pid) ? null : pid;
+    markChanged(); save();render();closet(id);
+}
+function toggleEquipLayout(id,pid){
+    const s = state.students[id-1];
+    const arr = s.equippedLayout;
+    if(arr.includes(pid)){
+        s.equippedLayout = arr.filter(x=>x!==pid);
+    }else{
+        s.equippedLayout.push(pid);
+    }
+    markChanged(); save();render();closet(id);
+}
+function equipBg(id,pid){
+    const s = state.students[id-1];
+    s.equippedBg = (s.equippedBg===pid) ? null : pid;
+    markChanged(); save();render();closet(id);
+}
+
+//後台
+openBackend = function(){
+    openModal(`
+    <h2>登入後台</h2>
+    <div class="row">
+        <label>管理密碼：</label>
+        <input type="password" id="backendPw">
+    </div>
+    <div class="row">
+        <button class="primary" onclick="checkBackendPw()">登入</button>
+        <button onclick="closeModal()">取消</button>
+    </div>
+    `);
+}
+async function checkBackendPw(){
+    const pw = document.getElementById("backendPw").value;
+    if(pw === "1127"){
+        closeModal();
+        await backend();
+    }else{
+        alert("密碼錯誤！");
+        closeModal();
+    }
+}
+
+async function backend(){
+    const used = getStorageUsage();
+    const usedMb = (used/1024/1024).toFixed(2);
+    const full = used > STORAGE_LIMIT * 0.9;
+
+    //任務統計
+    let taskListHtml = state.tasks.map(t=>{
+        const doneStudents = state.students.filter(s=>s.doneTasks.includes(t.id));
+        const undoneStudents = state.students.filter(s=>!s.doneTasks.includes(t.id));
+        const doneIds = doneStudents.map(s=>s.id+"號").join("、");
+        const undoneIds = undoneStudents.map(s=>s.id+"號").join("、");
+        return `
+        <div class="row">
+            <div class="grow">
+                <b>${esc(t.title)}</b> <span class="small">(獎勵 ${t.reward} 🪙)</span>
+                <div class="task-stat">✅已完成：${doneStudents.length} / ${state.students.length}</div>
+                <div class="student-list">已完成：${doneIds||"無"}</div>
+                <div class="student-list">未完成：${undoneIds||"全部完成"}</div>
+            </div>
+            <button class="danger" onclick="deleteTask('${esc(t.id)}')">刪除任務</button>
+        </div>`;
+    }).join("") || `<div class="empty">尚無任務</div>`;
+
+    //商品清單 + **可編輯名稱、價格**
+    let mClothHtml = state.clothesM.map(p=>`
+    <div class="row">
+        <div class="grow">
+            <div class="edit-item-row">
+                <input value="${esc(p.name)}" onchange="updateItemName('clothesM','${esc(p.id)}',this.value)" placeholder="名稱">
+                <input type="number" value="${p.price}" onchange="updateItemPrice('clothesM','${esc(p.id)}',Number(this.value))" style="width:90px">
+            </div>
+        </div>
+        <button class="danger" onclick="deleteItem('clothesM','${esc(p.id)}')">刪除</button>
+    </div>`).join("")||"<div class='small'>無男生服裝</div>";
+
+    let fClothHtml = state.clothesF.map(p=>`
+    <div class="row">
+        <div class="grow">
+            <div class="edit-item-row">
+                <input value="${esc(p.name)}" onchange="updateItemName('clothesF','${esc(p.id)}',this.value)" placeholder="名稱">
+                <input type="number" value="${p.price}" onchange="updateItemPrice('clothesF','${esc(p.id)}',Number(this.value))" style="width:90px">
+            </div>
+        </div>
+        <button class="danger" onclick="deleteItem('clothesF','${esc(p.id)}')">刪除</button>
+    </div>`).join("")||"<div class='small'>無女生服裝</div>";
+
+    let layHtml = state.layouts.map(p=>`
+    <div class="row">
+        <div class="grow">
+            <div class="edit-item-row">
+                <input value="${esc(p.name)}" onchange="updateItemName('layouts','${esc(p.id)}',this.value)" placeholder="名稱">
+                <input type="number" value="${p.price}" onchange="updateItemPrice('layouts','${esc(p.id)}',Number(this.value))" style="width:90px">
+            </div>
+        </div>
+        <button class="danger" onclick="deleteItem('layouts','${esc(p.id)}')">刪除</button>
+    </div>`).join("")||"<div class='small'>無佈置物件</div>";
+
+    let bgHtml = state.backgrounds.map(p=>`
+    <div class="row">
+        <div class="grow">
+            <div class="edit-item-row">
+                <input value="${esc(p.name)}" onchange="updateItemName('backgrounds','${esc(p.id)}',this.value)" placeholder="名稱">
+                <input type="number" value="${p.price}" onchange="updateItemPrice('backgrounds','${esc(p.id)}',Number(this.value))" style="width:90px">
+            </div>
+        </div>
+        <button class="danger" onclick="deleteItem('backgrounds','${esc(p.id)}')">刪除</button>
+    </div>`).join("")||"<div class='small'>無可購買背景</div>";
+
+    openModal(`
+    <h2>老師後台</h2>
+    <div class="row">
+        <div class="grow">
+            <div class="info">儲存空間：已用 ${usedMb} MB / 5 MB</div>
+            ${full ? `<div class="warn">⚠️ 空間即將滿！建議刪除不用的商品</div>`:""}
+        </div>
+        <button onclick="exportData()">匯出備份</button>
+        <button class="warning" onclick="document.getElementById('importFile').click()">匯入備份</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+    </div>
+
+    <h3>任務管理</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="newTaskTitle" placeholder="新任務名稱">
+            <input id="newTaskReward" type="number" placeholder="代幣" style="width:90px">
+        </div>
+        <button class="primary" onclick="addTask()">新增任務</button>
+    </div>
+    ${taskListHtml}
+
+    <h3>單號代幣調整｜給予 / 扣除</h3>
+    <div class="row">
+        <label>學生號碼：<input id="targetStuId" type="number" min="1"></label>
+        <label>數值：<input id="deltaToken" type="number" value="10"></label>
+        <button class="primary" onclick="addTokenOne()">➕給予代幣</button>
+        <button class="danger" onclick="subTokenOne()">➖扣除代幣</button>
+    </div>
+
+    <h3>成員管理</h3>
+    <div class="row">
+        <label>總人數：<input id="stuCount" type="number" min="1" value="${state.students.length}"></label>
+        <button onclick="resizeStudentList()">調整人數</button>
+    </div>
+    <div class="small">點擊號碼可直接覆蓋設定代幣</div>
+    <div class="row" style="flex-wrap:wrap;gap:6px">
+    ${state.students.map(s=>
+        `<button onclick="editToken(${s.id})" style="padding:4px 8px">${s.id}號 ${s.gender==="M"?"♂":"♀"} 🪙${s.tokens}</button>`
+    ).join("")}
+    </div>
+
+    <h3>代幣批量管理</h3>
+    <div class="row">
+        <label>全體學生代幣：<input id="batchToken" type="number" value="0"></label>
+        <button onclick="addTokenAll()">全體增加</button>
+        <button class="danger" onclick="setTokenAll()">全體設定為</button>
+    </div>
+
+    <h3>新增商品 - 男生服裝（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="mName" placeholder="名稱">
+            <input id="mPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <input type="file" id="mImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addClothM()">新增</button>
+    </div>
+    <h3>男生服裝｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="mImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddClothM()">批量新增男生服裝</button>
+    </div>
+    ${mClothHtml}
+
+    <h3>新增商品 - 女生服裝（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="fName" placeholder="名稱">
+            <input id="fPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <input type="file" id="fImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addClothF()">新增</button>
+    </div>
+    <h3>女生服裝｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="fImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddClothF()">批量新增女生服裝</button>
+    </div>
+    ${fClothHtml}
+
+    <h3>新增商品 - 佈置小物（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="layName" placeholder="名稱">
+            <input id="layPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <input type="file" id="layImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addLayout()">新增</button>
+    </div>
+    <h3>佈置小物｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="layImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddLayout()">批量新增佈置</button>
+    </div>
+    ${layHtml}
+
+    <h3>新增商品 - 可購買背景（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="bgName" placeholder="名稱">
+            <input id="bgPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <input type="file" id="bgImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addBgItem()">新增</button>
+    </div>
+    <h3>可購買背景｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="bgImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddBg()">批量新增背景</button>
+    </div>
+    ${bgHtml}
+
+    <h3>全域背景（全班頁面大背景，非學生角色背景）</h3>
+    <div class="row">
+        <input type="file" id="globalBgFile" accept="image/*">
+        <button class="primary" onclick="setGlobalBg()">設定全域背景</button>
+        <button class="danger" onclick="clearGlobalBg()">清除全域背景</button>
+    </div>
+
+    <div class="dangerzone">
+        <h3 class="warn">⚠️ 危險區域（資料清除）</h3>
+        <div class="small">建議先「匯出備份」再執行！動作無法復原</div>
+        <div class="row">
+            <button class="danger" onclick="wipeStorage()">刪除本遊戲全部儲存資料</button>
+            <button class="warning" onclick="resetGame()">重置遊戲回預設初始狀態</button>
+        </div>
+    </div>
+    `);
+}
+
+//【危險功能：清空記憶體 / 重置遊戲】
+function wipeStorage(){
+    if(!confirm("⚠️ 第一次確認：將刪除五年甲班換裝遊戲所有本機儲存！\n資料會消失！建議先匯出備份！")) return;
+    if(!confirm("🔥 第二次確認！真的要全部刪除嗎？無法復原！")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    alert("已刪除儲存！頁面即將重新載入");
+    location.reload();
+}
+function resetGame(){
+    if(!confirm("⚠️ 第一次確認：重置回遊戲預設初始狀態，自訂服裝、代幣全部清空！")) return;
+    if(!confirm("🔥 第二次確認！確定重置？")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    state = null;
+    raw = null;
+    state = {
+        students: Array.from({length:26}, (_,i)=>({
+            id:i+1, gender: i<12 ? "M" : "F",
+            tokens:0, doneTasks:[],
+            ownedClothes:[], equippedClothes:null,
+            ownedLayout:[], equippedLayout:[],
+            ownedBg:[], equippedBg:null
+        })),
+        tasks: [
+            {id:"t1", title:"完成今日作業", reward:20},
+            {id:"t2", title:"完成數學練習", reward:30},
+            {id:"t3", title:"幫助同學一次", reward:40}
+        ],
+        clothesM:[], clothesF:[], layouts:[], backgrounds:[],
+        globalBgImage:"", lastSaved:null
+    };
+    save();
+    render();
+    closeModal();
+    alert("已重置回遊戲初始狀態！");
+}
+
+//修改商品名稱、價格
+function updateItemName(listName,id,newName){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item) return;
+    item.name = newName.trim()||"未命名";
+    markChanged(); save(); backend();
+}
+function updateItemPrice(listName,id,newPrice){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item || isNaN(newPrice) || newPrice<0) return;
+    item.price = newPrice;
+    markChanged(); save(); backend();
+}
+
+//批量新增工具函式
+async function batchUploadFiles(fileList, targetArray, prefixName){
+    for(let i=0;i<fileList.length;i++){
+        const file = fileList[i];
+        const imgData = await compressImage(file, MAX_IMG_SIZE, IMG_QUALITY);
+        targetArray.push({
+            id: makeItemId(),
+            name: `${prefixName} ${i+1}`,
+            price: DEFAULT_PRICE,
+            image: imgData
+        });
+    }
+    markChanged(); save(); backend();
+}
+
+async function batchAddClothM(){
+    const files = document.getElementById("mImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.clothesM, "男生服裝");
+}
+async function batchAddClothF(){
+    const files = document.getElementById("fImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.clothesF, "女生服裝");
+}
+async function batchAddLayout(){
+    const files = document.getElementById("layImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.layouts, "佈置");
+}
+async function batchAddBg(){
+    const files = document.getElementById("bgImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.backgrounds, "背景");
+}
+
+//任務
+function addTask(){
+    const title = document.getElementById("newTaskTitle").value.trim();
+    const reward = Number(document.getElementById("newTaskReward").value)||0;
+    if(!title){alert("請輸入任務名稱");return;}
+    state.tasks.push({
+        id: makeTaskId(),
+        title: title,
+        reward: reward
+    });
+    markChanged(); save(); backend();
+}
+function deleteTask(tid){
+    if(!confirm("確定刪除這個任務？已完成紀錄會一併失效。")) return;
+    state.tasks = state.tasks.filter(t=>t.id!==tid);
+    markChanged(); save(); backend();
+}
+
+//學生
+function editToken(id){
+    const s = state.students[id-1];
+    const val = prompt(`覆蓋設定${id}號代幣，現在：${s.tokens}`, s.tokens);
+    if(val===null) return;
+    const n = Number(val);
+    if(isNaN(n)) return alert("請輸入數字");
+    s.tokens = n;
+    markChanged(); save(); render(); backend();
+}
+function addTokenOne(){
+    const sid = Number(document.getElementById("targetStuId").value);
+    const delta = Number(document.getElementById("deltaToken").value);
+    if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
+    state.students[sid-1].tokens += delta;
+    markChanged(); save(); render(); backend();
+}
+function subTokenOne(){
+    const sid = Number(document.getElementById("targetStuId").value);
+    const delta = Number(document.getElementById("deltaToken").value);
+    if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
+    state.students[sid-1].tokens -= delta;
+    markChanged(); save(); render(); backend();
+}
+
+function resizeStudentList(){
+    const n = Number(document.getElementById("stuCount").value);
+    if(!n || n<1) return;
+    if(n>state.students.length){
+        for(let i=state.students.length;i<n;i++){
+            state.students.push({
+                id:i+1, gender:i%2===0?"M":"F",
+                tokens:0, doneTasks:[],
+                ownedClothes:[], equippedClothes:null,
+                ownedLayout:[], equippedLayout:[],
+                ownedBg:[], equippedBg:null
+            });
+        }
+    }else{
+        state.students.splice(n);
+    }
+    markChanged(); save(); render(); backend();
+}
+function addTokenAll(){
+    const v = Number(document.getElementById("batchToken").value)||0;
+    state.students.forEach(s=>s.tokens+=v);
+    markChanged(); save(); render(); backend();
+}
+function setTokenAll(){
+    const v = Number(document.getElementById("batchToken").value)||0;
+    state.students.forEach(s=>s.tokens=v);
+    markChanged(); save(); render(); backend();
+}
+
+//新增商品（單張）
+async function addClothM(){
+    const name = document.getElementById("mName").value.trim();
+    const price = Number(document.getElementById("mPrice").value)||DEFAULT_PRICE;
+    const file = document.getElementById("mImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.clothesM.push({id:makeItemId(),name,price,image:img});
+    markChanged(); save(); backend();
+}
+async function addClothF(){
+    const name = document.getElementById("fName").value.trim();
+    const price = Number(document.getElementById("fPrice").value)||DEFAULT_PRICE;
+    const file = document.getElementById("fImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.clothesF.push({id:makeItemId(),name,price,image:img});
+    markChanged(); save(); backend();
+}
+async function addLayout(){
+    const name = document.getElementById("layName").value.trim();
+    const price = Number(document.getElementById("layPrice").value)||DEFAULT_PRICE;
+    const file = document.getElementById("layImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.layouts.push({id:makeItemId(),name,price,image:img});
+    markChanged(); save(); backend();
+}
+async function addBgItem(){
+    const name = document.getElementById("bgName").value.trim();
+    const price = Number(document.getElementById("bgPrice").value)||DEFAULT_PRICE;
+    const file = document.getElementById("bgImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.backgrounds.push({id:makeItemId(),name,price,image:img});
+    markChanged(); save(); backend();
+}
+function deleteItem(listName,id){
+    if(!confirm("刪除此商品！學生已經買走的不會被回收。")) return;
+    state[listName] = state[listName].filter(x=>x.id!==id);
+    markChanged(); save(); backend();
+}
+
+//全域背景
+async function setGlobalBg(){
+    const file = document.getElementById("globalBgFile").files[0];
+    if(!file) return;
+    state.globalBgImage = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    markChanged(); save(); applyGlobalBg(); backend();
+}
+function clearGlobalBg(){
+    state.globalBgImage = "";
+    markChanged(); save(); applyGlobalBg(); backend();
+}
+
+//備份匯入匯出
+function exportData(){
+    const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `五年甲班換裝遊戲_備份_${new Date().toLocaleDateString()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+async function importData(input){
+    const f = input.files[0];
+    if(!f) return;
+    const txt = await f.text();
+    try{
+        const newState = JSON.parse(txt);
+        if(!newState.students) throw new Error("檔案不是有效的備份");
+        if(!confirm("⚠️ 將覆蓋目前所有資料！建議先匯出備份！確定嗎？")) return;
+        state = newState;
+        markChanged(); save(); render(); backend();
+        alert("匯入成功！");
+    }catch(e){
+        alert("匯入失敗："+e.message);
+    }
+}
+
+//初始化
+render();
+</script>
+<script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const loadEl = document.querySelector('#load');
+        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+        // // The Firebase SDK is initialized and available here!
+        //
+        // firebase.auth().onAuthStateChanged(user => { });
+        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
+        // firebase.firestore().doc('/foo/bar').get().then(() => { });
+        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
+        // firebase.messaging().requestPermission().then(() => { });
+        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
+        // firebase.analytics(); // call to activate
+        // firebase.analytics().logEvent('tutorial_completed');
+        // firebase.performance(); // call to activate
+        //
+        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+
+        try {
+          let app = firebase.app();
+          let features = [
+            'auth', 
+            'database', 
+            'firestore',
+            'functions',
+            'messaging', 
+            'storage', 
+            'analytics', 
+            'remoteConfig',
+            'performance',
+          ].filter(feature => typeof app[feature] === 'function');
+          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
+        } catch (e) {
+          console.error(e);
+          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
+        }
+      });
+    </script>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
+    authDomain: "classroom-115.firebaseapp.com",
+    projectId: "classroom-115",
+    storageBucket: "classroom-115.firebasestorage.app",
+    messagingSenderId: "242136273912",
+    appId: "1:242136273912:web:8bd1b43dc7d8ecc698fc0d"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
+</body>
+</html>
+
+
+
+
+
