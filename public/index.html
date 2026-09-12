@@ -76,6 +76,8 @@ input[type="number"]{width:85px}
 .dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
 .backend-nav{position:sticky;top:0;z-index:3;display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px;padding:12px;background:#34405c;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
 .backend-nav button{padding:8px 10px;font-size:13px}
+.backend-page{display:none}
+.backend-page.active{display:block}
 .task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
@@ -769,7 +771,8 @@ async function backend(){
         <button onclick="jumpBackend('backend-backgrounds')">背景</button>
         <button onclick="jumpBackend('backend-settings')">設定</button>
     </nav>
-    <div id="backend-overview" class="row">
+    <div id="backend-overview" class="backend-page active">
+      <div class="row">
         <div class="grow">
             <div class="info">儲存空間：已用 ${usedMb} MB / 5 MB</div>
             ${full ? `<div class="warn">⚠️ 空間即將滿！建議刪除不用的商品</div>`:""}
@@ -779,7 +782,10 @@ async function backend(){
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
     </div>
 
-    <h3 id="backend-tasks">任務管理</h3>
+      </div>
+    </div>
+    <section id="backend-tasks" class="backend-page">
+    <h3>任務管理</h3>
     <div class="row">
         <div class="grow">
             <input id="newTaskTitle" placeholder="新任務名稱">
@@ -790,7 +796,9 @@ async function backend(){
     </div>
     ${taskListHtml}
 
-    <h3 id="backend-tokens">單號代幣調整｜給予 / 扣除</h3>
+    </section>
+    <section id="backend-tokens" class="backend-page">
+    <h3>單號代幣調整｜給予 / 扣除</h3>
     <div class="row">
         <label>學生號碼：<input id="targetStuId" type="number" min="1"></label>
         <label>數值：<input id="deltaToken" type="number" value="10"></label>
@@ -798,7 +806,9 @@ async function backend(){
         <button class="danger" onclick="subTokenOne()">➖扣除代幣</button>
     </div>
 
-    <h3 id="backend-members">成員管理</h3>
+    </section>
+    <section id="backend-members" class="backend-page">
+    <h3>成員管理</h3>
     <div class="row">
         <label>總人數：<input id="stuCount" type="number" min="1" value="${state.students.length}"></label>
         <button onclick="resizeStudentList()">調整人數</button>
@@ -827,7 +837,9 @@ async function backend(){
         <button class="danger" onclick="setTokenAll()">全體設定為</button>
     </div>
 
-    <h3 id="backend-clothes-m">新增商品 - 男生服裝（單張上傳）</h3>
+    </section>
+    <section id="backend-clothes-m" class="backend-page">
+    <h3>新增商品 - 男生服裝（單張上傳）</h3>
     <div class="row">
         <div class="grow">
             <input id="mName" placeholder="名稱">
@@ -843,7 +855,9 @@ async function backend(){
     </div>
     ${mClothHtml}
 
-    <h3 id="backend-clothes-f">新增商品 - 女生服裝（單張上傳）</h3>
+    </section>
+    <section id="backend-clothes-f" class="backend-page">
+    <h3>新增商品 - 女生服裝（單張上傳）</h3>
     <div class="row">
         <div class="grow">
             <input id="fName" placeholder="名稱">
@@ -859,7 +873,9 @@ async function backend(){
     </div>
     ${fClothHtml}
 
-    <h3 id="backend-layouts">新增商品 - 佈置小物（單張上傳）</h3>
+    </section>
+    <section id="backend-layouts" class="backend-page">
+    <h3>新增商品 - 佈置小物（單張上傳）</h3>
     <div class="row">
         <div class="grow">
             <input id="layName" placeholder="名稱">
@@ -875,7 +891,9 @@ async function backend(){
     </div>
     ${layHtml}
 
-    <h3 id="backend-backgrounds">新增商品 - 可購買背景（單張上傳）</h3>
+    </section>
+    <section id="backend-backgrounds" class="backend-page">
+    <h3>新增商品 - 可購買背景（單張上傳）</h3>
     <div class="row">
         <div class="grow">
             <input id="bgName" placeholder="名稱">
@@ -891,7 +909,9 @@ async function backend(){
     </div>
     ${bgHtml}
 
-    <h3 id="backend-settings">全域背景（全班頁面大背景，非學生角色背景）</h3>
+    </section>
+    <section id="backend-settings" class="backend-page">
+    <h3>全域背景（全班頁面大背景，非學生角色背景）</h3>
     <div class="row">
         <input type="file" id="globalBgFile" accept="image/*">
         <button class="primary" onclick="setGlobalBg()">設定全域背景</button>
@@ -906,6 +926,7 @@ async function backend(){
             <button class="warning" onclick="resetGame()">重置遊戲回預設初始狀態</button>
         </div>
     </div>
+    </section>
     `);
 }
 
@@ -965,8 +986,12 @@ function dropItem(event,listName,targetId){
     markChanged(); save(); backend();
 }
 function jumpBackend(targetId){
+    document.querySelectorAll(".backend-page").forEach(page=>page.classList.remove("active"));
     const target = document.getElementById(targetId);
-    if(target) target.scrollIntoView({behavior:"smooth",block:"start"});
+    if(target){
+        target.classList.add("active");
+        target.scrollIntoView({behavior:"smooth",block:"start"});
+    }
 }
 
 function moveItem(listName,id,direction){
