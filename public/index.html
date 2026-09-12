@@ -1208,6 +1208,16 @@ function resetGame(){
     alert("已重置回遊戲初始狀態！");
 }
 
+//後台商品陣列對應到實際功能分頁
+function backendPageId(listName){
+    return {
+        clothesM:"backend-clothes-m",
+        clothesF:"backend-clothes-f",
+        layouts:"backend-layouts",
+        backgrounds:"backend-backgrounds"
+    }[listName] || "backend-overview";
+}
+
 //商品排序：調整陣列順序，商店會依此順序顯示
 let draggedItem = null;
 function dragItem(event,listName,id){
@@ -1225,7 +1235,7 @@ function dropItem(event,listName,targetId){
     const [item] = list.splice(fromIndex,1);
     list.splice(toIndex,0,item);
     draggedItem = null;
-    markChanged(); save(); refreshBackendPage("backend-" + listName);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
 function jumpBackend(targetId){
     document.querySelectorAll(".backend-page").forEach(page=>page.classList.remove("active"));
@@ -1236,7 +1246,9 @@ function jumpBackend(targetId){
     }
 }
 function refreshBackendPage(targetId){
-    backend().then(()=>jumpBackend(targetId));
+    return backend().then(()=>{
+        jumpBackend(targetId);
+    });
 }
 
 function selectCoopMonster(button,image){
@@ -1268,7 +1280,7 @@ function moveItem(listName,id,direction){
     const targetIndex = index + direction;
     if(index<0 || targetIndex<0 || targetIndex>=list.length) return;
     [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
-    markChanged(); save(); refreshBackendPage("backend-" + listName);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
 
 //修改商品名稱、價格
@@ -1276,20 +1288,20 @@ function updateItemName(listName,id,newName){
     const item = state[listName].find(x=>x.id===id);
     if(!item) return;
     item.name = newName.trim()||"未命名";
-    markChanged(); save(); refreshBackendPage("backend-" + listName);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
 function updateItemLevel(listName,id,newLevel){
     const item = state[listName].find(x=>x.id===id);
     if(!item || !LEVEL_PRICES[newLevel]) return;
     item.level = newLevel;
     item.price = priceForLevel(newLevel);
-    markChanged(); save(); refreshBackendPage("backend-" + listName);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
 function updateItemPrice(listName,id,newPrice){
     const item = state[listName].find(x=>x.id===id);
     if(!item || isNaN(newPrice) || newPrice<0) return;
     item.price = newPrice;
-    markChanged(); save(); refreshBackendPage("backend-" + listName);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
 
 //批量新增工具函式
@@ -1471,7 +1483,7 @@ async function addBgItem(){
 function deleteItem(listName,id){
     if(!confirm("刪除此商品！學生已經買走的不會被回收。")) return;
     state[listName] = state[listName].filter(x=>x.id!==id);
-    markChanged(); save(); refreshBackendPage("backend-" + listName);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
 
 //備份匯入匯出
