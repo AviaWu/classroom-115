@@ -264,6 +264,9 @@ const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
+const LEVEL_PRICES = {R:50, SR:100, SSR:200, UR:300};
+const LEVEL_ORDER = ["R","SR","SSR","UR"];
+function priceForLevel(level){ return LEVEL_PRICES[level] || DEFAULT_PRICE; }
 const BUILTIN_MONSTERS = [
     {name:"怪獸 1", image:"/images/mon/m%20(1).jpg"},
     {name:"怪獸 2", image:"/images/mon/m%20(2).jpg"},
@@ -311,6 +314,10 @@ if(!state){
     if(!Array.isArray(state.backgrounds)) state.backgrounds=[];
     if(!Array.isArray(state.coopTasks)) state.coopTasks=[];
     if(!state.tasks) state.tasks = [];
+    [...state.clothesM,...state.clothesF,...state.layouts,...state.backgrounds].forEach(item=>{
+        if(!item.level) item.level = "R";
+        item.price = priceForLevel(item.level);
+    });
     state.students.forEach(s=>{
         if(!s.gender) s.gender = s.id<=12?"M":"F";
         if(!Array.isArray(s.equippedLayout)) s.equippedLayout = [];
@@ -395,7 +402,8 @@ function seedBuiltinBoyClothes(){
             state.clothesM.push({
                 id: `builtin_boy_${index}`,
                 name: `男生服裝 ${index+1}`,
-                price: 50,
+                level: "R",
+                price: priceForLevel("R"),
                 image
             });
             changed = true;
@@ -427,7 +435,8 @@ function seedBuiltinGirlClothes(){
             state.clothesF.push({
                 id: `builtin_girl_${index}`,
                 name: `女生服裝 ${index+1}`,
-                price: 50,
+                level: "R",
+                price: priceForLevel("R"),
                 image
             });
             changed = true;
@@ -451,7 +460,8 @@ function seedBuiltinBackgrounds(){
             state.backgrounds.push({
                 id: `builtin_background_${index}`,
                 name: `背景 ${index+1}`,
-                price: DEFAULT_PRICE,
+                level: "R",
+                price: priceForLevel("R"),
                 image
             });
             changed = true;
@@ -697,13 +707,20 @@ function completeCoopMember(taskId,studentId){
 }
 
 //商店
+function groupedShopCards(id,list,card){
+    return LEVEL_ORDER.map(level=>{
+        const items = list.filter(p=>(p.level||"R")===level);
+        return items.length ? `<section class="shop-level"><h3>${level}｜${priceForLevel(level)} 代幣</h3><div class="shopgrid">${items.map(p=>card(id,p)).join("")}</div></section>` : "";
+    }).join("") || `<div class="empty">尚無商品</div>`;
+}
 function clothCard(id,p){
     const s = state.students[id-1];
     const own = s.ownedClothes.includes(p.id);
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"👗"}</div>
         <b>${esc(p.name)}</b>
-        <div class="price">🪙 ${p.price}</div>
+        <div class="small">${esc(p.level||"R")}</div>
+        <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyCloth(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
 }
@@ -713,7 +730,8 @@ function layCard(id,p){
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"✨"}</div>
         <b>${esc(p.name)}</b>
-        <div class="price">🪙 ${p.price}</div>
+        <div class="small">${esc(p.level||"R")}</div>
+        <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyLayout(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
 }
@@ -723,7 +741,8 @@ function bgCard(id,p){
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"🖼"}</div>
         <b>${esc(p.name)}</b>
-        <div class="price">🪙 ${p.price}</div>
+        <div class="small">${esc(p.level||"R")}</div>
+        <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyBg(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
 }
@@ -743,9 +762,9 @@ function switchShopTab(id,tab){
     const s = state.students[id-1];
     const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
     let html="";
-    if(tab==="clothes") html=`<div class="shopgrid">${clothPool.map(p=>clothCard(id,p)).join("")||`<div class="empty">尚無服裝</div>`}</div>`;
-    if(tab==="layouts") html=`<div class="shopgrid">${state.layouts.map(p=>layCard(id,p)).join("")||`<div class="empty">尚無佈置</div>`}</div>`;
-    if(tab==="bgs") html=`<div class="shopgrid">${state.backgrounds.map(p=>bgCard(id,p)).join("")||`<div class="empty">尚無背景</div>`}</div>`;
+    if(tab==="clothes") html=groupedShopCards(id,clothPool,clothCard);
+    if(tab==="layouts") html=groupedShopCards(id,state.layouts,layCard);
+    if(tab==="bgs") html=groupedShopCards(id,state.backgrounds,bgCard);
     document.getElementById("shopTabContent").innerHTML = html;
     document.querySelectorAll(".tab").forEach((el,i)=>{
         el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
@@ -902,7 +921,7 @@ async function backend(){
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('clothesM','${esc(p.id)}',this.value)" placeholder="名稱">
-                <input type="number" value="${p.price}" onchange="updateItemPrice('clothesM','${esc(p.id)}',Number(this.value))" style="width:90px">
+                <select onchange="updateItemLevel('clothesM','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
             </div>
         </div>
         <button onclick="moveItem('clothesM','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -917,7 +936,7 @@ async function backend(){
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('clothesF','${esc(p.id)}',this.value)" placeholder="名稱">
-                <input type="number" value="${p.price}" onchange="updateItemPrice('clothesF','${esc(p.id)}',Number(this.value))" style="width:90px">
+                <select onchange="updateItemLevel('clothesF','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
             </div>
         </div>
         <button onclick="moveItem('clothesF','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -932,7 +951,7 @@ async function backend(){
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('layouts','${esc(p.id)}',this.value)" placeholder="名稱">
-                <input type="number" value="${p.price}" onchange="updateItemPrice('layouts','${esc(p.id)}',Number(this.value))" style="width:90px">
+                <select onchange="updateItemLevel('layouts','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
             </div>
         </div>
         <button onclick="moveItem('layouts','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -947,7 +966,7 @@ async function backend(){
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('backgrounds','${esc(p.id)}',this.value)" placeholder="名稱">
-                <input type="number" value="${p.price}" onchange="updateItemPrice('backgrounds','${esc(p.id)}',Number(this.value))" style="width:90px">
+                <select onchange="updateItemLevel('backgrounds','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
             </div>
         </div>
         <button onclick="moveItem('backgrounds','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -1061,7 +1080,10 @@ async function backend(){
     <div class="row">
         <div class="grow">
             <input id="mName" placeholder="名稱">
-            <input id="mPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <select id="mLevel" onchange="document.getElementById('mPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="mPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
             <input type="file" id="mImg" accept="image/*">
         </div>
         <button class="primary" onclick="addClothM()">新增</button>
@@ -1079,7 +1101,10 @@ async function backend(){
     <div class="row">
         <div class="grow">
             <input id="fName" placeholder="名稱">
-            <input id="fPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <select id="fLevel" onchange="document.getElementById('fPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="fPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
             <input type="file" id="fImg" accept="image/*">
         </div>
         <button class="primary" onclick="addClothF()">新增</button>
@@ -1097,7 +1122,10 @@ async function backend(){
     <div class="row">
         <div class="grow">
             <input id="layName" placeholder="名稱">
-            <input id="layPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <select id="layLevel" onchange="document.getElementById('layPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="layPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
             <input type="file" id="layImg" accept="image/*">
         </div>
         <button class="primary" onclick="addLayout()">新增</button>
@@ -1115,7 +1143,10 @@ async function backend(){
     <div class="row">
         <div class="grow">
             <input id="bgName" placeholder="名稱">
-            <input id="bgPrice" type="number" placeholder="售價" style="width:80px" value="${DEFAULT_PRICE}">
+            <select id="bgLevel" onchange="document.getElementById('bgPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="bgPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
             <input type="file" id="bgImg" accept="image/*">
         </div>
         <button class="primary" onclick="addBgItem()">新增</button>
@@ -1247,6 +1278,13 @@ function updateItemName(listName,id,newName){
     item.name = newName.trim()||"未命名";
     markChanged(); save(); refreshBackendPage("backend-" + listName);
 }
+function updateItemLevel(listName,id,newLevel){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item || !LEVEL_PRICES[newLevel]) return;
+    item.level = newLevel;
+    item.price = priceForLevel(newLevel);
+    markChanged(); save(); refreshBackendPage("backend-" + listName);
+}
 function updateItemPrice(listName,id,newPrice){
     const item = state[listName].find(x=>x.id===id);
     if(!item || isNaN(newPrice) || newPrice<0) return;
@@ -1262,7 +1300,8 @@ async function batchUploadFiles(fileList, targetArray, prefixName){
         targetArray.push({
             id: makeItemId(),
             name: `${prefixName} ${i+1}`,
-            price: DEFAULT_PRICE,
+            level: "R",
+            price: priceForLevel("R"),
             image: imgData
         });
     }
@@ -1391,38 +1430,42 @@ function setTokenAll(){
 //新增商品（單張）
 async function addClothM(){
     const name = document.getElementById("mName").value.trim();
-    const price = Number(document.getElementById("mPrice").value)||DEFAULT_PRICE;
+    const level = document.getElementById("mLevel").value;
+    const price = priceForLevel(level);
     const file = document.getElementById("mImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.clothesM.push({id:makeItemId(),name,price,image:img});
+    state.clothesM.push({id:makeItemId(),name,level,price,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-m");
 }
 async function addClothF(){
     const name = document.getElementById("fName").value.trim();
-    const price = Number(document.getElementById("fPrice").value)||DEFAULT_PRICE;
+    const level = document.getElementById("fLevel").value;
+    const price = priceForLevel(level);
     const file = document.getElementById("fImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.clothesF.push({id:makeItemId(),name,price,image:img});
+    state.clothesF.push({id:makeItemId(),name,level,price,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-f");
 }
 async function addLayout(){
     const name = document.getElementById("layName").value.trim();
-    const price = Number(document.getElementById("layPrice").value)||DEFAULT_PRICE;
+    const level = document.getElementById("layLevel").value;
+    const price = priceForLevel(level);
     const file = document.getElementById("layImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.layouts.push({id:makeItemId(),name,price,image:img});
+    state.layouts.push({id:makeItemId(),name,level,price,image:img});
     markChanged(); save(); refreshBackendPage("backend-layouts");
 }
 async function addBgItem(){
     const name = document.getElementById("bgName").value.trim();
-    const price = Number(document.getElementById("bgPrice").value)||DEFAULT_PRICE;
+    const level = document.getElementById("bgLevel").value;
+    const price = priceForLevel(level);
     const file = document.getElementById("bgImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.backgrounds.push({id:makeItemId(),name,price,image:img});
+    state.backgrounds.push({id:makeItemId(),name,level,price,image:img});
     markChanged(); save(); refreshBackendPage("backend-backgrounds");
 }
 function deleteItem(listName,id){
