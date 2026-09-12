@@ -74,7 +74,7 @@ input[type="number"]{width:85px}
 .edit-item-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .edit-item-row input{flex:1;min-width:120px}
 .dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
-.task-dot{position:absolute;top:4px;right:5px;width:9px;height:9px;background:#d83d3d;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #8f1f1f}
+.task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
 .drag-handle{cursor:grab;font-size:20px;user-select:none}
@@ -452,7 +452,7 @@ function render(){
                 <span class="tokens">🪙 ${s.tokens}</span>
             </div>
             <div class="actions">
-                <button onclick="tasks(${s.id})" style="position:relative">任務${hasTodo?'<span class="task-dot" aria-label="有未完成任務"></span>':''}</button>
+                <button onclick="tasks(${s.id})" style="position:relative">${hasTodo?'<span class="task-new" aria-label="有新的未完成任務">NEW</span>':''}任務</button>
                 <button onclick="shop(${s.id})">商店</button>
                 <button onclick="closet(${s.id})">衣櫃</button>
             </div>
