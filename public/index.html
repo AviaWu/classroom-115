@@ -99,7 +99,7 @@ input[type="number"]{width:85px}
 .edit-item-row input{flex:1;min-width:120px}
 .lottery-ticket{font-size:15px;font-weight:800;display:inline-block;color:#8b4e9f}
 .lottery-page{text-align:center;max-width:720px;margin:auto}
-.gacha-machine{position:relative;width:min(330px,82vw);margin:18px auto;padding:12px;background:#fff4d6;border:6px solid #20263a;box-shadow:9px 9px 0 #172033;overflow:hidden}
+.gacha-machine{position:relative;width:min(330px,82vw);margin:18px auto;padding:0;background:transparent;border:0;box-shadow:none;overflow:hidden}
 .gacha-machine-image{display:block;width:100%;height:auto;image-rendering:auto}
 .gacha-machine::after{content:"";position:absolute;inset:-40%;background:conic-gradient(transparent,#fff7 12%,transparent 24%);opacity:0;pointer-events:none}
 .gacha-machine.drawing{animation:gachaShake .7s ease}
@@ -696,7 +696,7 @@ function openCoopTask(taskId, taskButtons=""){
                     <div class="coop-hp" aria-label="怪獸HP"><div class="coop-hp-fill" style="width:${hpPercent}%"></div></div>
                     <b>HP ${state.students.length-completed.length} / ${state.students.length}</b>
                     <div>${esc(task.content)}</div>
-                    <div class="small">全員完成後，每位成員獲得 ${task.rewardType==="ticket"?"🎟️":"🪙"}</div>
+                    <div class="small">全員完成後，每位成員獲得 🪙/🎟️</div>
                 </div>
             </div>
             <div class="coop-side coop-side-members">
