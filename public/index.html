@@ -771,11 +771,21 @@ async function backend(){
         <label>總人數：<input id="stuCount" type="number" min="1" value="${state.students.length}"></label>
         <button onclick="resizeStudentList()">調整人數</button>
     </div>
-    <div class="small">點擊號碼可直接覆蓋設定代幣</div>
-    <div class="row" style="flex-wrap:wrap;gap:6px">
-    ${state.students.map(s=>
-        `<button onclick="editToken(${s.id})" style="padding:4px 8px">${s.id} 🪙${s.tokens}</button>`
-    ).join("")}
+    <div class="small">可設定性別、覆蓋代幣，或重置個別學生衣櫃。</div>
+    <div class="row" style="display:block">
+    ${state.students.map(s=>`
+        <div class="row">
+            <b style="min-width:45px">${s.id}</b>
+            <label>性別：
+                <select onchange="setStudentGender(${s.id},this.value)">
+                    <option value="M" ${s.gender==="M"?"selected":""}>男生</option>
+                    <option value="F" ${s.gender==="F"?"selected":""}>女生</option>
+                </select>
+            </label>
+            <span class="grow">🪙 ${s.tokens}</span>
+            <button onclick="editToken(${s.id})">設定代幣</button>
+            <button class="warning" onclick="resetStudentCloset(${s.id})">重置衣櫃</button>
+        </div>`).join("")}
     </div>
 
     <h3>代幣批量管理</h3>
@@ -981,7 +991,29 @@ function deleteTask(tid){
     markChanged(); save(); backend();
 }
 
-//學生
+//學生管理
+function setStudentGender(id,gender){
+    const s = state.students[id-1];
+    if(!s || !["M","F"].includes(gender)) return;
+    s.gender = gender;
+    if(s.equippedClothes && !(gender==="M"?state.clothesM:state.clothesF).some(item=>item.id===s.equippedClothes)){
+        s.equippedClothes = null;
+    }
+    markChanged(); save(); render(); backend();
+}
+
+function resetStudentCloset(id){
+    const s = state.students[id-1];
+    if(!s || !confirm(`確定重置${id}號的衣櫃嗎？已購買的服裝、佈置與背景都會清除，代幣不受影響。`)) return;
+    s.ownedClothes = [];
+    s.equippedClothes = null;
+    s.ownedLayout = [];
+    s.equippedLayout = [];
+    s.ownedBg = [];
+    s.equippedBg = null;
+    markChanged(); save(); render(); backend();
+}
+
 function editToken(id){
     const s = state.students[id-1];
     const val = prompt(`覆蓋設定${id}號代幣，現在：${s.tokens}`, s.tokens);
