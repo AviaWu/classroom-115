@@ -42,12 +42,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .coop-hit{animation:coopHit .45s ease}
 @keyframes coopHit{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-8px) rotate(-2deg);filter:brightness(1.8) saturate(1.8)}50%{transform:translateX(8px) rotate(2deg);filter:brightness(2.2) saturate(2)}75%{transform:translateX(-5px);filter:brightness(1.5)}}
 .coop-side-members{min-width:0;display:flex;align-items:stretch}
-.coop-side-members .coop-members{grid-template-columns:repeat(6,minmax(48px,1fr));gap:8px}
+.coop-side-members .coop-members{grid-template-columns:repeat(10,minmax(80px,1fr));gap:8px}
 .coop-side-members .coop-member{padding:6px;box-shadow:3px 3px 0 #172033}
 .coop-side-members .coop-member span{font-size:13px;margin-top:3px}
 @media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0;height:auto}.coop-side-members{display:block}.coop-side-members .coop-members{grid-template-columns:repeat(6,minmax(48px,1fr));gap:6px}.panel{padding:14px}}
 .coop-monster{text-align:center;margin:8px auto 18px;padding:14px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
-.coop-side-monster img{border:3px solid #20263a;box-shadow:3px 3px 0 #172033}
 .coop-monster img{display:block;width:min(220px,70vw);height:180px;object-fit:contain;margin:8px auto}
 .coop-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:12px}
 .coop-member{border:3px solid #20263a;background:#fff;padding:6px;text-align:center;box-shadow:3px 3px 0 #172033}
