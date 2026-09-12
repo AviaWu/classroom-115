@@ -99,12 +99,17 @@ input[type="number"]{width:85px}
 .edit-item-row input{flex:1;min-width:120px}
 .lottery-ticket{font-size:15px;font-weight:800;display:inline-block;color:#8b4e9f}
 .lottery-page{text-align:center;max-width:720px;margin:auto}
-.gacha-machine{position:relative;width:min(330px,82vw);margin:18px auto;padding:24px 22px 28px;background:#e95b62;border:6px solid #20263a;box-shadow:9px 9px 0 #172033}
-.gacha-globe{width:210px;aspect-ratio:1;margin:auto;border:6px solid #20263a;border-radius:50%;background:linear-gradient(145deg,#dff7ff,#fff);display:flex;align-items:center;justify-content:center;font-size:82px;overflow:hidden}
-.gacha-globe img{width:86%;height:86%;object-fit:contain}
-.gacha-slot{width:120px;height:48px;margin:20px auto 0;background:#fff4d6;border:5px solid #20263a;display:flex;align-items:center;justify-content:center;font-weight:900}
-.gacha-machine.drawing .gacha-globe{animation:gachaShake .55s ease}
-@keyframes gachaShake{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg) scale(1.03)}40%{transform:rotate(8deg)}60%{transform:rotate(-6deg)}80%{transform:rotate(5deg)}}
+.gacha-machine{position:relative;width:min(330px,82vw);margin:18px auto;padding:12px;background:#fff4d6;border:6px solid #20263a;box-shadow:9px 9px 0 #172033;overflow:hidden}
+.gacha-machine-image{display:block;width:100%;height:auto;image-rendering:auto}
+.gacha-machine::after{content:"";position:absolute;inset:-40%;background:conic-gradient(transparent,#fff7 12%,transparent 24%);opacity:0;pointer-events:none}
+.gacha-machine.drawing{animation:gachaShake .7s ease}
+.gacha-machine.drawing::after{opacity:1;animation:gachaSpark 1s linear infinite}
+@keyframes gachaShake{0%,100%{transform:rotate(0) scale(1)}15%{transform:rotate(-5deg) scale(1.03)}30%{transform:rotate(5deg) scale(1.05)}45%{transform:rotate(-4deg) scale(1.03)}60%{transform:rotate(4deg) scale(1.05)}75%{transform:rotate(-2deg) scale(1.02)}}
+@keyframes gachaSpark{to{transform:rotate(360deg)}}
+.lottery-result-popup{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(23,32,51,.78)}
+.lottery-result-card{width:min(420px,92vw);padding:22px;text-align:center;background:#fff4d6;border:5px solid #20263a;box-shadow:9px 9px 0 #172033}
+.lottery-result-card img{display:block;width:min(240px,70vw);height:240px;object-fit:contain;margin:0 auto 14px;background:#fff;border:3px solid #20263a}
+.lottery-result-card h3{font-size:22px;margin:8px 0 16px}
 .lottery-rules{padding:14px;text-align:left;background:#fff4d6;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;line-height:1.8}
 .lottery-result{margin:14px 0;padding:12px;font-size:18px;font-weight:900;min-height:28px}
 .dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
@@ -789,8 +794,7 @@ function switchShopTab(id,tab){
     if(tab==="lottery") html=`
         <div class="lottery-page">
             <div class="gacha-machine" id="gachaMachine">
-                <div class="gacha-globe" id="gachaGlobe">🎁</div>
-                <div class="gacha-slot">扭蛋出口</div>
+                <img class="gacha-machine-image" src="/images/icon/happy1.png" alt="樂透扭蛋機">
             </div>
             <h3>持有樂透券：🎟️ ${s.lotteryTickets||0}</h3>
             <button class="primary" onclick="drawLottery(${id})" ${(s.lotteryTickets||0)<1?"disabled":""}>使用 1 張樂透券抽一次</button>
@@ -839,20 +843,33 @@ function drawLottery(id){
     if(duplicate) s.tokens += 20;
     markChanged(); save(); render();
     const machine = document.getElementById("gachaMachine");
-    const globe = document.getElementById("gachaGlobe");
     machine?.classList.add("drawing");
-    if(globe) globe.innerHTML = prize.item.image ? `<img src="${esc(prize.item.image)}" alt="${esc(prize.item.name)}">` : "🎁";
     const resultMessage = duplicate
         ? `抽中 ${prize.item.level||"R"}｜${prize.item.name}，已擁有此商品，返還 20 代幣！`
         : `恭喜抽中 ${prize.item.level||"R"}｜${prize.item.name}！`;
     setTimeout(()=>{
         machine?.classList.remove("drawing");
-        alert(resultMessage);
-    },600);
+        showLotteryResult(prize.item,resultMessage);
+    },850);
     const ticketTitle = document.querySelector(".lottery-page h3");
     if(ticketTitle) ticketTitle.textContent = `持有樂透券：🎟️ ${s.lotteryTickets}`;
     const drawButton = document.querySelector(".lottery-page > button");
     if(drawButton) drawButton.disabled = s.lotteryTickets<1;
+}
+function showLotteryResult(item,message){
+    document.getElementById("lotteryResultPopup")?.remove();
+    const popup = document.createElement("div");
+    popup.id = "lotteryResultPopup";
+    popup.className = "lottery-result-popup";
+    popup.innerHTML = `<div class="lottery-result-card" role="dialog" aria-modal="true" aria-label="樂透抽獎結果">
+        ${item.image?`<img src="${esc(item.image)}" alt="${esc(item.name)}">`:`<div style="font-size:90px">🎁</div>`}
+        <h3>${esc(message)}</h3>
+        <button class="primary" onclick="closeLotteryResultPopup()">確定</button>
+    </div>`;
+    document.body.appendChild(popup);
+}
+function closeLotteryResultPopup(){
+    document.getElementById("lotteryResultPopup")?.remove();
 }
 
 function buyCloth(id,pid){
