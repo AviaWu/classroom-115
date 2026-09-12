@@ -8,7 +8,8 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans TC",system-ui,sans-serif;background:#f8f4ff;color:#403b4d}
 .bg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;background-repeat:no-repeat}
-header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #eee;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+header{position:sticky;top:0;z-index:10;background:#333;border-bottom:1px solid #222;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+header h1{color:#f3d98b}
 h1,h2,h3{margin-top:0}
 .wrap{max-width:1450px;margin:auto;padding:20px}
 button{border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;background:#eadfff;color:#44375f}
@@ -111,7 +112,7 @@ input[type="number"]{width:85px}
 <div class="bg" id="userBg"></div>
 
 <header>
-<h1>We are 5 甲</h1>
+<h1>Great teamwork makes the dream work</h1>
 <div>
 <button onclick="openBackend()">老師後台</button>
 <button onclick="save()">儲存</button>
@@ -353,7 +354,7 @@ function render(){
         return `<div class="card">
             <div class="avatar">${bgHtml}${charHtml}${layHtml}</div>
             <div>
-                <span class="num">${s.id}號 ${s.gender==="M"?"♂":"♀"}</span>
+                <span class="num">${s.id}</span>
                 <span class="tokens">🪙 ${s.tokens}</span>
             </div>
             <div class="actions">
@@ -677,7 +678,7 @@ async function backend(){
     <div class="small">點擊號碼可直接覆蓋設定代幣</div>
     <div class="row" style="flex-wrap:wrap;gap:6px">
     ${state.students.map(s=>
-        `<button onclick="editToken(${s.id})" style="padding:4px 8px">${s.id}號 ${s.gender==="M"?"♂":"♀"} 🪙${s.tokens}</button>`
+        `<button onclick="editToken(${s.id})" style="padding:4px 8px">${s.id} 🪙${s.tokens}</button>`
     ).join("")}
     </div>
 
