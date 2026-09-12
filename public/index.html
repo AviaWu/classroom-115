@@ -808,6 +808,16 @@ function resetGame(){
     alert("已重置回遊戲初始狀態！");
 }
 
+//商品排序：調整陣列順序，商店會依此順序顯示
+function moveItem(listName,id,direction){
+    const list = state[listName];
+    const index = list.findIndex(item=>item.id===id);
+    const targetIndex = index + direction;
+    if(index<0 || targetIndex<0 || targetIndex>=list.length) return;
+    [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
+    markChanged(); save(); backend();
+}
+
 //修改商品名稱、價格
 function updateItemName(listName,id,newName){
     const item = state[listName].find(x=>x.id===id);
