@@ -605,6 +605,8 @@ async function backend(){
                 <input type="number" value="${p.price}" onchange="updateItemPrice('clothesM','${esc(p.id)}',Number(this.value))" style="width:90px">
             </div>
         </div>
+        <button onclick="moveItem('clothesM','${esc(p.id)}',-1)" title="往前移">↑</button>
+        <button onclick="moveItem('clothesM','${esc(p.id)}',1)" title="往後移">↓</button>
         <button class="danger" onclick="deleteItem('clothesM','${esc(p.id)}')">刪除</button>
     </div>`).join("")||"<div class='small'>無男生服裝</div>";
 
@@ -616,6 +618,8 @@ async function backend(){
                 <input type="number" value="${p.price}" onchange="updateItemPrice('clothesF','${esc(p.id)}',Number(this.value))" style="width:90px">
             </div>
         </div>
+        <button onclick="moveItem('clothesF','${esc(p.id)}',-1)" title="往前移">↑</button>
+        <button onclick="moveItem('clothesF','${esc(p.id)}',1)" title="往後移">↓</button>
         <button class="danger" onclick="deleteItem('clothesF','${esc(p.id)}')">刪除</button>
     </div>`).join("")||"<div class='small'>無女生服裝</div>";
 
@@ -627,6 +631,8 @@ async function backend(){
                 <input type="number" value="${p.price}" onchange="updateItemPrice('layouts','${esc(p.id)}',Number(this.value))" style="width:90px">
             </div>
         </div>
+        <button onclick="moveItem('layouts','${esc(p.id)}',-1)" title="往前移">↑</button>
+        <button onclick="moveItem('layouts','${esc(p.id)}',1)" title="往後移">↓</button>
         <button class="danger" onclick="deleteItem('layouts','${esc(p.id)}')">刪除</button>
     </div>`).join("")||"<div class='small'>無佈置物件</div>";
 
@@ -638,6 +644,8 @@ async function backend(){
                 <input type="number" value="${p.price}" onchange="updateItemPrice('backgrounds','${esc(p.id)}',Number(this.value))" style="width:90px">
             </div>
         </div>
+        <button onclick="moveItem('backgrounds','${esc(p.id)}',-1)" title="往前移">↑</button>
+        <button onclick="moveItem('backgrounds','${esc(p.id)}',1)" title="往後移">↓</button>
         <button class="danger" onclick="deleteItem('backgrounds','${esc(p.id)}')">刪除</button>
     </div>`).join("")||"<div class='small'>無可購買背景</div>";
 
