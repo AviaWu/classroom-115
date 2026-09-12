@@ -345,7 +345,8 @@ function render(){
         if(eqCloth?.image){
             charHtml = `<div class="character" style="background-image:url('${esc(eqCloth.image)}')"></div>`;
         }else{
-            charHtml = s.gender==="M" ? "👦" : "👧";
+            const defaultImage = s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png";
+            charHtml = `<div class="character" style="background-image:url('${defaultImage}')"></div>`;
         }
         const layHtml = activeLayouts.map((p,i)=>
             `<div class="layout-item" style="z-index:${3+i};background-image:url('${esc(p.image)}')"></div>`
