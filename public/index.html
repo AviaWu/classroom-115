@@ -42,10 +42,10 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .coop-hit{animation:coopHit .45s ease}
 @keyframes coopHit{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-8px) rotate(-2deg);filter:brightness(1.8) saturate(1.8)}50%{transform:translateX(8px) rotate(2deg);filter:brightness(2.2) saturate(2)}75%{transform:translateX(-5px);filter:brightness(1.5)}}
 .coop-side-members{min-width:0}
-.coop-side-members .coop-members{grid-template-columns:repeat(8,minmax(48px,1fr));gap:6px}
+.coop-side-members .coop-members{grid-template-columns:repeat(10,minmax(40px,1fr));gap:5px}
 .coop-side-members .coop-member{padding:4px;box-shadow:2px 2px 0 #172033}
 .coop-side-members .coop-member span{font-size:12px;margin-top:2px}
-@media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0}.coop-side-members .coop-members{grid-template-columns:repeat(8,minmax(34px,1fr));gap:4px}.panel{padding:14px}}
+@media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0}.coop-side-members .coop-members{grid-template-columns:repeat(10,minmax(28px,1fr));gap:3px}.panel{padding:14px}}
 .coop-monster{text-align:center;margin:8px auto 18px;padding:14px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
 .coop-monster img{display:block;width:min(220px,70vw);height:180px;object-fit:contain;margin:8px auto}
 .coop-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:12px}
@@ -101,9 +101,12 @@ input[type="number"]{width:85px}
 .backend-page.active{display:block}
 .monster-list{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px}
 .monster-list button.active{background:#f3d98b;color:#20263a}
-.monster-choice-preview{text-align:center;margin-top:8px;min-height:110px}
-.monster-choice-preview img{display:block;width:140px;height:100px;object-fit:contain;margin:auto;background:#fff4d6;border:2px solid #a88d5f}
-======= REPLACE
+.monster-choice-grid{display:grid;grid-template-columns:repeat(4,minmax(86px,1fr));gap:8px;margin-top:8px}
+.monster-choice{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;background:#fff4d6;border:3px solid #a88d5f;border-radius:8px;color:#403b4d}
+.monster-choice.active{background:#f3d98b;border-color:#20263a;box-shadow:3px 3px 0 #172033}
+.monster-choice img{display:block;width:100%;height:72px;object-fit:contain}
+.monster-choice span{font-size:12px;font-weight:800}
+.monster-choice.none{justify-content:center;min-height:102px}
 .task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
@@ -935,13 +938,12 @@ async function backend(){
             <input id="coopMonsterName" placeholder="怪獸名稱">
             <textarea id="coopContent" placeholder="任務內容" rows="3" style="width:100%;margin-top:8px"></textarea>
             <input id="coopReward" type="number" min="0" value="50" placeholder="每位成員獎勵代幣" style="margin-top:8px">
-            <label style="display:block;margin-top:8px">選擇怪獸圖片：
-                <select id="coopMonsterImage" onchange="updateCoopMonsterPreview()" style="width:100%;margin-top:6px">
-                    <option value="">不使用圖片</option>
-                    ${BUILTIN_MONSTERS.map(monster=>`<option value="${monster.image}">${monster.name}</option>`).join("")}
-                </select>
-            </label>
-            <div class="monster-choice-preview"><img id="coopMonsterPreview" src="" alt="怪獸預覽"></div>
+            <label style="display:block;margin-top:8px">選擇怪獸圖片：</label>
+            <div class="monster-choice-grid">
+                <button type="button" class="monster-choice none active" onclick="selectCoopMonster(this,'')">不使用圖片</button>
+                ${BUILTIN_MONSTERS.map(monster=>`<button type="button" class="monster-choice" onclick="selectCoopMonster(this,'${esc(monster.image)}')"><img src="${esc(monster.image)}" alt="${esc(monster.name)}"><span>${esc(monster.name)}</span></button>`).join("")}
+            </div>
+            <input type="hidden" id="coopMonsterImage" value="">
         </div>
         <button class="primary" onclick="publishCoopTask()">發布協力任務</button>
     </div>
@@ -1148,12 +1150,12 @@ function jumpBackend(targetId){
     }
 }
 
-function updateCoopMonsterPreview(){
-    const select = document.getElementById("coopMonsterImage");
-    const preview = document.getElementById("coopMonsterPreview");
-    if(!select || !preview) return;
-    preview.src = select.value || "";
-    preview.style.display = select.value ? "block" : "none";
+function selectCoopMonster(button,image){
+    const input = document.getElementById("coopMonsterImage");
+    if(!input) return;
+    input.value = image;
+    document.querySelectorAll(".monster-choice").forEach(item=>item.classList.remove("active"));
+    button.classList.add("active");
 }
 
 async function publishCoopTask(){
