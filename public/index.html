@@ -341,6 +341,30 @@ function seedBuiltinGirlClothes(){
 
 seedBuiltinGirlClothes();
 
+// 內建背景商品：直接使用 public/images/bgm/ 的全部 PNG 圖片，避免重複建立商品
+function seedBuiltinBackgrounds(){
+    const filenames = [
+        "ba (1).png", "ba (2).png", "ba (3).png",
+        "ba (4).png", "ba (5).png", "ba (6).png"
+    ];
+    let changed = false;
+    filenames.forEach((filename, index)=>{
+        const image = `/images/bgm/${encodeURIComponent(filename)}`;
+        if(!state.backgrounds.some(item=>item.image===image)){
+            state.backgrounds.push({
+                id: `builtin_background_${index}`,
+                name: `背景 ${index+1}`,
+                price: DEFAULT_PRICE,
+                image
+            });
+            changed = true;
+        }
+    });
+    if(changed) save();
+}
+
+seedBuiltinBackgrounds();
+
 function markChanged(){
     unsavedChange = true;
     document.getElementById("saveStatus").textContent = "⚠️有未儲存變更";
