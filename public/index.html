@@ -958,7 +958,7 @@ async function backend(){
     openModal(`
     <h2>老師後台</h2>
     <nav class="backend-nav" aria-label="後台功能選單">
-        <button onclick="jumpBackend('backend-overview')">總覽</button>
+        <button onclick="jumpBackend('backend-overview')">存檔</button>
         <button onclick="jumpBackend('backend-tasks')">任務</button>
         <button onclick="jumpBackend('backend-tokens')">代幣</button>
         <button onclick="jumpBackend('backend-members')">成員</button>
@@ -1129,13 +1129,6 @@ async function backend(){
 
     </section>
     <section id="backend-settings" class="backend-page">
-    <h3>全域背景（全班頁面大背景，非學生角色背景）</h3>
-    <div class="row">
-        <input type="file" id="globalBgFile" accept="image/*">
-        <button class="primary" onclick="setGlobalBg()">設定全域背景</button>
-        <button class="danger" onclick="clearGlobalBg()">清除全域背景</button>
-    </div>
-
     <div class="dangerzone">
         <h3 class="warn">⚠️ 危險區域（資料清除）</h3>
         <div class="small">建議先「匯出備份」再執行！動作無法復原</div>
@@ -1211,6 +1204,9 @@ function jumpBackend(targetId){
         target.scrollIntoView({behavior:"smooth",block:"start"});
     }
 }
+function refreshBackendPage(targetId){
+    backend().then(()=>jumpBackend(targetId));
+}
 
 function selectCoopMonster(button,image){
     const input = document.getElementById("coopMonsterImage");
@@ -1227,12 +1223,12 @@ async function publishCoopTask(){
     const monsterImage = document.getElementById("coopMonsterImage").value;
     if(!monsterName || !content || !Number.isFinite(reward) || reward<0) return alert("請完整填寫怪獸名稱、任務內容與獎勵");
     state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,monsterImage,completedBy:[],claimed:false});
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-coop");
 }
 function deleteCoopTask(taskId){
     if(!confirm("確定刪除此協力任務？")) return;
     state.coopTasks = state.coopTasks.filter(t=>t.id!==taskId);
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-coop");
 }
 
 function moveItem(listName,id,direction){
@@ -1433,18 +1429,6 @@ function deleteItem(listName,id){
     if(!confirm("刪除此商品！學生已經買走的不會被回收。")) return;
     state[listName] = state[listName].filter(x=>x.id!==id);
     markChanged(); save(); backend();
-}
-
-//全域背景
-async function setGlobalBg(){
-    const file = document.getElementById("globalBgFile").files[0];
-    if(!file) return;
-    state.globalBgImage = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    markChanged(); save(); applyGlobalBg(); backend();
-}
-function clearGlobalBg(){
-    state.globalBgImage = "";
-    markChanged(); save(); applyGlobalBg(); backend();
 }
 
 //備份匯入匯出
