@@ -1194,7 +1194,7 @@ function dropItem(event,listName,targetId){
     const [item] = list.splice(fromIndex,1);
     list.splice(toIndex,0,item);
     draggedItem = null;
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-" + listName);
 }
 function jumpBackend(targetId){
     document.querySelectorAll(".backend-page").forEach(page=>page.classList.remove("active"));
@@ -1237,7 +1237,7 @@ function moveItem(listName,id,direction){
     const targetIndex = index + direction;
     if(index<0 || targetIndex<0 || targetIndex>=list.length) return;
     [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-" + listName);
 }
 
 //修改商品名稱、價格
@@ -1245,13 +1245,13 @@ function updateItemName(listName,id,newName){
     const item = state[listName].find(x=>x.id===id);
     if(!item) return;
     item.name = newName.trim()||"未命名";
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-" + listName);
 }
 function updateItemPrice(listName,id,newPrice){
     const item = state[listName].find(x=>x.id===id);
     if(!item || isNaN(newPrice) || newPrice<0) return;
     item.price = newPrice;
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-" + listName);
 }
 
 //批量新增工具函式
@@ -1266,7 +1266,7 @@ async function batchUploadFiles(fileList, targetArray, prefixName){
             image: imgData
         });
     }
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-" + (targetArray===state.clothesM ? "clothes-m" : targetArray===state.clothesF ? "clothes-f" : targetArray===state.layouts ? "layouts" : "backgrounds"));
 }
 
 async function batchAddClothM(){
@@ -1304,12 +1304,12 @@ function addTask(){
         reward: reward,
         dueAt: dueAt
     });
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-tasks");
 }
 function deleteTask(tid){
     if(!confirm("確定刪除這個任務？已完成紀錄會一併失效。")) return;
     state.tasks = state.tasks.filter(t=>t.id!==tid);
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-tasks");
 }
 
 //學生管理
@@ -1320,7 +1320,7 @@ function setStudentGender(id,gender){
     if(s.equippedClothes && !(gender==="M"?state.clothesM:state.clothesF).some(item=>item.id===s.equippedClothes)){
         s.equippedClothes = null;
     }
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 
 function resetStudentCloset(id){
@@ -1332,7 +1332,7 @@ function resetStudentCloset(id){
     s.equippedLayout = [];
     s.ownedBg = [];
     s.equippedBg = null;
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 
 function editToken(id){
@@ -1342,21 +1342,21 @@ function editToken(id){
     const n = Number(val);
     if(isNaN(n)) return alert("請輸入數字");
     s.tokens = n;
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 function addTokenOne(){
     const sid = Number(document.getElementById("targetStuId").value);
     const delta = Number(document.getElementById("deltaToken").value);
     if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
     state.students[sid-1].tokens += delta;
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
 }
 function subTokenOne(){
     const sid = Number(document.getElementById("targetStuId").value);
     const delta = Number(document.getElementById("deltaToken").value);
     if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
     state.students[sid-1].tokens -= delta;
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
 }
 
 function resizeStudentList(){
@@ -1375,17 +1375,17 @@ function resizeStudentList(){
     }else{
         state.students.splice(n);
     }
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 function addTokenAll(){
     const v = Number(document.getElementById("batchToken").value)||0;
     state.students.forEach(s=>s.tokens+=v);
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 function setTokenAll(){
     const v = Number(document.getElementById("batchToken").value)||0;
     state.students.forEach(s=>s.tokens=v);
-    markChanged(); save(); render(); backend();
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 
 //新增商品（單張）
@@ -1396,7 +1396,7 @@ async function addClothM(){
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
     state.clothesM.push({id:makeItemId(),name,price,image:img});
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-clothes-m");
 }
 async function addClothF(){
     const name = document.getElementById("fName").value.trim();
@@ -1405,7 +1405,7 @@ async function addClothF(){
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
     state.clothesF.push({id:makeItemId(),name,price,image:img});
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-clothes-f");
 }
 async function addLayout(){
     const name = document.getElementById("layName").value.trim();
@@ -1414,7 +1414,7 @@ async function addLayout(){
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
     state.layouts.push({id:makeItemId(),name,price,image:img});
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-layouts");
 }
 async function addBgItem(){
     const name = document.getElementById("bgName").value.trim();
@@ -1423,12 +1423,12 @@ async function addBgItem(){
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
     state.backgrounds.push({id:makeItemId(),name,price,image:img});
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-backgrounds");
 }
 function deleteItem(listName,id){
     if(!confirm("刪除此商品！學生已經買走的不會被回收。")) return;
     state[listName] = state[listName].filter(x=>x.id!==id);
-    markChanged(); save(); backend();
+    markChanged(); save(); refreshBackendPage("backend-" + listName);
 }
 
 //備份匯入匯出
