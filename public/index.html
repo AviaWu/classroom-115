@@ -240,6 +240,12 @@ const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
+const BUILTIN_MONSTERS = [
+    {name:"怪獸 1", image:"/images/mon/m%20(1).jpg"},
+    {name:"怪獸 2", image:"/images/mon/m%20(2).jpg"},
+    {name:"怪獸 3", image:"/images/mon/m%20(3).jpg"},
+    {name:"怪獸 4", image:"/images/mon/m%20(4).jpg"}
+];
 
 let raw = localStorage.getItem(STORAGE_KEY);
 let state = raw ? JSON.parse(raw) : null;
@@ -886,7 +892,13 @@ async function backend(){
             <input id="coopMonsterName" placeholder="怪獸名稱">
             <textarea id="coopContent" placeholder="任務內容" rows="3" style="width:100%;margin-top:8px"></textarea>
             <input id="coopReward" type="number" min="0" value="50" placeholder="每位成員獎勵代幣" style="margin-top:8px">
-            <label style="display:block;margin-top:8px">怪獸圖片：<input type="file" id="coopMonsterImage" accept="image/*"></label>
+            <label style="display:block;margin-top:8px">選擇怪獸圖片：
+                <select id="coopMonsterImage" onchange="updateCoopMonsterPreview()" style="width:100%;margin-top:6px">
+                    <option value="">不使用圖片</option>
+                    ${BUILTIN_MONSTERS.map(monster=>`<option value="${monster.image}">${monster.name}</option>`).join("")}
+                </select>
+            </label>
+            <div class="monster-choice-preview"><img id="coopMonsterPreview" src="" alt="怪獸預覽"></div>
         </div>
         <button class="primary" onclick="publishCoopTask()">發布協力任務</button>
     </div>
@@ -1097,10 +1109,8 @@ async function publishCoopTask(){
     const monsterName = document.getElementById("coopMonsterName").value.trim();
     const content = document.getElementById("coopContent").value.trim();
     const reward = Number(document.getElementById("coopReward").value);
-    const file = document.getElementById("coopMonsterImage").files[0];
+    const monsterImage = document.getElementById("coopMonsterImage").value;
     if(!monsterName || !content || !Number.isFinite(reward) || reward<0) return alert("請完整填寫怪獸名稱、任務內容與獎勵");
-    let monsterImage = "";
-    if(file) monsterImage = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
     state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,monsterImage,completedBy:[],claimed:false});
     markChanged(); save(); backend();
 }
