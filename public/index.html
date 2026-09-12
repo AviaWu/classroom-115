@@ -25,8 +25,9 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .avatar .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
 .avatar .layout-item{position:absolute;inset:0;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
 
-.num{font-size:22px;font-weight:800;margin-top:10px;display:inline-block}
-.tokens{font-size:20px;font-weight:800;margin-top:4px;display:inline-block;margin-left:8px;color:#b58835}
+.resource-line{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;white-space:nowrap}
+.num{font-size:18px;font-weight:800;display:inline-block}
+.tokens{font-size:15px;font-weight:800;display:inline-block;color:#b58835}
 .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:12px}
 .actions button{padding:9px 4px;font-size:13px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;padding:18px;z-index:30}
@@ -96,7 +97,7 @@ input[type="number"]{width:85px}
 .student-list{font-size:13px;line-height:1.6;padding:6px 8px;background:#f8f8f8;border-radius:8px;margin-top:6px;word-break:break-all}
 .edit-item-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .edit-item-row input{flex:1;min-width:120px}
-.lottery-ticket{font-size:20px;font-weight:800;margin-top:4px;display:inline-block;margin-left:8px;color:#8b4e9f}
+.lottery-ticket{font-size:15px;font-weight:800;display:inline-block;color:#8b4e9f}
 .lottery-page{text-align:center;max-width:720px;margin:auto}
 .gacha-machine{position:relative;width:min(330px,82vw);margin:18px auto;padding:24px 22px 28px;background:#e95b62;border:6px solid #20263a;box-shadow:9px 9px 0 #172033}
 .gacha-globe{width:210px;aspect-ratio:1;margin:auto;border:6px solid #20263a;border-radius:50%;background:linear-gradient(145deg,#dff7ff,#fff);display:flex;align-items:center;justify-content:center;font-size:82px;overflow:hidden}
@@ -594,7 +595,7 @@ function render(){
 
         return `<div class="card">
             <div class="avatar">${bgHtml}${charHtml}${layHtml}</div>
-            <div>
+            <div class="resource-line">
                 <span class="num">${s.id}</span>
                 <span class="tokens">🪙 ${s.tokens}</span>
                 <span class="lottery-ticket">🎟️ ${s.lotteryTickets||0}</span>
@@ -690,7 +691,7 @@ function openCoopTask(taskId, taskButtons=""){
                     <div class="coop-hp" aria-label="怪獸HP"><div class="coop-hp-fill" style="width:${hpPercent}%"></div></div>
                     <b>HP ${state.students.length-completed.length} / ${state.students.length}</b>
                     <div>${esc(task.content)}</div>
-                    <div class="small">全員完成後，每位成員獲得 ${task.rewardType==="ticket"?"🎟️":"🪙"} ${task.reward}</div>
+                    <div class="small">全員完成後，每位成員獲得 ${task.rewardType==="ticket"?"🎟️":"🪙"}</div>
                 </div>
             </div>
             <div class="coop-side coop-side-members">
@@ -766,6 +767,7 @@ function bgCard(id,p){
 }
 
 function shop(id){
+    lastShopTab = "clothes";
     openModal(`<h2>${id}號｜商店</h2>
     <div class="tabs">
         <button class="tab" onclick="switchShopTab(${id},'clothes')">服裝</button>
@@ -792,12 +794,11 @@ function switchShopTab(id,tab){
             </div>
             <h3>持有樂透券：🎟️ ${s.lotteryTickets||0}</h3>
             <button class="primary" onclick="drawLottery(${id})" ${(s.lotteryTickets||0)<1?"disabled":""}>使用 1 張樂透券抽一次</button>
-            <div class="lottery-result" id="lotteryResult"></div>
-            <div class="lottery-rules">
+            <div class="lottery-rules" style="margin-top:18px">
                 <b>樂透規則與機率</b><br>
                 🎟️ 每次抽獎消耗 1 張樂透券。<br>
                 可抽到該成員性別的服裝，以及商店中的佈置、背景商品。<br>
-                R 商品：75%｜SR 商品：15%｜SSR 商品：7%｜UR 商品：3%。<br>
+                R 商品：80%｜SR 商品：15%｜SSR 商品：4%｜UR 商品：1%。<br>
                 若抽到已購買的商品，商品不重複加入衣櫃，改為返還 🪙 20 代幣。<br>
                 若抽中的等級目前沒有商品，會從其他有商品的等級重新抽取。
             </div>
@@ -819,7 +820,7 @@ function drawLottery(id){
     ];
     if(!prizes.length) return alert("商店目前沒有可抽取的商品！");
     const roll = Math.random()*100;
-    const wantedLevel = roll<75 ? "R" : roll<90 ? "SR" : roll<97 ? "SSR" : "UR";
+    const wantedLevel = roll<80 ? "R" : roll<95 ? "SR" : roll<99 ? "SSR" : "UR";
     const levelPrizes = prizes.filter(prize=>(prize.item.level||"R")===wantedLevel);
     const pool = levelPrizes.length ? levelPrizes : prizes;
     const prize = pool[Math.floor(Math.random()*pool.length)];
@@ -839,13 +840,15 @@ function drawLottery(id){
     markChanged(); save(); render();
     const machine = document.getElementById("gachaMachine");
     const globe = document.getElementById("gachaGlobe");
-    const result = document.getElementById("lotteryResult");
     machine?.classList.add("drawing");
     if(globe) globe.innerHTML = prize.item.image ? `<img src="${esc(prize.item.image)}" alt="${esc(prize.item.name)}">` : "🎁";
-    if(result) result.innerHTML = duplicate
-        ? `抽中 <span class="warn">${esc(prize.item.level||"R")}｜${esc(prize.item.name)}</span>，已擁有此商品，返還 🪙 20 代幣！`
-        : `恭喜抽中 <span class="info">${esc(prize.item.level||"R")}｜${esc(prize.item.name)}</span>！`;
-    setTimeout(()=>machine?.classList.remove("drawing"),600);
+    const resultMessage = duplicate
+        ? `抽中 ${prize.item.level||"R"}｜${prize.item.name}，已擁有此商品，返還 20 代幣！`
+        : `恭喜抽中 ${prize.item.level||"R"}｜${prize.item.name}！`;
+    setTimeout(()=>{
+        machine?.classList.remove("drawing");
+        alert(resultMessage);
+    },600);
     const ticketTitle = document.querySelector(".lottery-page h3");
     if(ticketTitle) ticketTitle.textContent = `持有樂透券：🎟️ ${s.lotteryTickets}`;
     const drawButton = document.querySelector(".lottery-page > button");
