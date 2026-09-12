@@ -1237,17 +1237,29 @@ function dropItem(event,listName,targetId){
     draggedItem = null;
     markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
-function jumpBackend(targetId){
+function activateBackendPage(targetId,shouldScroll=false){
     document.querySelectorAll(".backend-page").forEach(page=>page.classList.remove("active"));
     const target = document.getElementById(targetId);
-    if(target){
-        target.classList.add("active");
+    if(!target) return;
+    target.classList.add("active");
+    if(shouldScroll){
         target.scrollIntoView({behavior:"smooth",block:"start"});
     }
 }
+function jumpBackend(targetId){
+    activateBackendPage(targetId,true);
+}
 function refreshBackendPage(targetId){
+    const panel = document.querySelector("#modal .panel");
+    const savedScrollTop = panel ? panel.scrollTop : 0;
     return backend().then(()=>{
-        jumpBackend(targetId);
+        activateBackendPage(targetId,false);
+        const refreshedPanel = document.querySelector("#modal .panel");
+        if(!refreshedPanel) return;
+        refreshedPanel.scrollTop = savedScrollTop;
+        requestAnimationFrame(()=>{
+            refreshedPanel.scrollTop = savedScrollTop;
+        });
     });
 }
 
