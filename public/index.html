@@ -690,8 +690,10 @@ async function backend(){
     }).join("") || `<div class="empty">尚無任務</div>`;
 
     //商品清單 + **可編輯名稱、價格**
-    let mClothHtml = state.clothesM.map(p=>`
-    <div class="row">
+    let mClothHtml = state.clothesM.map((p,index)=>`
+    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'clothesM','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'clothesM','${esc(p.id)}')">
+        <span class="drag-handle" title="拖曳排列">⠿</span>
+        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('clothesM','${esc(p.id)}',this.value)" placeholder="名稱">
@@ -703,8 +705,10 @@ async function backend(){
         <button class="danger" onclick="deleteItem('clothesM','${esc(p.id)}')">刪除</button>
     </div>`).join("")||"<div class='small'>無男生服裝</div>";
 
-    let fClothHtml = state.clothesF.map(p=>`
-    <div class="row">
+    let fClothHtml = state.clothesF.map((p,index)=>`
+    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'clothesF','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'clothesF','${esc(p.id)}')">
+        <span class="drag-handle" title="拖曳排列">⠿</span>
+        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('clothesF','${esc(p.id)}',this.value)" placeholder="名稱">
@@ -716,8 +720,10 @@ async function backend(){
         <button class="danger" onclick="deleteItem('clothesF','${esc(p.id)}')">刪除</button>
     </div>`).join("")||"<div class='small'>無女生服裝</div>";
 
-    let layHtml = state.layouts.map(p=>`
-    <div class="row">
+    let layHtml = state.layouts.map((p,index)=>`
+    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'layouts','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'layouts','${esc(p.id)}')">
+        <span class="drag-handle" title="拖曳排列">⠿</span>
+        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('layouts','${esc(p.id)}',this.value)" placeholder="名稱">
@@ -729,8 +735,10 @@ async function backend(){
         <button class="danger" onclick="deleteItem('layouts','${esc(p.id)}')">刪除</button>
     </div>`).join("")||"<div class='small'>無佈置物件</div>";
 
-    let bgHtml = state.backgrounds.map(p=>`
-    <div class="row">
+    let bgHtml = state.backgrounds.map((p,index)=>`
+    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'backgrounds','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'backgrounds','${esc(p.id)}')">
+        <span class="drag-handle" title="拖曳排列">⠿</span>
+        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
         <div class="grow">
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('backgrounds','${esc(p.id)}',this.value)" placeholder="名稱">
@@ -920,6 +928,24 @@ function resetGame(){
 }
 
 //商品排序：調整陣列順序，商店會依此順序顯示
+let draggedItem = null;
+function dragItem(event,listName,id){
+    draggedItem = {listName,id};
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+}
+function dropItem(event,listName,targetId){
+    event.preventDefault();
+    if(!draggedItem || draggedItem.listName!==listName || draggedItem.id===targetId) return;
+    const list = state[listName];
+    const fromIndex = list.findIndex(item=>item.id===draggedItem.id);
+    const toIndex = list.findIndex(item=>item.id===targetId);
+    if(fromIndex<0 || toIndex<0) return;
+    const [item] = list.splice(fromIndex,1);
+    list.splice(toIndex,0,item);
+    draggedItem = null;
+    markChanged(); save(); backend();
+}
 function moveItem(listName,id,direction){
     const list = state[listName];
     const index = list.findIndex(item=>item.id===id);
