@@ -61,6 +61,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .empty{text-align:center;padding:30px;color:#777}
 .shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:13px}
 .product{border:1px solid #eee;border-radius:17px;padding:10px;text-align:center;background:#fff}
+.closet-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+.closet-preview-wrap{position:sticky;top:0;text-align:center}
+.closet-preview{width:100%;max-width:260px;margin:auto;aspect-ratio:9/16;border:3px solid #20263a;background:#F0ECE9;overflow:hidden;position:relative;box-shadow:5px 5px 0 #172033}
+.closet-preview .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center}
+.closet-preview .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat}
+.closet-preview .layout-item{position:absolute;inset:0;z-index:3;background-size:contain;background-position:center bottom;background-repeat:no-repeat}
+@media(max-width:700px){.closet-layout{grid-template-columns:1fr}.closet-preview-wrap{position:static;order:-1}.closet-preview{max-width:180px}}
 
 /* 已移除棋盤格，背景設透明 */
 .pic{
@@ -333,6 +340,7 @@ function normalizeState(target){
         if(!Number.isFinite(Number(s.lotteryTickets))) s.lotteryTickets = 0;
         else s.lotteryTickets = Math.max(0,Number(s.lotteryTickets));
         if(!Array.isArray(s.equippedLayout)) s.equippedLayout = [];
+        if(s.equippedLayout.length>1) s.equippedLayout = s.equippedLayout.slice(-1);
         if(!Array.isArray(s.ownedClothes)) s.ownedClothes = [];
         if(!Array.isArray(s.ownedLayout)) s.ownedLayout = [];
         if(!Array.isArray(s.ownedBg)) s.ownedBg = [];
@@ -478,21 +486,25 @@ function seedBuiltinGirlClothes(){
 
 seedBuiltinGirlClothes();
 
-// 內建佈置商品：直接使用 public/images/dec/ 的全部 PNG 圖片，避免重複建立商品
+// 內建寵物商品：直接使用 public/images/dec/ 的全部 PNG 圖片，避免重複建立商品
 function seedBuiltinLayouts(){
     const filenames = Array.from({length:25}, (_,index)=>`d (${index+1}).png`);
     let changed = false;
     filenames.forEach((filename,index)=>{
         const image = `/images/dec/${encodeURIComponent(filename)}`;
-        if(!state.layouts.some(item=>item.image===image)){
+        const existing = state.layouts.find(item=>item.image===image);
+        if(!existing){
             state.layouts.push({
                 id: `builtin_layout_${index}`,
-                name: `佈置 ${index+1}`,
+                name: `寵物 ${index+1}`,
                 level: "R",
                 price: priceForLevel("R"),
                 active: true,
                 image
             });
+            changed = true;
+        }else if(/^佈置 \d+$/.test(existing.name||"")){
+            existing.name = `寵物 ${index+1}`;
             changed = true;
         }
     });
@@ -653,7 +665,7 @@ function render(){
         const hasTodo = state.tasks.some(t=>!s.doneTasks.includes(t.id));
         const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
         const eqCloth = clothPool.find(x=>x.id===s.equippedClothes);
-        const activeLayouts = state.layouts.filter(x=>s.equippedLayout.includes(x.id));
+        const activePet = state.layouts.find(x=>s.equippedLayout.includes(x.id));
 
         let bgHtml = eqBg ? `<div class="bg-layer" style="background-image:url('${esc(eqBg.image)}')"></div>` : "";
         let charHtml;
@@ -663,9 +675,9 @@ function render(){
             const defaultImage = s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png";
             charHtml = `<div class="character" style="background-image:url('${defaultImage}')"></div>`;
         }
-        const layHtml = activeLayouts.map((p,i)=>
-            `<div class="layout-item" style="z-index:${3+i};background-image:url('${esc(p.image)}')"></div>`
-        ).join("");
+        const layHtml = activePet
+            ? `<div class="layout-item" style="z-index:3;background-image:url('${esc(activePet.image)}')"></div>`
+            : "";
 
         return `<div class="card">
             <div class="avatar">${bgHtml}${charHtml}${layHtml}</div>
@@ -743,13 +755,13 @@ function openCoopTask(taskId, taskButtons=""){
         const pool = s.gender==="M" ? state.clothesM : state.clothesF;
         const equipped = pool.find(x=>x.id===s.equippedClothes);
         const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
-        const activeLayouts = state.layouts.filter(x=>s.equippedLayout.includes(x.id));
+        const activePet = state.layouts.find(x=>s.equippedLayout.includes(x.id));
         const image = equipped?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
         const bgImage = eqBg?.image || "";
         const bgHtml = bgImage ? `<div class="bg-layer" style="background-image:url('${esc(bgImage)}')"></div>` : "";
-        const layoutHtml = activeLayouts.map((item,index)=>
-            `<div class="layout-item" style="z-index:${3+index};background-image:url('${esc(item.image)}')"></div>`
-        ).join("");
+        const layoutHtml = activePet
+            ? `<div class="layout-item" style="z-index:3;background-image:url('${esc(activePet.image)}')"></div>`
+            : "";
         return `<button class="coop-member ${done?"done":""}" ${done?"disabled":""} onclick="completeCoopMember('${esc(task.id)}',${s.id})">
             <div class="coop-avatar"><div class="avatar">${bgHtml}<div class="character" style="background-image:url('${esc(image)}')"></div>${layoutHtml}</div></div>
             <span>${s.id}${done?" ✓":""}</span>
@@ -846,7 +858,7 @@ function shop(id){
     openModal(`<h2>${id}號｜商店</h2>
     <div class="tabs">
         <button class="tab" onclick="switchShopTab(${id},'clothes')">服裝</button>
-        <button class="tab" onclick="switchShopTab(${id},'layouts')">佈置</button>
+        <button class="tab" onclick="switchShopTab(${id},'layouts')">寵物</button>
         <button class="tab" onclick="switchShopTab(${id},'bgs')">背景</button>
         <button class="tab" onclick="switchShopTab(${id},'lottery')">🎟️ 樂透</button>
     </div>
@@ -871,7 +883,7 @@ function switchShopTab(id,tab){
             <div class="lottery-rules" style="margin-top:18px">
                 <b>樂透規則與機率</b><br>
                 🎟️ 每次抽獎消耗 1 張樂透券。<br>
-                可抽到該成員性別的服裝，以及商店中的佈置、背景商品。<br>
+                可抽到該成員性別的服裝，以及商店中的寵物、背景商品。<br>
                 R 商品：80%｜SR 商品：15%｜SSR 商品：4%｜UR 商品：1%。<br>
                 若抽到已購買的商品，商品不重複加入衣櫃，改為返還 🪙 20 代幣。<br>
                 若抽中的等級目前沒有商品，會從其他有商品的等級重新抽取。
@@ -969,15 +981,36 @@ function buyBg(id,pid){
 }
 
 //衣櫃
-function closet(id){
+function closet(id,initialTab="clothes"){
     openModal(`<h2>${id}號｜衣櫃</h2>
-    <div class="tabs">
-        <button class="tab active" onclick="switchClosetTab(${id},'clothes')">服裝</button>
-        <button class="tab" onclick="switchClosetTab(${id},'layouts')">佈置</button>
-        <button class="tab" onclick="switchClosetTab(${id},'bgs')">背景</button>
-    </div>
-    <div id="closetTabContent"></div>`);
-    switchClosetTab(id,"clothes");
+    <div class="closet-layout">
+        <div>
+            <div class="tabs">
+                <button class="tab" onclick="switchClosetTab(${id},'clothes')">服裝</button>
+                <button class="tab" onclick="switchClosetTab(${id},'layouts')">寵物</button>
+                <button class="tab" onclick="switchClosetTab(${id},'bgs')">背景</button>
+            </div>
+            <div id="closetTabContent"></div>
+        </div>
+        <aside class="closet-preview-wrap">
+            <h3>穿搭預覽</h3>
+            <div id="closetPreview"></div>
+        </aside>
+    </div>`);
+    switchClosetTab(id,initialTab);
+}
+function closetPreviewHtml(id){
+    const s = state.students[id-1];
+    const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
+    const cloth = clothPool.find(item=>item.id===s.equippedClothes);
+    const background = state.backgrounds.find(item=>item.id===s.equippedBg);
+    const pet = state.layouts.find(item=>s.equippedLayout.includes(item.id));
+    const characterImage = cloth?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
+    return `<div class="closet-preview">
+        ${background?`<div class="bg-layer" style="background-image:url('${esc(background.image)}')"></div>`:""}
+        <div class="character" style="background-image:url('${esc(characterImage)}')"></div>
+        ${pet?`<div class="layout-item" style="background-image:url('${esc(pet.image)}')"></div>`:""}
+    </div>`;
 }
 function switchClosetTab(id,tab){
     const s = state.students[id-1];
@@ -994,10 +1027,10 @@ function switchClosetTab(id,tab){
     if(tab==="layouts"){
         const list = state.layouts.filter(x=>s.ownedLayout.includes(x.id));
         html = `<div class="shopgrid">${list.map(p=>`<div class="product">
-            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"✨"}</div>
+            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🐾"}</div>
             <b>${esc(p.name)}</b>
-            <div><button onclick="toggleEquipLayout(${id},'${esc(p.id)}')">${s.equippedLayout.includes(p.id)?"卸下":"配戴"}</button></div>
-        </div>`).join("")||`<div class="empty">還沒有佈置</div>`}</div>`;
+            <div><button onclick="toggleEquipLayout(${id},'${esc(p.id)}')">${s.equippedLayout.includes(p.id)?"卸下":"穿上"}</button></div>
+        </div>`).join("")||`<div class="empty">還沒有寵物</div>`}</div>`;
     }
     if(tab==="bgs"){
         const list = state.backgrounds.filter(x=>s.ownedBg.includes(x.id));
@@ -1008,29 +1041,25 @@ function switchClosetTab(id,tab){
         </div>`).join("")||`<div class="empty">還沒有背景</div>`}</div>`;
     }
     document.getElementById("closetTabContent").innerHTML = html;
-    document.querySelectorAll(".tab").forEach((el,i)=>{
+    document.getElementById("closetPreview").innerHTML = closetPreviewHtml(id);
+    document.querySelectorAll("#modal .tabs .tab").forEach((el,i)=>{
         el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
     });
 }
 function equipClothes(id,pid){
     const s = state.students[id-1];
     s.equippedClothes = (s.equippedClothes===pid) ? null : pid;
-    markChanged(); save();render();closet(id);
+    markChanged(); save(); render(); switchClosetTab(id,"clothes");
 }
 function toggleEquipLayout(id,pid){
     const s = state.students[id-1];
-    const arr = s.equippedLayout;
-    if(arr.includes(pid)){
-        s.equippedLayout = arr.filter(x=>x!==pid);
-    }else{
-        s.equippedLayout.push(pid);
-    }
-    markChanged(); save();render();closet(id);
+    s.equippedLayout = s.equippedLayout.includes(pid) ? [] : [pid];
+    markChanged(); save(); render(); switchClosetTab(id,"layouts");
 }
 function equipBg(id,pid){
     const s = state.students[id-1];
     s.equippedBg = (s.equippedBg===pid) ? null : pid;
-    markChanged(); save();render();closet(id);
+    markChanged(); save(); render(); switchClosetTab(id,"bgs");
 }
 
 //後台
@@ -1120,7 +1149,7 @@ async function backend(){
         <button onclick="jumpBackend('backend-members')">成員</button>
         <button onclick="jumpBackend('backend-clothes-m')">男生服裝</button>
         <button onclick="jumpBackend('backend-clothes-f')">女生服裝</button>
-        <button onclick="jumpBackend('backend-layouts')">佈置</button>
+        <button onclick="jumpBackend('backend-layouts')">寵物</button>
         <button onclick="jumpBackend('backend-backgrounds')">背景</button>
         <button onclick="jumpBackend('backend-coop')">協力任務</button>
     </nav>
@@ -1282,7 +1311,7 @@ async function backend(){
 
     </section>
     <section id="backend-layouts" class="backend-page">
-    <h3>新增商品 - 佈置小物（單張上傳）</h3>
+    <h3>新增商品 - 寵物（單張上傳）</h3>
     <div class="row">
         <div class="grow">
             <input id="layName" placeholder="名稱">
@@ -1294,10 +1323,10 @@ async function backend(){
         </div>
         <button class="primary" onclick="addLayout()">新增</button>
     </div>
-    <h3>佈置小物｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <h3>寵物｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
     <div class="row">
         <input type="file" id="layImgBatch" accept="image/*" multiple>
-        <button onclick="batchAddLayout()">批量新增佈置</button>
+        <button onclick="batchAddLayout()">批量新增寵物</button>
     </div>
     ${layHtml}
 
@@ -1485,7 +1514,7 @@ async function batchAddClothF(){
 async function batchAddLayout(){
     const files = document.getElementById("layImgBatch").files;
     if(!files.length) return alert("請選擇圖片");
-    await batchUploadFiles(files, state.layouts, "佈置");
+    await batchUploadFiles(files, state.layouts, "寵物");
 }
 async function batchAddBg(){
     const files = document.getElementById("bgImgBatch").files;
@@ -1528,7 +1557,7 @@ function setStudentGender(id,gender){
 
 function resetStudentCloset(id){
     const s = state.students[id-1];
-    if(!s || !confirm(`確定重置${id}號的衣櫃嗎？已購買的服裝、佈置與背景都會清除，代幣不受影響。`)) return;
+    if(!s || !confirm(`確定重置${id}號的衣櫃嗎？已購買的服裝、寵物與背景都會清除，代幣不受影響。`)) return;
     s.ownedClothes = [];
     s.equippedClothes = null;
     s.ownedLayout = [];
