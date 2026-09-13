@@ -332,6 +332,7 @@ if(!state){
     if(!state.tasks) state.tasks = [];
     [...state.clothesM,...state.clothesF,...state.layouts,...state.backgrounds].forEach(item=>{
         if(!item.level) item.level = "R";
+        if(typeof item.active!=="boolean") item.active = true;
         item.price = priceForLevel(item.level);
     });
     state.students.forEach(s=>{
@@ -429,6 +430,7 @@ function seedBuiltinBoyClothes(){
                 name: `男生服裝 ${index+1}`,
                 level: "R",
                 price: priceForLevel("R"),
+                active: true,
                 image
             });
             changed = true;
@@ -469,6 +471,7 @@ function seedBuiltinGirlClothes(){
                 name: `女生服裝 ${index+1}`,
                 level: "R",
                 price: priceForLevel("R"),
+                active: true,
                 image
             });
             changed = true;
@@ -494,6 +497,7 @@ function seedBuiltinBackgrounds(){
                 name: `背景 ${index+1}`,
                 level: "R",
                 price: priceForLevel("R"),
+                active: true,
                 image
             });
             changed = true;
@@ -746,8 +750,9 @@ function completeCoopMember(taskId,studentId){
 
 //商店
 function groupedShopCards(id,list,card){
+    const activeItems = list.filter(p=>p.active!==false);
     return LEVEL_ORDER.map(level=>{
-        const items = list.filter(p=>(p.level||"R")===level);
+        const items = activeItems.filter(p=>(p.level||"R")===level);
         return items.length ? `<section class="shop-level"><h3>${level}｜${priceForLevel(level)} 代幣</h3><div class="shopgrid">${items.map(p=>card(id,p)).join("")}</div></section>` : "";
     }).join("") || `<div class="empty">尚無商品</div>`;
 }
@@ -830,11 +835,11 @@ function switchShopTab(id,tab){
 function drawLottery(id){
     const s = state.students[id-1];
     if(!s || (s.lotteryTickets||0)<1) return alert("樂透券不足！");
-    const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
+    const clothPool = (s.gender==="M" ? state.clothesM : state.clothesF).filter(item=>item.active!==false);
     const prizes = [
         ...clothPool.map(item=>({item,type:"clothes"})),
-        ...state.layouts.map(item=>({item,type:"layout"})),
-        ...state.backgrounds.map(item=>({item,type:"background"}))
+        ...state.layouts.filter(item=>item.active!==false).map(item=>({item,type:"layout"})),
+        ...state.backgrounds.filter(item=>item.active!==false).map(item=>({item,type:"background"}))
     ];
     if(!prizes.length) return alert("商店目前沒有可抽取的商品！");
     const roll = Math.random()*100;
@@ -1037,6 +1042,7 @@ async function backend(){
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('clothesM','${esc(p.id)}',this.value)" placeholder="名稱">
                 <select onchange="updateItemLevel('clothesM','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
+                <select onchange="updateItemActive('clothesM','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
             </div>
         </div>
         <button onclick="moveItem('clothesM','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -1052,6 +1058,7 @@ async function backend(){
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('clothesF','${esc(p.id)}',this.value)" placeholder="名稱">
                 <select onchange="updateItemLevel('clothesF','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
+                <select onchange="updateItemActive('clothesF','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
             </div>
         </div>
         <button onclick="moveItem('clothesF','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -1067,6 +1074,7 @@ async function backend(){
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('layouts','${esc(p.id)}',this.value)" placeholder="名稱">
                 <select onchange="updateItemLevel('layouts','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
+                <select onchange="updateItemActive('layouts','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
             </div>
         </div>
         <button onclick="moveItem('layouts','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -1082,6 +1090,7 @@ async function backend(){
             <div class="edit-item-row">
                 <input value="${esc(p.name)}" onchange="updateItemName('backgrounds','${esc(p.id)}',this.value)" placeholder="名稱">
                 <select onchange="updateItemLevel('backgrounds','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
+                <select onchange="updateItemActive('backgrounds','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
             </div>
         </div>
         <button onclick="moveItem('backgrounds','${esc(p.id)}',-1)" title="往前移">↑</button>
@@ -1101,7 +1110,6 @@ async function backend(){
         <button onclick="jumpBackend('backend-clothes-f')">女生服裝</button>
         <button onclick="jumpBackend('backend-layouts')">佈置</button>
         <button onclick="jumpBackend('backend-backgrounds')">背景</button>
-        <button onclick="jumpBackend('backend-settings')">設定</button>
         <button onclick="jumpBackend('backend-coop')">協力任務</button>
     </nav>
     <div id="backend-overview" class="backend-page active">
@@ -1113,6 +1121,13 @@ async function backend(){
         <button onclick="exportData()">匯出備份</button>
         <button class="warning" onclick="document.getElementById('importFile').click()">匯入備份</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+      </div>
+      <div class="dangerzone">
+          <h3 class="warn">⚠️ 危險區域（資料清除）</h3>
+          <div class="small">建議先「匯出備份」再執行！動作無法復原</div>
+          <div class="row">
+              <button class="danger" onclick="wipeStorage()">刪除本遊戲全部儲存資料</button>
+          </div>
       </div>
     </div>
     <section id="backend-tasks" class="backend-page">
@@ -1296,53 +1311,16 @@ async function backend(){
     ${bgHtml}
 
     </section>
-    <section id="backend-settings" class="backend-page">
-    <div class="dangerzone">
-        <h3 class="warn">⚠️ 危險區域（資料清除）</h3>
-        <div class="small">建議先「匯出備份」再執行！動作無法復原</div>
-        <div class="row">
-            <button class="danger" onclick="wipeStorage()">刪除本遊戲全部儲存資料</button>
-            <button class="warning" onclick="resetGame()">重置遊戲回預設初始狀態</button>
-        </div>
-    </div>
-    </section>
     `);
 }
 
-//【危險功能：清空記憶體 / 重置遊戲】
+//【危險功能：清空本機儲存資料】
 function wipeStorage(){
     if(!confirm("⚠️ 第一次確認：將刪除五年甲班換裝遊戲所有本機儲存！\n資料會消失！建議先匯出備份！")) return;
     if(!confirm("🔥 第二次確認！真的要全部刪除嗎？無法復原！")) return;
     localStorage.removeItem(STORAGE_KEY);
     alert("已刪除儲存！頁面即將重新載入");
     location.reload();
-}
-function resetGame(){
-    if(!confirm("⚠️ 第一次確認：重置回遊戲預設初始狀態，自訂服裝、代幣全部清空！")) return;
-    if(!confirm("🔥 第二次確認！確定重置？")) return;
-    localStorage.removeItem(STORAGE_KEY);
-    state = null;
-    raw = null;
-    state = {
-        students: Array.from({length:26}, (_,i)=>({
-            id:i+1, gender: i<12 ? "M" : "F",
-            tokens:0, lotteryTickets:0, doneTasks:[],
-            ownedClothes:[], equippedClothes:null,
-            ownedLayout:[], equippedLayout:[],
-            ownedBg:[], equippedBg:null
-        })),
-        tasks: [
-            {id:"t1", title:"完成今日作業", reward:20},
-            {id:"t2", title:"完成數學練習", reward:30},
-            {id:"t3", title:"幫助同學一次", reward:40}
-        ],
-        clothesM:[], clothesF:[], layouts:[], backgrounds:[], coopTasks:[],
-        globalBgImage:"", lastSaved:null
-    };
-    save();
-    render();
-    closeModal();
-    alert("已重置回遊戲初始狀態！");
 }
 
 //後台商品陣列對應到實際功能分頁
@@ -1447,6 +1425,12 @@ function updateItemLevel(listName,id,newLevel){
     item.price = priceForLevel(newLevel);
     markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
+function updateItemActive(listName,id,value){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item) return;
+    item.active = value === "true";
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
 function updateItemPrice(listName,id,newPrice){
     const item = state[listName].find(x=>x.id===id);
     if(!item || isNaN(newPrice) || newPrice<0) return;
@@ -1464,6 +1448,7 @@ async function batchUploadFiles(fileList, targetArray, prefixName){
             name: `${prefixName} ${i+1}`,
             level: "R",
             price: priceForLevel("R"),
+            active: true,
             image: imgData
         });
     }
@@ -1617,7 +1602,7 @@ async function addClothM(){
     const file = document.getElementById("mImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.clothesM.push({id:makeItemId(),name,level,price,image:img});
+    state.clothesM.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-m");
 }
 async function addClothF(){
@@ -1627,7 +1612,7 @@ async function addClothF(){
     const file = document.getElementById("fImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.clothesF.push({id:makeItemId(),name,level,price,image:img});
+    state.clothesF.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-f");
 }
 async function addLayout(){
@@ -1637,7 +1622,7 @@ async function addLayout(){
     const file = document.getElementById("layImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.layouts.push({id:makeItemId(),name,level,price,image:img});
+    state.layouts.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-layouts");
 }
 async function addBgItem(){
@@ -1647,7 +1632,7 @@ async function addBgItem(){
     const file = document.getElementById("bgImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    state.backgrounds.push({id:makeItemId(),name,level,price,image:img});
+    state.backgrounds.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-backgrounds");
 }
 function deleteItem(listName,id){
