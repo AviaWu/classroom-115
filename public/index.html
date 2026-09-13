@@ -154,14 +154,14 @@ input[type="number"]{width:85px}
 .pet-mood-side{text-align:left}
 .pet-mood-side h3{margin-top:0;padding:9px 12px;background:#34405c;color:#f3d98b;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;text-align:center}
 .pet-mood-grid{display:grid;grid-template-columns:repeat(3,minmax(82px,1fr));gap:11px}
-.pet-mood-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:78px;padding:8px 5px;background:#f7e9c8;border:4px solid #20263a;color:#20263a;box-shadow:4px 4px 0 #172033;font-family:"Courier New",monospace}
-.pet-mood-button:nth-child(3n+2){background:#9ed7d3}
-.pet-mood-button:nth-child(3n){background:#f3d98b}
-.pet-mood-button:hover{background:#fff8e8;transform:translate(-1px,-1px);box-shadow:5px 5px 0 #172033}
+.pet-mood-button{--mood-color:#f3d98b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;width:100%;min-width:0;min-height:78px;padding:8px 4px;overflow:hidden;background:#d7d7d7;border:4px solid #20263a;color:#20263a;box-shadow:4px 4px 0 #172033;font-family:"Courier New",monospace}
+.pet-mood-button:hover{background:#e8e8e8;transform:translate(-1px,-1px);box-shadow:5px 5px 0 #172033}
+.pet-mood-button.selected{background:var(--mood-color);transform:translate(2px,2px);box-shadow:2px 2px 0 #172033}
 .pet-mood-button:focus-visible{outline:4px solid #efb1a5;outline-offset:3px}
-.pet-mood-button span{font-size:27px;line-height:1}
+.pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:clamp(11px,1.55vw,16px);line-height:1.15;white-space:nowrap;letter-spacing:-1px}
+.pet-mood-button b{font-size:14px}
 .pet-stage{display:flex;flex-direction:column;align-items:center;min-width:0}
-.pet-mood-reply{position:relative;width:100%;min-height:96px;box-sizing:border-box;margin-bottom:24px;padding:17px;background:#fffdf3;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-size:16px;line-height:1.7;text-align:left}
+.pet-mood-reply{position:relative;width:100%;min-height:96px;box-sizing:border-box;margin-bottom:24px;padding:18px;background:#fffdf3;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:19px;font-weight:700;line-height:1.75;letter-spacing:.5px;text-align:left}
 .pet-mood-reply::before{content:"";position:absolute;right:42px;bottom:-18px;width:28px;height:28px;background:#fffdf3;border-right:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg)}
 .pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
 .pet-mood-reply p{margin:8px 0 0}
@@ -873,8 +873,9 @@ function openPetMood(id){
         openModal(`<h2>${id}號｜寵物心情互動</h2><div class="empty">尚未裝備寵物，請先到衣櫃選擇一隻寵物。</div>`);
         return;
     }
-    const moodButtons = Object.keys(PET_MOOD_RESPONSES).map(mood=>`
-        <button class="pet-mood-button" onclick="showPetMoodReply('${mood}')" aria-label="選擇${mood}心情">
+    const moodColors = ["#ffd36e","#ff9f9f","#ffb45e","#9ed7d3","#efd57b","#c4b3e8","#9fc4e7","#8fa5c8","#ef9b88","#b9c0c8","#8fb5db","#b798c7"];
+    const moodButtons = Object.keys(PET_MOOD_RESPONSES).map((mood,index)=>`
+        <button class="pet-mood-button" style="--mood-color:${moodColors[index]}" onclick="showPetMoodReply('${mood}',this)" aria-label="選擇${mood}心情" aria-pressed="false">
             <span aria-hidden="true">${PET_MOOD_ICONS[mood]}</span><b>${mood}</b>
         </button>`).join("");
     openModal(`<h2>${id}號｜寵物心情互動</h2>
@@ -890,10 +891,15 @@ function openPetMood(id){
         </div>`);
 }
 
-function showPetMoodReply(mood){
+function showPetMoodReply(mood,button){
     const responses = PET_MOOD_RESPONSES[mood];
     const replyElement = document.getElementById("petMoodReply");
     if(!responses?.length || !replyElement) return;
+    document.querySelectorAll(".pet-mood-button").forEach(item=>{
+        const selected = item===button;
+        item.classList.toggle("selected",selected);
+        item.setAttribute("aria-pressed",String(selected));
+    });
     const reply = responses[Math.floor(Math.random()*responses.length)];
     replyElement.textContent = reply;
 }
@@ -1412,7 +1418,8 @@ async function backend(){
     <div class="row">
         <label>全體學生代幣：<input id="batchToken" type="number" value="0"></label>
         <button onclick="addTokenAll()">全體增加</button>
-        <button class="danger" onclick="setTokenAll()">全體設定為</button>
+        <button onclick="setTokenAll()">全體設定為</button>
+        <button class="danger" onclick="resetAllTokens()">重置全體代幣為 0</button>
     </div>
     </section>
     <section id="backend-lottery" class="backend-page">
@@ -1423,11 +1430,12 @@ async function backend(){
         <button class="primary" onclick="addLotteryTicketOne()">➕給予樂透券</button>
         <button class="danger" onclick="subLotteryTicketOne()">➖移除樂透券</button>
     </div>
+    <h3>樂透券批量管理</h3>
     <div class="row">
-        <button class="warning" onclick="resetAllLotteryTickets()">重置全體成員樂透券為 0</button>
-    </div>
-    <div class="row" style="display:block">
-        ${state.students.map(s=>`<div class="row"><b class="grow">${s.id}號</b><span>🎟️ ${s.lotteryTickets||0}</span></div>`).join("")}
+        <label>全體成員樂透券：<input id="batchLotteryTicket" type="number" min="0" value="0"></label>
+        <button onclick="addLotteryTicketsAll()">全體增加</button>
+        <button onclick="setLotteryTicketsAll()">全體設定為</button>
+        <button class="danger" onclick="resetAllLotteryTickets()">重置全體樂透券為 0</button>
     </div>
     </section>
     <section id="backend-members" class="backend-page">
@@ -1792,6 +1800,18 @@ function subLotteryTicketOne(){
     student.lotteryTickets = Math.max(0,(student.lotteryTickets||0)-delta);
     markChanged(); save(); render(); refreshBackendPage("backend-lottery");
 }
+function addLotteryTicketsAll(){
+    const value = Math.floor(Number(document.getElementById("batchLotteryTicket").value));
+    if(!Number.isFinite(value) || value<0) return alert("請輸入大於或等於 0 的整數");
+    state.students.forEach(s=>s.lotteryTickets=(s.lotteryTickets||0)+value);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+function setLotteryTicketsAll(){
+    const value = Math.floor(Number(document.getElementById("batchLotteryTicket").value));
+    if(!Number.isFinite(value) || value<0) return alert("請輸入大於或等於 0 的整數");
+    state.students.forEach(s=>s.lotteryTickets=value);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
 function resetAllLotteryTickets(){
     if(!confirm("確定將全體成員的樂透券重置為 0？")) return;
     state.students.forEach(s=>s.lotteryTickets=0);
@@ -1824,6 +1844,11 @@ function addTokenAll(){
 function setTokenAll(){
     const v = Number(document.getElementById("batchToken").value)||0;
     state.students.forEach(s=>s.tokens=v);
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+}
+function resetAllTokens(){
+    if(!confirm("確定將全體成員的代幣重置為 0？")) return;
+    state.students.forEach(s=>s.tokens=0);
     markChanged(); save(); render(); refreshBackendPage("backend-tokens");
 }
 
