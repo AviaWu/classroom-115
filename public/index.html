@@ -291,6 +291,8 @@ const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
+const DEFAULT_PET_IMAGE = "/images/Dec2/1000095494-removebg-preview.png";
+const DEFAULT_PET_NAME = "預設寵物";
 const LEVEL_PRICES = {R:50, SR:100, SSR:200, UR:300};
 const LEVEL_ORDER = ["R","SR","SSR","UR"];
 const PET_MOOD_ICONS = {
@@ -558,28 +560,19 @@ function seedBuiltinBoyClothes(persist=true){
 
 seedBuiltinBoyClothes();
 
-// 內建女生服裝：直接使用 public/images/girl/ 的圖片，避免每次載入重複建立商品
+// 內建女生服裝：以 public/images/girl/ 的商品圖片完整取代舊商品；g0 僅作預設服裝
 function seedBuiltinGirlClothes(persist=true){
-    const removedIds = state.clothesF.filter(item=>item.image==="/images/girl/g0.png").map(item=>item.id);
+    const filenames = Array.from({length:42}, (_,index)=>`g (${index+1}).png`);
+    const allowedImages = new Set(filenames.map(filename=>`/images/girl/${encodeURIComponent(filename)}`));
+    const removedIds = state.clothesF.filter(item=>!allowedImages.has(item.image)).map(item=>item.id);
     let changed = removedIds.length>0;
     if(changed){
-        state.clothesF = state.clothesF.filter(item=>item.image!=="/images/girl/g0.png");
+        state.clothesF = state.clothesF.filter(item=>allowedImages.has(item.image));
         state.students.forEach(s=>{
             s.ownedClothes = s.ownedClothes.filter(id=>!removedIds.includes(id));
             if(removedIds.includes(s.equippedClothes)) s.equippedClothes = null;
         });
     }
-    const filenames = [
-        "g (1).png", "g (2).png", "g (3).png", "g (4).png", "g (5).png",
-        "g (6).png", "g (7).png", "g (8).png", "g (9).png", "g (10).png",
-        "g (11).png", "g (12).png", "g (13).png", "g (14).png", "g (15).png",
-        "g (16).png", "g (17).png", "g (18).png", "g (19).png", "g (20).png",
-        "g (21).png", "g (22).png", "g (23).png", "g (24).png", "g (25).png",
-        "g (26).png", "g (27).png", "g (28).png", "g (29).png", "g (30).png",
-        "g (31).png", "g (32).png", "g (33).png", "g (34).png", "g (35).png",
-        "g (36).png", "g (37).png", "g (38).png", "g (39).png", "g (40).png",
-        "g (41).png", "g (42).png"
-    ];
     filenames.forEach((filename, index)=>{
         const image = `/images/girl/${encodeURIComponent(filename)}`;
         if(!state.clothesF.some(item=>item.image===image)){
@@ -600,7 +593,7 @@ function seedBuiltinGirlClothes(persist=true){
 
 seedBuiltinGirlClothes();
 
-// 內建寵物商品：以 public/images/Dec2/ 的全部 PNG 取代舊版 dec 寵物
+// 內建寵物商品：指定圖片作為免費預設寵物，其餘 Dec2 圖片加入商店
 function seedBuiltinLayouts(persist=true){
     const filenames = [
         "1000095479-removebg-preview.png",
@@ -613,7 +606,6 @@ function seedBuiltinLayouts(persist=true){
         "1000095489-removebg-preview.png",
         "1000095491-removebg-preview.png",
         "1000095493-removebg-preview.png",
-        "1000095494-removebg-preview.png",
         "1000095495-removebg-preview.png",
         "1000095496-removebg-preview.png",
         "1000095497-removebg-preview.png",
@@ -621,7 +613,9 @@ function seedBuiltinLayouts(persist=true){
         "1000095502-removebg-preview.png",
         "1000095503-removebg-preview.png"
     ];
-    const removedItems = state.layouts.filter(item=>/^\/images\/dec\//i.test(item.image||""));
+    const removedItems = state.layouts.filter(item=>
+        /^\/images\/dec\//i.test(item.image||"") || item.image===DEFAULT_PET_IMAGE
+    );
     const removedIds = removedItems.map(item=>item.id);
     let changed = removedIds.length>0;
     if(changed){
@@ -867,11 +861,10 @@ function openPetMood(id){
     const student = state.students.find(s=>s.id===id);
     if(!student) return;
     const equippedLayout = Array.isArray(student.equippedLayout) ? student.equippedLayout : [];
-    const pet = state.layouts.find(item=>equippedLayout.includes(item.id));
-    if(!pet){
-        openModal(`<h2>${id}號｜寵物心情互動</h2><div class="empty">尚未裝備寵物，請先到衣櫃選擇一隻寵物。</div>`);
-        return;
-    }
+    const pet = state.layouts.find(item=>equippedLayout.includes(item.id)) || {
+        name:DEFAULT_PET_NAME,
+        image:DEFAULT_PET_IMAGE
+    };
     const moodColors = ["#ffd43b","#ff6b9a","#ff8c42","#66d9c4","#ffe66d","#b197fc","#4dabf7","#6c7a9c","#ff7043","#adb5bd","#5c7cfa","#9c36b5"];
     const moodButtons = Object.keys(PET_MOOD_RESPONSES).map((mood,index)=>`
         <button class="pet-mood-button" style="--mood-color:${moodColors[index]}" onclick="showPetMoodReply('${mood}',this)" aria-label="選擇${mood}心情" aria-pressed="false">
@@ -948,7 +941,7 @@ function openCoopTask(taskId, taskButtons=""){
         const pool = s.gender==="M" ? state.clothesM : state.clothesF;
         const equipped = pool.find(x=>x.id===s.equippedClothes);
         const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
-        const activePet = state.layouts.find(x=>s.equippedLayout.includes(x.id));
+        const activePet = state.layouts.find(x=>s.equippedLayout.includes(x.id)) || {image:DEFAULT_PET_IMAGE};
         const image = equipped?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
         const bgImage = eqBg?.image || "";
         const bgHtml = bgImage ? `<div class="bg-layer" style="background-image:url('${esc(bgImage)}')"></div>` : "";
@@ -1203,7 +1196,10 @@ function closetPreviewHtml(id){
     const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
     const cloth = clothPool.find(item=>item.id===s.equippedClothes);
     const background = state.backgrounds.find(item=>item.id===s.equippedBg);
-    const pet = state.layouts.find(item=>s.equippedLayout.includes(item.id));
+    const pet = state.layouts.find(item=>s.equippedLayout.includes(item.id)) || {
+        name:DEFAULT_PET_NAME,
+        image:DEFAULT_PET_IMAGE
+    };
     const characterImage = cloth?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
     return `<div class="closet-preview">
         ${background?`<div class="bg-layer" style="background-image:url('${esc(background.image)}')"></div>`:""}
