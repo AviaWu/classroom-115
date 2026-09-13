@@ -173,7 +173,7 @@ input[type="number"]{width:85px}
 .drawing-thumb img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff;border:2px solid #20263a}
 .drawing-thumb span{display:block;margin-top:5px;font-size:11px;text-align:center}
 .drawing-canvas-wrap{min-width:0}
-#drawingCanvas{display:block;width:100%;height:auto;aspect-ratio:4/3;background:#fff;border:4px solid #20263a;box-shadow:6px 6px 0 #172033;touch-action:none;cursor:crosshair}
+#drawingCanvas{display:block;width:100%;height:auto;aspect-ratio:4/3;background:#fff;border:4px solid #20263a;box-shadow:6px 6px 0 #172033;touch-action:none;cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ccircle cx='9' cy='9' r='5' fill='%23000'/%3E%3C/svg%3E") 9 9,crosshair}
 .drawing-tools{padding:12px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
 .drawing-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:10px 0 16px}
 .drawing-color{width:100%;aspect-ratio:1;padding:0;background:var(--paint-color);border:3px solid #20263a;box-shadow:2px 2px 0 #172033}
@@ -181,7 +181,11 @@ input[type="number"]{width:85px}
 .drawing-tool-actions{display:grid;gap:10px}
 .drawing-tool-actions button.active{background:#9ed7d3}
 .drawing-status{min-height:20px;margin-top:12px;font-size:12px;font-weight:700}
-@media(max-width:800px){.drawing-board-layout{grid-template-columns:1fr}.drawing-canvas-wrap{order:1}.drawing-tools{order:2}.drawing-history{order:3;display:grid;grid-template-columns:repeat(5,minmax(80px,1fr));max-height:none}.drawing-palette{grid-template-columns:repeat(8,1fr)}}
+.backend-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px}
+.backend-album-item{padding:10px;background:#fff8e8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;text-align:center}
+.backend-album-item img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff;border:2px solid #20263a;margin-bottom:8px}
+.backend-album-actions{display:flex;justify-content:center;gap:8px;margin-top:8px}
+@media(max-width:800px){.drawing-board-layout{grid-template-columns:1fr}.drawing-canvas-wrap{order:1}.drawing-tools{order:2}.drawing-history{order:3;display:grid;grid-template-columns:repeat(3,minmax(80px,1fr));max-height:none}.drawing-palette{grid-template-columns:repeat(8,1fr)}}
 @media(max-width:520px){.drawing-history{grid-template-columns:repeat(2,1fr)}.drawing-palette{grid-template-columns:repeat(6,1fr)}}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
@@ -436,6 +440,7 @@ if(!state){
         backgrounds:[],
         coopTasks:[],
         drawings:[],
+        drawingAlbum:[],
         globalBgImage:"",
         lastSaved:null
     };
@@ -452,7 +457,13 @@ function normalizeState(target){
     if(!Array.isArray(target.backgrounds)) target.backgrounds=[];
     if(!Array.isArray(target.coopTasks)) target.coopTasks=[];
     if(!Array.isArray(target.drawings)) target.drawings=[];
-    target.drawings = target.drawings.filter(item=>item && typeof item.data==="string").slice(0,10);
+    if(!Array.isArray(target.drawingAlbum)) target.drawingAlbum=[];
+    target.drawings = target.drawings.filter(item=>item && typeof item.data==="string");
+    target.drawingAlbum = target.drawingAlbum.filter(item=>item && typeof item.data==="string");
+    if(target.drawings.length>3){
+        target.drawingAlbum.unshift(...target.drawings.slice(3));
+        target.drawings = target.drawings.slice(0,3);
+    }
     if(!Array.isArray(target.tasks)) target.tasks=[];
     target.clothesM = target.clothesM.filter(item=>item && typeof item==="object");
     target.clothesF = target.clothesF.filter(item=>item && typeof item==="object");
@@ -887,6 +898,7 @@ let drawingContext = null;
 let drawingActive = false;
 let drawingTool = "pen";
 let drawingColor = DRAWING_COLORS[0];
+let drawingUndoStack = [];
 
 function drawingHistoryHtml(){
     if(!state.drawings.length) return `<div class="empty">尚無儲存作品</div>`;
@@ -907,6 +919,7 @@ function openDrawingBoard(){
                 <div class="drawing-palette">${palette}</div>
                 <div class="drawing-tool-actions">
                     <button id="drawingEraser" onclick="toggleDrawingEraser()">橡皮擦</button>
+                    <button id="drawingUndo" onclick="undoDrawing()" disabled>返回上一步（0/5）</button>
                     <button class="warning" onclick="clearDrawingBoard()">清空</button>
                     <button class="primary" onclick="saveDrawingBoard()">儲存</button>
                 </div>
@@ -926,6 +939,8 @@ function initializeDrawingCanvas(){
     drawingContext.lineJoin = "round";
     drawingTool = "pen";
     drawingColor = DRAWING_COLORS[0];
+    drawingUndoStack = [];
+    updateDrawingUndoButton();
     const point = event=>{
         const rect = canvas.getBoundingClientRect();
         return {
@@ -935,6 +950,7 @@ function initializeDrawingCanvas(){
     };
     canvas.addEventListener("pointerdown",event=>{
         event.preventDefault();
+        pushDrawingUndoState();
         drawingActive = true;
         canvas.setPointerCapture(event.pointerId);
         const p = point(event);
@@ -957,6 +973,26 @@ function initializeDrawingCanvas(){
     canvas.addEventListener("pointercancel",stop);
 }
 
+function updateDrawingUndoButton(){
+    const button = document.getElementById("drawingUndo");
+    if(!button) return;
+    button.disabled = drawingUndoStack.length===0;
+    button.textContent = `返回上一步（${drawingUndoStack.length}/5）`;
+}
+function pushDrawingUndoState(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas || !drawingContext) return;
+    drawingUndoStack.push(drawingContext.getImageData(0,0,canvas.width,canvas.height));
+    if(drawingUndoStack.length>5) drawingUndoStack.shift();
+    updateDrawingUndoButton();
+}
+function undoDrawing(){
+    if(!drawingContext || !drawingUndoStack.length) return;
+    drawingContext.putImageData(drawingUndoStack.pop(),0,0);
+    updateDrawingUndoButton();
+    const status = document.getElementById("drawingStatus");
+    if(status) status.textContent = "已返回上一步";
+}
 function applyDrawingStroke(){
     if(!drawingContext) return;
     drawingContext.strokeStyle = drawingTool==="eraser" ? "#ffffff" : drawingColor;
@@ -975,6 +1011,7 @@ function toggleDrawingEraser(){
 function clearDrawingBoard(){
     const canvas = document.getElementById("drawingCanvas");
     if(!canvas || !drawingContext || !confirm("確定清空目前畫板？")) return;
+    pushDrawingUndoState();
     drawingContext.fillStyle = "#ffffff";
     drawingContext.fillRect(0,0,canvas.width,canvas.height);
     document.getElementById("drawingStatus").textContent = "畫板已清空";
@@ -984,11 +1021,13 @@ function saveDrawingBoard(){
     if(!canvas) return;
     const item = {id:"drawing_"+Date.now(),savedAt:new Date().toISOString(),data:canvas.toDataURL("image/jpeg",.78)};
     state.drawings.unshift(item);
-    state.drawings = state.drawings.slice(0,10);
+    if(state.drawings.length>3){
+        state.drawingAlbum.unshift(...state.drawings.splice(3));
+    }
     markChanged();
     if(!save()) return;
     document.getElementById("drawingHistory").innerHTML = drawingHistoryHtml();
-    document.getElementById("drawingStatus").textContent = "已儲存，最多保留最近 10 張";
+    document.getElementById("drawingStatus").textContent = "已儲存；最近保留 3 張，舊作已移至後台畫冊";
 }
 function loadDrawing(id){
     const item = state.drawings.find(drawing=>drawing.id===id);
@@ -996,6 +1035,7 @@ function loadDrawing(id){
     if(!item || !canvas || !drawingContext) return;
     const image = new Image();
     image.onload = ()=>{
+        pushDrawingUndoState();
         drawingContext.fillStyle = "#ffffff";
         drawingContext.fillRect(0,0,canvas.width,canvas.height);
         drawingContext.drawImage(image,0,0,canvas.width,canvas.height);
@@ -1508,6 +1548,15 @@ async function backend(){
     let fClothHtml = adminProductGroups("clothesF",state.clothesF);
     let layHtml = adminProductGroups("layouts",state.layouts);
     let bgHtml = adminProductGroups("backgrounds",state.backgrounds);
+    const albumHtml = state.drawingAlbum.map((item,index)=>`<article class="backend-album-item">
+        <img src="${esc(item.data)}" alt="畫冊作品 ${index+1}">
+        <b>畫作 ${state.drawingAlbum.length-index}</b>
+        <div class="small">${esc(new Date(item.savedAt).toLocaleString())}</div>
+        <div class="backend-album-actions">
+            <button onclick="downloadAlbumDrawing('${esc(item.id)}')">下載</button>
+            <button class="danger" onclick="deleteAlbumDrawing('${esc(item.id)}')">永久刪除</button>
+        </div>
+    </article>`).join("") || `<div class="empty">畫冊目前沒有作品</div>`;
 
     openModal(`
     <h2>老師後台</h2>
@@ -1522,6 +1571,7 @@ async function backend(){
         <button onclick="jumpBackend('backend-layouts')">寵物</button>
         <button onclick="jumpBackend('backend-backgrounds')">背景</button>
         <button onclick="jumpBackend('backend-coop')">協力任務</button>
+        <button onclick="jumpBackend('backend-album')">畫冊</button>
     </nav>
     <div id="backend-overview" class="backend-page active">
       <div class="row">
@@ -1716,6 +1766,11 @@ async function backend(){
     ${bgHtml}
 
     </section>
+    <section id="backend-album" class="backend-page">
+        <h3>畫冊</h3>
+        <p class="small">畫板只顯示最近 3 張；超出的舊作品會自動收藏於此，可下載或永久刪除。</p>
+        <div class="backend-album-grid">${albumHtml}</div>
+    </section>
     `);
 }
 
@@ -1772,6 +1827,25 @@ function refreshBackendPage(targetId){
             refreshedPanel.scrollTop = savedScrollTop;
         });
     });
+}
+
+function downloadAlbumDrawing(id){
+    const item = state.drawingAlbum.find(drawing=>drawing.id===id);
+    if(!item) return;
+    const link = document.createElement("a");
+    link.href = item.data;
+    link.download = `班級畫作_${new Date(item.savedAt).toISOString().replace(/[:.]/g,"-")}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+function deleteAlbumDrawing(id){
+    const item = state.drawingAlbum.find(drawing=>drawing.id===id);
+    if(!item || !confirm("確定永久刪除這張畫作？此動作無法復原。")) return;
+    state.drawingAlbum = state.drawingAlbum.filter(drawing=>drawing.id!==id);
+    markChanged();
+    save();
+    refreshBackendPage("backend-album");
 }
 
 function selectCoopMonster(button,image){
