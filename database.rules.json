@@ -1,0 +1,27 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "games": {
+      "classroom-115": {
+        "progress": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['students', 'lastSaved'])",
+          "students": {
+            ".validate": "newData.hasChildren(['0'])"
+          },
+          "globalBgImage": {
+            ".validate": "!newData.exists() || newData.isString()"
+          },
+          "lastSaved": {
+            ".validate": "newData.isString()"
+          },
+          "$other": {
+            ".validate": true
+          }
+        }
+      }
+    }
+  }
+}

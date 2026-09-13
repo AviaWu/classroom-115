@@ -228,7 +228,7 @@ input[type="number"]{width:85px}
 <div>
 <button onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
 <button onclick="openBackend()">老師後台</button>
-<span class="small" id="saveStatus"></span>
+<span class="small" id="saveStatus">☁️ 正在連線 Firebase...</span>
 </div>
 </header>
 
@@ -245,6 +245,7 @@ input[type="number"]{width:85px}
 
 <script>
 const STORAGE_KEY = "growth26_v18_full";
+const CLOUD_SAVE_PATH = "games/classroom-115/progress";
 const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
@@ -537,10 +538,12 @@ function getStorageUsage(){
 
 function save(){
     try{
-        state.lastSaved = new Date().toLocaleString();
+        state.lastSaved = new Date().toISOString();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         unsavedChange = false;
-        document.getElementById("saveStatus").textContent = "✅已儲存";
+        const status = document.getElementById("saveStatus");
+        status.textContent = window.firebaseGameStore ? "☁️ 正在同步..." : "💾 已儲存於本機";
+        window.firebaseGameStore?.queueSave(state);
         return true;
     }catch(e){
         if(e.name === "QuotaExceededError"){
@@ -550,6 +553,15 @@ function save(){
         }
         return false;
     }
+}
+
+function applyCloudState(cloudState){
+    if(!cloudState || !Array.isArray(cloudState.students)) return false;
+    state = cloudState;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    unsavedChange = false;
+    render();
+    return true;
 }
 
 function esc(x){
@@ -1244,13 +1256,18 @@ async function backend(){
     `);
 }
 
-//【危險功能：清空本機儲存資料】
-function wipeStorage(){
-    if(!confirm("⚠️ 第一次確認：將刪除五年甲班換裝遊戲所有本機儲存！\n資料會消失！建議先匯出備份！")) return;
+//【危險功能：清空本機與 Firebase 儲存資料】
+async function wipeStorage(){
+    if(!confirm("⚠️ 第一次確認：將刪除遊戲的本機與 Firebase 雲端存檔！\n資料會消失！建議先匯出備份！")) return;
     if(!confirm("🔥 第二次確認！真的要全部刪除嗎？無法復原！")) return;
-    localStorage.removeItem(STORAGE_KEY);
-    alert("已刪除儲存！頁面即將重新載入");
-    location.reload();
+    try{
+        await window.firebaseGameStore?.remove();
+        localStorage.removeItem(STORAGE_KEY);
+        alert("已刪除本機與雲端存檔！頁面即將重新載入");
+        location.reload();
+    }catch(error){
+        alert("刪除雲端存檔失敗："+(error.message||error));
+    }
 }
 
 //後台商品陣列對應到實際功能分頁
@@ -1600,23 +1617,78 @@ async function importData(input){
 render();
 </script>
 <script type="module">
-  // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+  import { getDatabase, get, onValue, ref, remove, set } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
 
-  // Your web app's Firebase configuration
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
     authDomain: "classroom-115.firebaseapp.com",
+    databaseURL: "https://classroom-115-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "classroom-115",
     storageBucket: "classroom-115.firebasestorage.app",
     messagingSenderId: "242136273912",
     appId: "1:242136273912:web:8bd1b43dc7d8ecc698fc0d"
   };
 
-  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const database = getDatabase(app);
+  const gameRef = ref(database, CLOUD_SAVE_PATH);
+  const status = document.getElementById("saveStatus");
+  let cloudReady = false;
+  let saveTimer = null;
+  let applyingRemote = false;
+
+  function showCloudError(error){
+    console.error("Firebase 同步失敗", error);
+    status.textContent = "⚠️ 雲端同步失敗（保留本機存檔）";
+  }
+
+  window.firebaseGameStore = {
+    queueSave(nextState){
+      if(!cloudReady || applyingRemote) return;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async()=>{
+        try{
+          await set(gameRef, nextState);
+          status.textContent = `☁️ 已同步 ${new Date().toLocaleTimeString()}`;
+        }catch(error){
+          showCloudError(error);
+        }
+      }, 500);
+    },
+    remove(){
+      clearTimeout(saveTimer);
+      return remove(gameRef);
+    }
+  };
+
+  try{
+    await signInAnonymously(auth);
+    const initialSnapshot = await get(gameRef);
+    if(initialSnapshot.exists()){
+      applyingRemote = true;
+      applyCloudState(initialSnapshot.val());
+      applyingRemote = false;
+      status.textContent = "☁️ 已載入雲端進度";
+    }else{
+      await set(gameRef, state);
+      status.textContent = "☁️ 已建立雲端存檔";
+    }
+    cloudReady = true;
+
+    onValue(gameRef, snapshot=>{
+      if(!cloudReady || !snapshot.exists()) return;
+      const remoteState = snapshot.val();
+      if(remoteState.lastSaved === state.lastSaved) return;
+      applyingRemote = true;
+      if(applyCloudState(remoteState)) status.textContent = "☁️ 已取得最新進度";
+      applyingRemote = false;
+    }, showCloudError);
+  }catch(error){
+    showCloudError(error);
+  }
 </script>
 </body>
 </html>
