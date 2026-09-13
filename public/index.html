@@ -293,20 +293,29 @@ if(!state){
         globalBgImage:"",
         lastSaved:null
     };
-}else{
-    if(!state.clothesM) state.clothesM=[];
-    if(!state.clothesF) state.clothesF=[];
-    if(!Array.isArray(state.layouts)) state.layouts=[];
-    if(!Array.isArray(state.backgrounds)) state.backgrounds=[];
-    if(!Array.isArray(state.coopTasks)) state.coopTasks=[];
-    if(!state.tasks) state.tasks = [];
-    [...state.clothesM,...state.clothesF,...state.layouts,...state.backgrounds].forEach(item=>{
+}
+normalizeState(state);
+
+function normalizeState(target){
+    if(!target || typeof target!=="object") return null;
+    if(!Array.isArray(target.students)) target.students=[];
+    if(!Array.isArray(target.clothesM)) target.clothesM=[];
+    if(!Array.isArray(target.clothesF)) target.clothesF=[];
+    if(!Array.isArray(target.layouts)) target.layouts=[];
+    if(!Array.isArray(target.backgrounds)) target.backgrounds=[];
+    if(!Array.isArray(target.coopTasks)) target.coopTasks=[];
+    if(!Array.isArray(target.tasks)) target.tasks=[];
+    if(typeof target.globalBgImage!=="string") target.globalBgImage="";
+    [...target.clothesM,...target.clothesF,...target.layouts,...target.backgrounds].forEach(item=>{
         if(!item.level) item.level = "R";
         if(typeof item.active!=="boolean") item.active = true;
         item.price = priceForLevel(item.level);
     });
-    state.students.forEach(s=>{
+    target.students.forEach((s,index)=>{
+        if(!Number.isFinite(Number(s.id))) s.id=index+1;
         if(!s.gender) s.gender = s.id<=12?"M":"F";
+        if(!Number.isFinite(Number(s.tokens))) s.tokens=0;
+        else s.tokens=Number(s.tokens);
         if(!Number.isFinite(Number(s.lotteryTickets))) s.lotteryTickets = 0;
         else s.lotteryTickets = Math.max(0,Number(s.lotteryTickets));
         if(!Array.isArray(s.equippedLayout)) s.equippedLayout = [];
@@ -314,7 +323,10 @@ if(!state){
         if(!Array.isArray(s.ownedLayout)) s.ownedLayout = [];
         if(!Array.isArray(s.ownedBg)) s.ownedBg = [];
         if(!Array.isArray(s.doneTasks)) s.doneTasks = [];
+        if(typeof s.equippedClothes==="undefined") s.equippedClothes=null;
+        if(typeof s.equippedBg==="undefined") s.equippedBg=null;
     });
+    return target;
 }
 
 function readSharedState(){
@@ -557,7 +569,7 @@ function save(){
 
 function applyCloudState(cloudState){
     if(!cloudState || !Array.isArray(cloudState.students)) return false;
-    state = cloudState;
+    state = normalizeState(cloudState);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     unsavedChange = false;
     render();
@@ -1605,7 +1617,7 @@ async function importData(input){
         const newState = JSON.parse(txt);
         if(!newState.students) throw new Error("檔案不是有效的備份");
         if(!confirm("⚠️ 將覆蓋目前所有資料！建議先匯出備份！確定嗎？")) return;
-        state = newState;
+        state = normalizeState(newState);
         markChanged(); save(); render(); backend();
         alert("匯入成功！");
     }catch(e){
