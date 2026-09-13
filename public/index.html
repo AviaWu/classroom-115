@@ -167,6 +167,22 @@ input[type="number"]{width:85px}
 .pet-mood-reply p{margin:8px 0 0}
 .pet-interaction-image{display:block;width:100%;height:230px;box-sizing:border-box;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
 @media(max-width:700px){.pet-interaction{grid-template-columns:1fr}.pet-stage{order:-1}.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr))}.pet-interaction-image{height:180px}.pet-mood-reply{max-width:430px}}
+.drawing-board-layout{display:grid;grid-template-columns:150px minmax(0,1fr) 190px;gap:18px;align-items:start;clear:both}
+.drawing-history{display:flex;flex-direction:column;gap:10px;max-height:650px;overflow:auto;padding:3px}
+.drawing-thumb{width:100%;padding:5px;background:#fff8e8;text-align:left}
+.drawing-thumb img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff;border:2px solid #20263a}
+.drawing-thumb span{display:block;margin-top:5px;font-size:11px;text-align:center}
+.drawing-canvas-wrap{min-width:0}
+#drawingCanvas{display:block;width:100%;height:auto;aspect-ratio:4/3;background:#fff;border:4px solid #20263a;box-shadow:6px 6px 0 #172033;touch-action:none;cursor:crosshair}
+.drawing-tools{padding:12px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
+.drawing-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:10px 0 16px}
+.drawing-color{width:100%;aspect-ratio:1;padding:0;background:var(--paint-color);border:3px solid #20263a;box-shadow:2px 2px 0 #172033}
+.drawing-color.selected{outline:4px solid #4dabf7;outline-offset:2px;transform:translate(1px,1px);box-shadow:none}
+.drawing-tool-actions{display:grid;gap:10px}
+.drawing-tool-actions button.active{background:#9ed7d3}
+.drawing-status{min-height:20px;margin-top:12px;font-size:12px;font-weight:700}
+@media(max-width:800px){.drawing-board-layout{grid-template-columns:1fr}.drawing-canvas-wrap{order:1}.drawing-tools{order:2}.drawing-history{order:3;display:grid;grid-template-columns:repeat(5,minmax(80px,1fr));max-height:none}.drawing-palette{grid-template-columns:repeat(8,1fr)}}
+@media(max-width:520px){.drawing-history{grid-template-columns:repeat(2,1fr)}.drawing-palette{grid-template-columns:repeat(6,1fr)}}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
 .drag-handle{cursor:grab;font-size:20px;user-select:none}
@@ -268,6 +284,7 @@ input[type="number"]{width:85px}
 <h1>Great teamwork makes the dream work</h1>
 <div>
 <button onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
+<button onclick="openDrawingBoard()">畫板</button>
 <button onclick="openBackend()">老師後台</button>
 <span class="small" id="saveStatus">☁️ 正在連線 Firebase...</span>
 </div>
@@ -418,6 +435,7 @@ if(!state){
         layouts:[],
         backgrounds:[],
         coopTasks:[],
+        drawings:[],
         globalBgImage:"",
         lastSaved:null
     };
@@ -433,6 +451,8 @@ function normalizeState(target){
     if(!Array.isArray(target.layouts)) target.layouts=[];
     if(!Array.isArray(target.backgrounds)) target.backgrounds=[];
     if(!Array.isArray(target.coopTasks)) target.coopTasks=[];
+    if(!Array.isArray(target.drawings)) target.drawings=[];
+    target.drawings = target.drawings.filter(item=>item && typeof item.data==="string").slice(0,10);
     if(!Array.isArray(target.tasks)) target.tasks=[];
     target.clothesM = target.clothesM.filter(item=>item && typeof item==="object");
     target.clothesF = target.clothesF.filter(item=>item && typeof item==="object");
@@ -855,6 +875,133 @@ function openModal(content){
 function closeModal(){
     document.getElementById("body").innerHTML = "";
     document.getElementById("modal").classList.remove("open");
+}
+
+const DRAWING_COLORS = [
+    "#000000","#4a4a4a","#808080","#c0c0c0","#ffffff","#7f1d1d",
+    "#ef4444","#f97316","#f59e0b","#fde047","#84cc16","#22c55e",
+    "#15803d","#14b8a6","#06b6d4","#38bdf8","#2563eb","#1e3a8a",
+    "#7c3aed","#a855f7","#ec4899","#f9a8d4","#92400e","#d6a66f"
+];
+let drawingContext = null;
+let drawingActive = false;
+let drawingTool = "pen";
+let drawingColor = DRAWING_COLORS[0];
+
+function drawingHistoryHtml(){
+    if(!state.drawings.length) return `<div class="empty">尚無儲存作品</div>`;
+    return state.drawings.map((item,index)=>`<button class="drawing-thumb" onclick="loadDrawing('${esc(item.id)}')" title="載入這張畫板">
+        <img src="${esc(item.data)}" alt="畫板作品 ${index+1}">
+        <span>${esc(new Date(item.savedAt).toLocaleString())}</span>
+    </button>`).join("");
+}
+
+function openDrawingBoard(){
+    const palette = DRAWING_COLORS.map((color,index)=>`<button class="drawing-color ${index===0?"selected":""}" style="--paint-color:${color}" onclick="selectDrawingColor('${color}',this)" aria-label="選擇顏色 ${color}" title="${color}"></button>`).join("");
+    openModal(`<h2>班級畫板</h2>
+        <div class="drawing-board-layout">
+            <aside><h3>最近作品</h3><div id="drawingHistory" class="drawing-history">${drawingHistoryHtml()}</div></aside>
+            <main class="drawing-canvas-wrap"><canvas id="drawingCanvas" width="800" height="600" aria-label="繪圖畫板"></canvas></main>
+            <aside class="drawing-tools">
+                <h3>24 色畫具</h3>
+                <div class="drawing-palette">${palette}</div>
+                <div class="drawing-tool-actions">
+                    <button id="drawingEraser" onclick="toggleDrawingEraser()">橡皮擦</button>
+                    <button class="warning" onclick="clearDrawingBoard()">清空</button>
+                    <button class="primary" onclick="saveDrawingBoard()">儲存</button>
+                </div>
+                <div id="drawingStatus" class="drawing-status">拖曳滑鼠或手指開始繪圖</div>
+            </aside>
+        </div>`);
+    initializeDrawingCanvas();
+}
+
+function initializeDrawingCanvas(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas) return;
+    drawingContext = canvas.getContext("2d",{alpha:false});
+    drawingContext.fillStyle = "#ffffff";
+    drawingContext.fillRect(0,0,canvas.width,canvas.height);
+    drawingContext.lineCap = "round";
+    drawingContext.lineJoin = "round";
+    drawingTool = "pen";
+    drawingColor = DRAWING_COLORS[0];
+    const point = event=>{
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x:(event.clientX-rect.left)*canvas.width/rect.width,
+            y:(event.clientY-rect.top)*canvas.height/rect.height
+        };
+    };
+    canvas.addEventListener("pointerdown",event=>{
+        event.preventDefault();
+        drawingActive = true;
+        canvas.setPointerCapture(event.pointerId);
+        const p = point(event);
+        drawingContext.beginPath();
+        drawingContext.moveTo(p.x,p.y);
+        drawingContext.lineTo(p.x+.01,p.y+.01);
+        applyDrawingStroke();
+        drawingContext.stroke();
+    });
+    canvas.addEventListener("pointermove",event=>{
+        if(!drawingActive) return;
+        event.preventDefault();
+        const p = point(event);
+        drawingContext.lineTo(p.x,p.y);
+        applyDrawingStroke();
+        drawingContext.stroke();
+    });
+    const stop=()=>{ drawingActive=false; drawingContext?.closePath(); };
+    canvas.addEventListener("pointerup",stop);
+    canvas.addEventListener("pointercancel",stop);
+}
+
+function applyDrawingStroke(){
+    if(!drawingContext) return;
+    drawingContext.strokeStyle = drawingTool==="eraser" ? "#ffffff" : drawingColor;
+    drawingContext.lineWidth = drawingTool==="eraser" ? 30 : 7;
+}
+function selectDrawingColor(color,button){
+    drawingColor = color;
+    drawingTool = "pen";
+    document.querySelectorAll(".drawing-color").forEach(item=>item.classList.toggle("selected",item===button));
+    document.getElementById("drawingEraser")?.classList.remove("active");
+}
+function toggleDrawingEraser(){
+    drawingTool = drawingTool==="eraser" ? "pen" : "eraser";
+    document.getElementById("drawingEraser")?.classList.toggle("active",drawingTool==="eraser");
+}
+function clearDrawingBoard(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas || !drawingContext || !confirm("確定清空目前畫板？")) return;
+    drawingContext.fillStyle = "#ffffff";
+    drawingContext.fillRect(0,0,canvas.width,canvas.height);
+    document.getElementById("drawingStatus").textContent = "畫板已清空";
+}
+function saveDrawingBoard(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas) return;
+    const item = {id:"drawing_"+Date.now(),savedAt:new Date().toISOString(),data:canvas.toDataURL("image/jpeg",.78)};
+    state.drawings.unshift(item);
+    state.drawings = state.drawings.slice(0,10);
+    markChanged();
+    if(!save()) return;
+    document.getElementById("drawingHistory").innerHTML = drawingHistoryHtml();
+    document.getElementById("drawingStatus").textContent = "已儲存，最多保留最近 10 張";
+}
+function loadDrawing(id){
+    const item = state.drawings.find(drawing=>drawing.id===id);
+    const canvas = document.getElementById("drawingCanvas");
+    if(!item || !canvas || !drawingContext) return;
+    const image = new Image();
+    image.onload = ()=>{
+        drawingContext.fillStyle = "#ffffff";
+        drawingContext.fillRect(0,0,canvas.width,canvas.height);
+        drawingContext.drawImage(image,0,0,canvas.width,canvas.height);
+        document.getElementById("drawingStatus").textContent = "已載入作品，可繼續繪圖";
+    };
+    image.src = item.data;
 }
 
 function openPetMood(id){
