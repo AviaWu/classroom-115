@@ -295,8 +295,8 @@ const DEFAULT_PRICE = 50;
 const LEVEL_PRICES = {R:50, SR:100, SSR:200, UR:300};
 const LEVEL_ORDER = ["R","SR","SSR","UR"];
 const PET_MOOD_ICONS = {
-    快樂:"😊", 喜悅:"😄", 興奮:"🤩", 平靜:"😌", 期待:"✨", 焦慮:"😟",
-    緊張:"😰", 恐懼:"😨", 煩躁:"😣", 無聊:"🥱", 悲傷:"😢", 痛苦:"😭"
+    快樂:"(＾▽＾)", 喜悅:"ヽ(・∀・)ﾉ", 興奮:"٩(ˊᗜˋ*)و", 平靜:"( ´ ▽ ` )", 期待:"(☆▽☆)", 焦慮:"(；´Д｀)",
+    緊張:"(⊙﹏⊙)", 恐懼:"Σ(°△°|||)", 煩躁:"(¬_¬)", 無聊:"(￣o￣)", 悲傷:"(╥﹏╥)", 痛苦:"(ಥ﹏ಥ)"
 };
 const PET_MOOD_RESPONSES = {
     快樂:[
@@ -886,7 +886,6 @@ function openPetMood(id){
             <section class="pet-stage">
                 <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
                 <img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}">
-                <h3>${esc(pet.name)}</h3>
             </section>
         </div>`);
 }
@@ -896,7 +895,7 @@ function showPetMoodReply(mood){
     const replyElement = document.getElementById("petMoodReply");
     if(!responses?.length || !replyElement) return;
     const reply = responses[Math.floor(Math.random()*responses.length)];
-    replyElement.innerHTML = `<b>${PET_MOOD_ICONS[mood]} ${esc(mood)}</b><p>${esc(reply)}</p>`;
+    replyElement.textContent = reply;
 }
 
 //學生端任務
@@ -1204,7 +1203,6 @@ function closetPreviewHtml(id){
         ${background?`<div class="bg-layer" style="background-image:url('${esc(background.image)}')"></div>`:""}
         <div class="character" style="background-image:url('${esc(characterImage)}')"></div>
     </div>
-    <h3>寵物預覽</h3>
     <div class="closet-pet-preview">
         ${pet?`<img src="${esc(pet.image)}" alt="${esc(pet.name)}">`:`<div class="closet-pet-empty">尚未裝備寵物</div>`}
     </div>`;
@@ -1360,13 +1358,6 @@ async function backend(){
         <button class="warning" onclick="document.getElementById('importFile').click()">匯入備份</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
       </div>
-      <div class="dangerzone">
-          <h3 class="warn">⚠️ 危險區域（資料清除）</h3>
-          <div class="small">建議先「匯出備份」再執行！動作無法復原</div>
-          <div class="row">
-              <button class="danger" onclick="wipeStorage()">刪除本遊戲全部儲存資料</button>
-          </div>
-      </div>
     </div>
     <section id="backend-tasks" class="backend-page">
     <h3>任務管理</h3>
@@ -1417,7 +1408,12 @@ async function backend(){
         <button class="primary" onclick="addTokenOne()">➕給予代幣</button>
         <button class="danger" onclick="subTokenOne()">➖扣除代幣</button>
     </div>
-
+    <h3>代幣批量管理</h3>
+    <div class="row">
+        <label>全體學生代幣：<input id="batchToken" type="number" value="0"></label>
+        <button onclick="addTokenAll()">全體增加</button>
+        <button class="danger" onclick="setTokenAll()">全體設定為</button>
+    </div>
     </section>
     <section id="backend-lottery" class="backend-page">
     <h3>樂透券管理</h3>
@@ -1439,6 +1435,7 @@ async function backend(){
     <div class="row">
         <label>總人數：<input id="stuCount" type="number" min="1" value="${state.students.length}"></label>
         <button onclick="resizeStudentList()">調整人數</button>
+        <button class="danger" onclick="resetAllStudentResources()">一鍵清空全體代幣、樂透券與衣櫃</button>
     </div>
     <div class="small">可設定性別、覆蓋代幣，或重置個別學生衣櫃。</div>
     <div class="row" style="display:block">
@@ -1456,14 +1453,6 @@ async function backend(){
             <button class="warning" onclick="resetStudentCloset(${s.id})">重置衣櫃</button>
         </div>`).join("")}
     </div>
-
-    <h3>代幣批量管理</h3>
-    <div class="row">
-        <label>全體學生代幣：<input id="batchToken" type="number" value="0"></label>
-        <button onclick="addTokenAll()">全體增加</button>
-        <button class="danger" onclick="setTokenAll()">全體設定為</button>
-    </div>
-
     </section>
     <section id="backend-clothes-m" class="backend-page">
     <h3>新增商品 - 男生服裝（單張上傳）</h3>
@@ -1550,20 +1539,6 @@ async function backend(){
 
     </section>
     `);
-}
-
-//【危險功能：清空本機與 Firebase 儲存資料】
-async function wipeStorage(){
-    if(!confirm("⚠️ 第一次確認：將刪除遊戲的本機與 Firebase 雲端存檔！\n資料會消失！建議先匯出備份！")) return;
-    if(!confirm("🔥 第二次確認！真的要全部刪除嗎？無法復原！")) return;
-    try{
-        await window.firebaseGameStore?.remove();
-        localStorage.removeItem(STORAGE_KEY);
-        alert("已刪除本機與雲端存檔！頁面即將重新載入");
-        location.reload();
-    }catch(error){
-        alert("刪除雲端存檔失敗："+(error.message||error));
-    }
 }
 
 //後台商品陣列對應到實際功能分頁
@@ -1764,6 +1739,21 @@ function resetStudentCloset(id){
     markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 
+function resetAllStudentResources(){
+    if(!confirm("確定清空全體成員的代幣、樂透券與衣櫃嗎？此動作無法復原。")) return;
+    state.students.forEach(s=>{
+        s.tokens = 0;
+        s.lotteryTickets = 0;
+        s.ownedClothes = [];
+        s.equippedClothes = null;
+        s.ownedLayout = [];
+        s.equippedLayout = [];
+        s.ownedBg = [];
+        s.equippedBg = null;
+    });
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+
 function editToken(id){
     const s = state.students[id-1];
     const val = prompt(`覆蓋設定${id}號代幣，現在：${s.tokens}`, s.tokens);
@@ -1829,12 +1819,12 @@ function resizeStudentList(){
 function addTokenAll(){
     const v = Number(document.getElementById("batchToken").value)||0;
     state.students.forEach(s=>s.tokens+=v);
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
 }
 function setTokenAll(){
     const v = Number(document.getElementById("batchToken").value)||0;
     state.students.forEach(s=>s.tokens=v);
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
 }
 
 //新增商品（單張）
