@@ -1033,70 +1033,31 @@ async function backend(){
         </div>`;
     }).join("") || `<div class="empty">尚無任務</div>`;
 
-    //商品清單 + **可編輯名稱、價格**
-    let mClothHtml = state.clothesM.map((p,index)=>`
-    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'clothesM','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'clothesM','${esc(p.id)}')">
-        <span class="drag-handle" title="拖曳排列">⠿</span>
-        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
-        <div class="grow">
-            <div class="edit-item-row">
-                <input value="${esc(p.name)}" onchange="updateItemName('clothesM','${esc(p.id)}',this.value)" placeholder="名稱">
-                <select onchange="updateItemLevel('clothesM','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
-                <select onchange="updateItemActive('clothesM','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
-            </div>
-        </div>
-        <button onclick="moveItem('clothesM','${esc(p.id)}',-1)" title="往前移">↑</button>
-        <button onclick="moveItem('clothesM','${esc(p.id)}',1)" title="往後移">↓</button>
-        <button class="danger" onclick="deleteItem('clothesM','${esc(p.id)}')">刪除</button>
-    </div>`).join("")||"<div class='small'>無男生服裝</div>";
+    //商品清單依等級分區，可拖曳排序並編輯名稱、等級與上下架狀態
+    function adminProductGroups(listName,list){
+        return LEVEL_ORDER.map(level=>{
+            const items = list.filter(p=>(p.level||"R")===level);
+            const rows = items.map(p=>`
+            <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'${listName}','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'${listName}','${esc(p.id)}')">
+                <span class="drag-handle" title="拖曳排列">⠿</span>
+                ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
+                <div class="grow">
+                    <div class="edit-item-row">
+                        <input value="${esc(p.name)}" onchange="updateItemName('${listName}','${esc(p.id)}',this.value)" placeholder="名稱">
+                        <select onchange="updateItemLevel('${listName}','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(optionLevel=>`<option value="${optionLevel}" ${(p.level||"R")===optionLevel?"selected":""}>${optionLevel}</option>`).join("")}</select>
+                        <select onchange="updateItemActive('${listName}','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
+                    </div>
+                </div>
+                <button class="danger" onclick="deleteItem('${listName}','${esc(p.id)}')">刪除</button>
+            </div>`).join("");
+            return `<section class="shop-level"><h3>${level}｜${priceForLevel(level)} 代幣</h3>${rows||`<div class="small">此等級尚無商品</div>`}</section>`;
+        }).join("");
+    }
 
-    let fClothHtml = state.clothesF.map((p,index)=>`
-    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'clothesF','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'clothesF','${esc(p.id)}')">
-        <span class="drag-handle" title="拖曳排列">⠿</span>
-        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
-        <div class="grow">
-            <div class="edit-item-row">
-                <input value="${esc(p.name)}" onchange="updateItemName('clothesF','${esc(p.id)}',this.value)" placeholder="名稱">
-                <select onchange="updateItemLevel('clothesF','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
-                <select onchange="updateItemActive('clothesF','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
-            </div>
-        </div>
-        <button onclick="moveItem('clothesF','${esc(p.id)}',-1)" title="往前移">↑</button>
-        <button onclick="moveItem('clothesF','${esc(p.id)}',1)" title="往後移">↓</button>
-        <button class="danger" onclick="deleteItem('clothesF','${esc(p.id)}')">刪除</button>
-    </div>`).join("")||"<div class='small'>無女生服裝</div>";
-
-    let layHtml = state.layouts.map((p,index)=>`
-    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'layouts','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'layouts','${esc(p.id)}')">
-        <span class="drag-handle" title="拖曳排列">⠿</span>
-        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
-        <div class="grow">
-            <div class="edit-item-row">
-                <input value="${esc(p.name)}" onchange="updateItemName('layouts','${esc(p.id)}',this.value)" placeholder="名稱">
-                <select onchange="updateItemLevel('layouts','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
-                <select onchange="updateItemActive('layouts','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
-            </div>
-        </div>
-        <button onclick="moveItem('layouts','${esc(p.id)}',-1)" title="往前移">↑</button>
-        <button onclick="moveItem('layouts','${esc(p.id)}',1)" title="往後移">↓</button>
-        <button class="danger" onclick="deleteItem('layouts','${esc(p.id)}')">刪除</button>
-    </div>`).join("")||"<div class='small'>無佈置物件</div>";
-
-    let bgHtml = state.backgrounds.map((p,index)=>`
-    <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'backgrounds','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'backgrounds','${esc(p.id)}')">
-        <span class="drag-handle" title="拖曳排列">⠿</span>
-        ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
-        <div class="grow">
-            <div class="edit-item-row">
-                <input value="${esc(p.name)}" onchange="updateItemName('backgrounds','${esc(p.id)}',this.value)" placeholder="名稱">
-                <select onchange="updateItemLevel('backgrounds','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(level=>`<option value="${level}" ${(p.level||"R")===level?"selected":""}>${level}</option>`).join("")}</select>
-                <select onchange="updateItemActive('backgrounds','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
-            </div>
-        </div>
-        <button onclick="moveItem('backgrounds','${esc(p.id)}',-1)" title="往前移">↑</button>
-        <button onclick="moveItem('backgrounds','${esc(p.id)}',1)" title="往後移">↓</button>
-        <button class="danger" onclick="deleteItem('backgrounds','${esc(p.id)}')">刪除</button>
-    </div>`).join("")||"<div class='small'>無可購買背景</div>";
+    let mClothHtml = adminProductGroups("clothesM",state.clothesM);
+    let fClothHtml = adminProductGroups("clothesF",state.clothesF);
+    let layHtml = adminProductGroups("layouts",state.layouts);
+    let bgHtml = adminProductGroups("backgrounds",state.backgrounds);
 
     openModal(`
     <h2>老師後台</h2>
