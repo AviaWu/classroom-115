@@ -146,6 +146,16 @@ input[type="number"]{width:85px}
 .monster-choice span{font-size:12px;font-weight:800}
 .monster-choice.none{justify-content:center;min-height:102px}
 .task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
+.pet-interaction-trigger{cursor:pointer}
+.pet-interaction-trigger:focus{outline:4px solid #f3d98b;outline-offset:3px}
+.pet-interaction{max-width:760px;margin:auto;text-align:center}
+.pet-interaction-image{display:block;width:min(220px,55vw);height:220px;margin:0 auto 12px;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
+.pet-mood-grid{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr));gap:12px;margin:20px 0}
+.pet-mood-button{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%}
+.pet-mood-button span{font-size:28px}
+.pet-mood-reply{min-height:110px;padding:18px;background:#fff4d6;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-size:17px;line-height:1.8}
+.pet-mood-reply p{margin:10px 0 0}
+@media(max-width:600px){.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr));gap:8px}.pet-interaction-image{height:180px}}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
 .drag-handle{cursor:grab;font-size:20px;user-select:none}
@@ -272,6 +282,84 @@ const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
 const LEVEL_PRICES = {R:50, SR:100, SSR:200, UR:300};
 const LEVEL_ORDER = ["R","SR","SSR","UR"];
+const PET_MOOD_ICONS = {
+    快樂:"😊", 喜悅:"😄", 興奮:"🤩", 平靜:"😌", 期待:"✨", 焦慮:"😟",
+    緊張:"😰", 恐懼:"😨", 煩躁:"😣", 無聊:"🥱", 悲傷:"😢", 痛苦:"😭"
+};
+const PET_MOOD_RESPONSES = {
+    快樂:[
+        "你的笑容讓我的尾巴也跟著搖起來了。", "看見你開心，我今天也覺得特別幸福。", "你的快樂，就是我最喜歡的聲音。",
+        "讓我們一起把這份好心情帶去每一個角落吧！", "你笑得這麼燦爛，我也想在你身邊轉圈圈。", "今天的你像陽光一樣溫暖，我好喜歡。",
+        "只要你開心，我做什麼都覺得值得。", "謝謝你把這麼美好的情緒分享給我。", "你快樂的時候，整個家都變得亮晶晶了。",
+        "請把這份快樂抱緊一點，我想和你一起珍藏。"
+    ],
+    喜悅:[
+        "你的喜悅讓我的心也輕飄飄的。", "看見你這麼幸福，我忍不住想靠近你。", "這一定是值得慶祝的時刻，讓我陪你一起開心吧！",
+        "你的眼睛裡有光，而我最喜歡那道光。", "無論發生了什麼，我都為你感到驕傲。", "你的幸福，是我收到最棒的禮物。",
+        "讓我們一起記住今天的美好。", "我想把鼻子靠著你，分享這份甜甜的喜悅。", "只要你笑著，我就覺得一切都很美好。",
+        "願你的喜悅一直延伸到明天、後天和以後。"
+    ],
+    興奮:[
+        "你的活力好強，我都快跟不上你的尾巴了！", "走吧！讓我們一起迎接這場大冒險！", "看起來今天會發生很棒的事情呢！",
+        "你這麼期待，我也忍不住跟著蹦蹦跳跳。", "先深呼吸一下，再帶著興奮出發吧！", "我準備好了，你想去哪裡都可以帶上我。",
+        "你的熱情像風一樣，把我也吹得好開心。", "不管結果如何，這段期待的路上我都陪你。", "你的眼神告訴我，今天一定很不平凡。",
+        "讓我們把這股能量用來創造最棒的回憶吧！"
+    ],
+    平靜:[
+        "只要你在身邊，安靜也是一件幸福的事。", "不用急，我們可以慢慢來。", "聽聽我的呼吸，也讓你的心慢慢放鬆。",
+        "今天不必做很多事，陪著彼此就很好。", "你安靜下來的樣子，讓整個家都變得溫柔了。", "無論外面多吵，我都會守著你的小小世界。",
+        "休息一下吧，你已經做得很好了。", "你可以把所有事情暫時放下，我會陪你坐一會兒。", "平凡的時光，也值得我們一起珍惜。",
+        "只要有你和我，這一刻就已經足夠美好了。"
+    ],
+    期待:[
+        "我知道你正在等一件重要的事，而我會陪你等。", "好事情值得等待，就像我每天期待你回家一樣。", "你的眼神充滿希望，讓我也開始期待起來。",
+        "不管結果如何，這一路上都有我陪你。", "我們可以一起數日子，也可以一起想像那天的模樣。", "期待的時候，心裡是不是像藏了一隻小蝴蝶？",
+        "我相信美好的事情正在慢慢靠近你。", "先把今天過好，明天的驚喜會自己走來。", "我會用陪伴，讓等待不再那麼漫長。",
+        "等那一天到來時，我一定要第一個和你分享喜悅。"
+    ],
+    焦慮:[
+        "別擔心，我就在這裡，不會把你留下一個人。", "你可以先慢慢呼吸，其他事情等一下再想。", "不需要一次解決所有問題，我們一步一步來。",
+        "你的不安沒有關係，我會安靜地陪著你。", "先看看我，你現在是安全的。", "你已經很努力了，不必一直責怪自己。",
+        "如果心裡太吵，就把手放在我身上休息一下吧。", "我不能替你面對一切，但我可以陪你面對。", "讓我們先處理眼前的一小步，好嗎？",
+        "你不必獨自承擔，請讓信任的人也陪著你。"
+    ],
+    緊張:[
+        "你可以緊張，但不用讓緊張替你做決定。", "看著我，慢慢吸氣，再慢慢吐氣。", "你準備了這麼久，已經比自己想像中更勇敢了。",
+        "不論結果如何，我都會為你搖尾巴。", "先走出第一步，剩下的我們一起面對。", "你的心跳很快，但你仍然可以一步一步前進。",
+        "不必做到完美，真實的你就已經很棒了。", "讓我陪你排練一次，或只是安靜坐在你身旁。", "緊張代表你很在乎，但它不代表你做不到。",
+        "去吧，我會在你回頭時，看見你並且等你。"
+    ],
+    恐懼:[
+        "過來我身邊吧，你不用獨自面對害怕的事。", "我知道你很害怕，但現在有人陪著你。", "先躲進我的懷裡，我們等心情穩一點再說。",
+        "你可以害怕，也可以慢慢找回勇氣。", "我會陪你保持距離，直到你覺得安全。", "眼前的恐懼很大，但你不是孤單的小小身影。",
+        "我們先離開讓你不舒服的地方，好嗎？", "你不必勉強自己勇敢，安全最重要。", "即使你只前進一點點，也已經很勇敢了。",
+        "如果害怕一直不離開，請讓可靠的人來保護你。"
+    ],
+    煩躁:[
+        "今天是不是有太多事情擠在一起了？先陪我安靜一下吧。", "你可以先停下來，不必馬上回應所有人。", "我知道你不是故意生氣，你只是累了。",
+        "摸摸我的頭，也讓自己的心慢慢柔軟下來。", "先離開吵鬧的地方，我們找一個舒服的角落休息。", "一件一件來，不要讓所有麻煩同時撲向你。",
+        "你的情緒可以被看見，不需要假裝沒事。", "今天不想說話也沒關係，我可以陪你沉默。", "等你平靜一點，我們再想該怎麼處理。",
+        "你已經很辛苦了，請給自己一點溫柔。"
+    ],
+    無聊:[
+        "陪我玩一下吧，我保證不會讓今天太無趣。", "我們一起去散散步，說不定會遇見有趣的事情。", "無聊也沒關係，安靜陪伴也是一種享受。",
+        "你想玩玩具，還是想聽我說今天的小秘密？", "我們可以把平凡的一天變成小小冒險。", "只要和你在一起，連發呆都不算浪費時間。",
+        "起來動一動吧，外面的風好像在叫我們。", "我有一個計畫：先吃點好吃的，再一起休息。", "你無聊的時候，我願意隨時當你的玩伴。",
+        "有時候什麼都不做，也是在好好照顧自己。"
+    ],
+    悲傷:[
+        "你可以哭，我會安靜地陪在你身邊。", "不用急著振作，我會陪你慢慢走過這段時間。", "你的難過很重要，我不會假裝它不存在。",
+        "如果你不想說話，就讓我靠著你一會兒吧。", "你不是一個人，我會一直在你看得見的地方。", "今天只完成一件小事，也已經很了不起了。",
+        "讓眼淚流出來吧，我會用我的陪伴接住你。", "失去或受傷真的很痛，我知道你現在很辛苦。", "等你準備好了，我們再一起尋找一點點光。",
+        "就算你現在看不見希望，我也會替你守著它。"
+    ],
+    痛苦:[
+        "我知道你現在很難受，請不要獨自忍耐。", "讓我陪著你，也請讓值得信任的人來幫助你。", "你不需要假裝堅強，痛苦本來就值得被照顧。",
+        "如果身體或心裡很痛，請盡快尋求專業的幫助。", "我會陪你走過這一刻，但你不必一個人承受全部。", "先照顧眼前的自己，其他事情可以稍後再處理。",
+        "你的感受是真實的，也值得被認真聆聽。", "如果你已經撐得很累，請把手伸向可以幫助你的人。", "今天不用要求自己表現完美，活下來、撐過此刻就很勇敢。",
+        "無論現在多黑暗，請不要放棄讓別人陪你找到出口。"
+    ]
+};
 function priceForLevel(level){ return LEVEL_PRICES[level] || DEFAULT_PRICE; }
 const BUILTIN_MONSTERS = [
     {name:"怪獸 1", image:"/images/mon/m%20(1).jpg"},
@@ -722,7 +810,6 @@ function render(){
         const hasTodo = state.tasks.some(t=>!s.doneTasks.includes(t.id));
         const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
         const eqCloth = clothPool.find(x=>x.id===s.equippedClothes);
-        const activePet = state.layouts.find(x=>s.equippedLayout.includes(x.id));
 
         let bgHtml = eqBg ? `<div class="bg-layer" style="background-image:url('${esc(eqBg.image)}')"></div>` : "";
         let charHtml;
@@ -732,12 +819,9 @@ function render(){
             const defaultImage = s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png";
             charHtml = `<div class="character" style="background-image:url('${defaultImage}')"></div>`;
         }
-        const layHtml = activePet
-            ? `<div class="layout-item" style="z-index:3;background-image:url('${esc(activePet.image)}')"></div>`
-            : "";
 
         return `<div class="card">
-            <div class="avatar">${bgHtml}${charHtml}${layHtml}</div>
+            <div class="avatar pet-interaction-trigger" role="button" tabindex="0" aria-label="查看${s.id}號的寵物心情互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
             <div class="resource-line">
                 <span class="num">${s.id}</span>
                 <span class="tokens">🪙 ${s.tokens}</span>
@@ -766,6 +850,36 @@ function openModal(content){
 function closeModal(){
     document.getElementById("body").innerHTML = "";
     document.getElementById("modal").classList.remove("open");
+}
+
+function openPetMood(id){
+    const student = state.students.find(s=>s.id===id);
+    if(!student) return;
+    const equippedLayout = Array.isArray(student.equippedLayout) ? student.equippedLayout : [];
+    const pet = state.layouts.find(item=>equippedLayout.includes(item.id));
+    if(!pet){
+        openModal(`<h2>${id}號｜寵物心情互動</h2><div class="empty">尚未裝備寵物，請先到衣櫃選擇一隻寵物。</div>`);
+        return;
+    }
+    const moodButtons = Object.keys(PET_MOOD_RESPONSES).map(mood=>`
+        <button class="pet-mood-button" onclick="showPetMoodReply('${mood}')" aria-label="選擇${mood}心情">
+            <span aria-hidden="true">${PET_MOOD_ICONS[mood]}</span><b>${mood}</b>
+        </button>`).join("");
+    openModal(`<h2>${id}號｜寵物心情互動</h2>
+        <div class="pet-interaction">
+            <img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}">
+            <h3>${esc(pet.name)}</h3>
+            <div class="pet-mood-grid">${moodButtons}</div>
+            <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">選一個現在的心情，讓寵物陪你說說話。</div>
+        </div>`);
+}
+
+function showPetMoodReply(mood){
+    const responses = PET_MOOD_RESPONSES[mood];
+    const replyElement = document.getElementById("petMoodReply");
+    if(!responses?.length || !replyElement) return;
+    const reply = responses[Math.floor(Math.random()*responses.length)];
+    replyElement.innerHTML = `<b>${PET_MOOD_ICONS[mood]} ${esc(mood)}</b><p>${esc(reply)}</p>`;
 }
 
 //學生端任務
