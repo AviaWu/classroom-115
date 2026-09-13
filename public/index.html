@@ -61,13 +61,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .empty{text-align:center;padding:30px;color:#777}
 .shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:13px}
 .product{border:1px solid #eee;border-radius:17px;padding:10px;text-align:center;background:#fff}
-.closet-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+.closet-layout{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:20px;align-items:start}
 .closet-preview-wrap{position:sticky;top:0;text-align:center}
-.closet-preview{width:100%;max-width:260px;margin:auto;aspect-ratio:9/16;border:3px solid #20263a;background:#F0ECE9;overflow:hidden;position:relative;box-shadow:5px 5px 0 #172033}
+.closet-preview{width:100%;max-width:130px;margin:auto;aspect-ratio:9/16;border:3px solid #20263a;background:#F0ECE9;overflow:hidden;position:relative;box-shadow:5px 5px 0 #172033}
 .closet-preview .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center}
 .closet-preview .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat}
 .closet-preview .layout-item{position:absolute;inset:0;z-index:3;background-size:contain;background-position:center bottom;background-repeat:no-repeat}
-@media(max-width:700px){.closet-layout{grid-template-columns:1fr}.closet-preview-wrap{position:static;order:-1}.closet-preview{max-width:180px}}
+@media(max-width:700px){.closet-layout{grid-template-columns:1fr}.closet-preview-wrap{position:static;order:-1}.closet-preview{max-width:90px}}
 
 /* 已移除棋盤格，背景設透明 */
 .pic{
@@ -119,6 +119,19 @@ input[type="number"]{width:85px}
 .lottery-result-card h3{font-size:22px;margin:8px 0 16px}
 .lottery-rules{padding:14px;text-align:left;background:#fff4d6;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;line-height:1.8}
 .lottery-result{margin:14px 0;padding:12px;font-size:18px;font-weight:900;min-height:28px}
+.shop-level{--level-color:#768195;--level-bg:#eef1f5;margin:22px 0 30px;padding:16px;border:4px solid var(--level-color);background:var(--level-bg);box-shadow:7px 7px 0 #172033}
+.shop-level:first-child{margin-top:10px}
+.shop-level-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-16px -16px 18px;padding:11px 14px;background:var(--level-color);color:#fff;border-bottom:4px solid #20263a}
+.shop-level-header h3{display:flex;align-items:center;gap:10px;margin:0;color:inherit;font-size:22px;text-shadow:2px 2px 0 rgba(0,0,0,.35)}
+.level-badge{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:5px 10px;background:#fff;color:var(--level-color);border:3px solid #20263a;box-shadow:3px 3px 0 #172033;font-size:24px;line-height:1}
+.level-price{font-weight:900;white-space:nowrap}
+.shop-level.level-r{--level-color:#687386;--level-bg:#eef1f5}
+.shop-level.level-sr{--level-color:#27868c;--level-bg:#e4f7f4}
+.shop-level.level-ssr{--level-color:#8960b5;--level-bg:#f1e8ff}
+.shop-level.level-ur{--level-color:#c18418;--level-bg:#fff1bf;background-image:linear-gradient(135deg,#fff8da 0,#ffe7a0 50%,#fff4c9 100%)}
+.shop-level .product{border-color:var(--level-color)}
+.product-level-badge{display:inline-block;margin:7px 0 2px;padding:3px 9px;border:2px solid var(--level-color);background:var(--level-color);color:#fff;font-size:13px;font-weight:900}
+@media(max-width:600px){.shop-level-header{align-items:flex-start;flex-direction:column}.level-price{padding-left:2px}}
 .dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
 .backend-nav{position:relative;z-index:1;display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px;padding:12px;background:#34405c;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
 .backend-nav button{padding:8px 10px;font-size:13px}
@@ -816,7 +829,13 @@ function groupedShopCards(id,list,card){
     const activeItems = list.filter(p=>p.active!==false);
     return LEVEL_ORDER.map(level=>{
         const items = activeItems.filter(p=>(p.level||"R")===level);
-        return items.length ? `<section class="shop-level"><h3>${level}｜${priceForLevel(level)} 代幣</h3><div class="shopgrid">${items.map(p=>card(id,p)).join("")}</div></section>` : "";
+        return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
+            <div class="shop-level-header">
+                <h3><span class="level-badge">${level}</span>${level} 等級商品</h3>
+                <span class="level-price">🪙 每件 ${priceForLevel(level)} 代幣</span>
+            </div>
+            <div class="shopgrid">${items.map(p=>card(id,p)).join("")}</div>
+        </section>` : "";
     }).join("") || `<div class="empty">尚無商品</div>`;
 }
 function clothCard(id,p){
@@ -825,7 +844,7 @@ function clothCard(id,p){
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"👗"}</div>
         <b>${esc(p.name)}</b>
-        <div class="small">${esc(p.level||"R")}</div>
+        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
         <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyCloth(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
@@ -836,7 +855,7 @@ function layCard(id,p){
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"✨"}</div>
         <b>${esc(p.name)}</b>
-        <div class="small">${esc(p.level||"R")}</div>
+        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
         <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyLayout(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
@@ -847,7 +866,7 @@ function bgCard(id,p){
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"🖼"}</div>
         <b>${esc(p.name)}</b>
-        <div class="small">${esc(p.level||"R")}</div>
+        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
         <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyBg(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
