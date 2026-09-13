@@ -66,8 +66,10 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .closet-preview{width:100%;max-width:130px;margin:auto;aspect-ratio:9/16;border:3px solid #20263a;background:#F0ECE9;overflow:hidden;position:relative;box-shadow:5px 5px 0 #172033}
 .closet-preview .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center}
 .closet-preview .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat}
-.closet-preview .layout-item{position:absolute;inset:0;z-index:3;background-size:contain;background-position:center bottom;background-repeat:no-repeat}
-@media(max-width:700px){.closet-layout{grid-template-columns:1fr}.closet-preview-wrap{position:static;order:-1}.closet-preview{max-width:90px}}
+.closet-pet-preview{width:100%;max-width:130px;aspect-ratio:1;margin:12px auto 0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff8e8;border:3px solid #20263a;box-shadow:5px 5px 0 #172033}
+.closet-pet-preview img{display:block;width:92%;height:92%;object-fit:contain}
+.closet-pet-empty{padding:10px;color:#777;font-size:12px;font-weight:700}
+@media(max-width:700px){.closet-layout{grid-template-columns:1fr}.closet-preview-wrap{position:static;order:-1}.closet-preview,.closet-pet-preview{max-width:90px}}
 
 /* 已移除棋盤格，背景設透明 */
 .pic{
@@ -148,14 +150,24 @@ input[type="number"]{width:85px}
 .task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
 .pet-interaction-trigger{cursor:pointer}
 .pet-interaction-trigger:focus{outline:4px solid #f3d98b;outline-offset:3px}
-.pet-interaction{max-width:760px;margin:auto;text-align:center}
-.pet-interaction-image{display:block;width:min(220px,55vw);height:220px;margin:0 auto 12px;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
-.pet-mood-grid{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr));gap:12px;margin:20px 0}
-.pet-mood-button{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%}
-.pet-mood-button span{font-size:28px}
-.pet-mood-reply{min-height:110px;padding:18px;background:#fff4d6;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-size:17px;line-height:1.8}
-.pet-mood-reply p{margin:10px 0 0}
-@media(max-width:600px){.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr));gap:8px}.pet-interaction-image{height:180px}}
+.pet-interaction{display:grid;grid-template-columns:minmax(270px,1fr) minmax(260px,.85fr);gap:28px;max-width:820px;margin:auto;align-items:center}
+.pet-mood-side{text-align:left}
+.pet-mood-side h3{margin-top:0;padding:9px 12px;background:#34405c;color:#f3d98b;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;text-align:center}
+.pet-mood-grid{display:grid;grid-template-columns:repeat(3,minmax(82px,1fr));gap:11px}
+.pet-mood-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:78px;padding:8px 5px;background:#f7e9c8;border:4px solid #20263a;color:#20263a;box-shadow:4px 4px 0 #172033;font-family:"Courier New",monospace}
+.pet-mood-button:nth-child(3n+2){background:#9ed7d3}
+.pet-mood-button:nth-child(3n){background:#f3d98b}
+.pet-mood-button:hover{background:#fff8e8;transform:translate(-1px,-1px);box-shadow:5px 5px 0 #172033}
+.pet-mood-button:focus-visible{outline:4px solid #efb1a5;outline-offset:3px}
+.pet-mood-button span{font-size:27px;line-height:1}
+.pet-stage{display:flex;flex-direction:column;align-items:center;min-width:0}
+.pet-mood-reply{position:relative;width:100%;min-height:96px;box-sizing:border-box;margin-bottom:24px;padding:17px;background:#fffdf3;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-size:16px;line-height:1.7;text-align:left}
+.pet-mood-reply::before{content:"";position:absolute;right:42px;bottom:-18px;width:28px;height:28px;background:#fffdf3;border-right:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg)}
+.pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
+.pet-mood-reply p{margin:8px 0 0}
+.pet-interaction-image{display:block;width:min(230px,55vw);height:230px;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
+.pet-stage h3{margin:13px 0 0}
+@media(max-width:700px){.pet-interaction{grid-template-columns:1fr}.pet-stage{order:-1}.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr))}.pet-interaction-image{height:180px}.pet-mood-reply{max-width:430px}}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
 .drag-handle{cursor:grab;font-size:20px;user-select:none}
@@ -867,10 +879,15 @@ function openPetMood(id){
         </button>`).join("");
     openModal(`<h2>${id}號｜寵物心情互動</h2>
         <div class="pet-interaction">
-            <img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}">
-            <h3>${esc(pet.name)}</h3>
-            <div class="pet-mood-grid">${moodButtons}</div>
-            <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">選一個現在的心情，讓寵物陪你說說話。</div>
+            <section class="pet-mood-side" aria-label="選擇心情">
+                <h3>選擇現在的心情</h3>
+                <div class="pet-mood-grid">${moodButtons}</div>
+            </section>
+            <section class="pet-stage">
+                <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
+                <img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}">
+                <h3>${esc(pet.name)}</h3>
+            </section>
         </div>`);
 }
 
@@ -1186,7 +1203,10 @@ function closetPreviewHtml(id){
     return `<div class="closet-preview">
         ${background?`<div class="bg-layer" style="background-image:url('${esc(background.image)}')"></div>`:""}
         <div class="character" style="background-image:url('${esc(characterImage)}')"></div>
-        ${pet?`<div class="layout-item" style="background-image:url('${esc(pet.image)}')"></div>`:""}
+    </div>
+    <h3>寵物預覽</h3>
+    <div class="closet-pet-preview">
+        ${pet?`<img src="${esc(pet.image)}" alt="${esc(pet.name)}">`:`<div class="closet-pet-empty">尚未裝備寵物</div>`}
     </div>`;
 }
 function switchClosetTab(id,tab){
