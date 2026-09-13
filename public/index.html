@@ -501,25 +501,48 @@ function seedBuiltinGirlClothes(persist=true){
 
 seedBuiltinGirlClothes();
 
-// 內建寵物商品：直接使用 public/images/dec/ 的全部 PNG 圖片，避免重複建立商品
+// 內建寵物商品：以 public/images/Dec2/ 的全部 PNG 取代舊版 dec 寵物
 function seedBuiltinLayouts(persist=true){
-    const filenames = Array.from({length:25}, (_,index)=>`d (${index+1}).png`);
-    let changed = false;
+    const filenames = [
+        "1000095479-removebg-preview.png",
+        "1000095481-removebg-preview.png",
+        "1000095483-removebg-preview.png",
+        "1000095484-removebg-preview.png",
+        "1000095486-removebg-preview.png",
+        "1000095487-removebg-preview.png",
+        "1000095488-removebg-preview.png",
+        "1000095489-removebg-preview.png",
+        "1000095491-removebg-preview.png",
+        "1000095493-removebg-preview.png",
+        "1000095494-removebg-preview.png",
+        "1000095495-removebg-preview.png",
+        "1000095496-removebg-preview.png",
+        "1000095497-removebg-preview.png",
+        "1000095500-removebg-preview.png",
+        "1000095502-removebg-preview.png",
+        "1000095503-removebg-preview.png"
+    ];
+    const removedItems = state.layouts.filter(item=>/^\/images\/dec\//i.test(item.image||""));
+    const removedIds = removedItems.map(item=>item.id);
+    let changed = removedIds.length>0;
+    if(changed){
+        state.layouts = state.layouts.filter(item=>!removedIds.includes(item.id));
+        state.students.forEach(student=>{
+            student.ownedLayout = student.ownedLayout.filter(id=>!removedIds.includes(id));
+            student.equippedLayout = student.equippedLayout.filter(id=>!removedIds.includes(id));
+        });
+    }
     filenames.forEach((filename,index)=>{
-        const image = `/images/dec/${encodeURIComponent(filename)}`;
-        const existing = state.layouts.find(item=>item.image===image);
-        if(!existing){
+        const image = `/images/Dec2/${encodeURIComponent(filename)}`;
+        if(!state.layouts.some(item=>item.image===image)){
             state.layouts.push({
-                id: `builtin_layout_${index}`,
+                id: `builtin_pet_dec2_${index}`,
                 name: `寵物 ${index+1}`,
                 level: "R",
                 price: priceForLevel("R"),
                 active: true,
                 image
             });
-            changed = true;
-        }else if(/^佈置 \d+$/.test(existing.name||"")){
-            existing.name = `寵物 ${index+1}`;
             changed = true;
         }
     });
