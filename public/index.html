@@ -439,9 +439,11 @@ if(!state){
         layouts:[],
         backgrounds:[],
         coopTasks:[],
+        coopTaskTemplates:[],
         drawings:[],
         drawingAlbum:[],
         dailyTaskTemplates:[],
+        weeklyTaskTemplates:[],
         globalBgImage:"",
         lastSaved:null
     };
@@ -457,6 +459,7 @@ function normalizeState(target){
     if(!Array.isArray(target.layouts)) target.layouts=[];
     if(!Array.isArray(target.backgrounds)) target.backgrounds=[];
     if(!Array.isArray(target.coopTasks)) target.coopTasks=[];
+    if(!Array.isArray(target.coopTaskTemplates)) target.coopTaskTemplates=[];
     if(!Array.isArray(target.drawings)) target.drawings=[];
     if(!Array.isArray(target.drawingAlbum)) target.drawingAlbum=[];
     target.drawings = target.drawings.filter(item=>item && typeof item.data==="string");
@@ -473,11 +476,35 @@ function normalizeState(target){
         appearTime:/^\d{2}:\d{2}$/.test(item.appearTime||"") ? item.appearTime : "08:00",
         dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
     }));
+    if(!Array.isArray(target.weeklyTaskTemplates)) target.weeklyTaskTemplates=[];
+    target.weeklyTaskTemplates = target.weeklyTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
+        ...item,
+        enabled:item.enabled!==false,
+        appearWeekday:Number.isInteger(Number(item.appearWeekday)) && Number(item.appearWeekday)>=0 && Number(item.appearWeekday)<=6 ? Number(item.appearWeekday) : 1,
+        dueWeekday:Number.isInteger(Number(item.dueWeekday)) && Number(item.dueWeekday)>=0 && Number(item.dueWeekday)<=6 ? Number(item.dueWeekday) : 5,
+        appearTime:/^\d{2}:\d{2}$/.test(item.appearTime||"") ? item.appearTime : "08:00",
+        dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
+    }));
     target.clothesM = target.clothesM.filter(item=>item && typeof item==="object");
     target.clothesF = target.clothesF.filter(item=>item && typeof item==="object");
     target.layouts = target.layouts.filter(item=>item && typeof item==="object");
     target.backgrounds = target.backgrounds.filter(item=>item && typeof item==="object");
-    target.coopTasks = target.coopTasks.filter(task=>task && typeof task==="object");
+    target.coopTasks = target.coopTasks.filter(task=>task && typeof task==="object").map(task=>({
+        ...task,
+        completedBy:Array.isArray(task.completedBy)?task.completedBy:[],
+        claimed:task.claimed===true,
+        startAt:Number.isFinite(Number(task.startAt))?Number(task.startAt):null,
+        dueAt:Number.isFinite(Number(task.dueAt))?Number(task.dueAt):null
+    }));
+    target.coopTaskTemplates = target.coopTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
+        ...item,
+        enabled:item.enabled!==false,
+        scheduleType:item.scheduleType==="weekly"?"weekly":"daily",
+        appearWeekday:Number.isInteger(Number(item.appearWeekday)) && Number(item.appearWeekday)>=0 && Number(item.appearWeekday)<=6 ? Number(item.appearWeekday) : 1,
+        dueWeekday:Number.isInteger(Number(item.dueWeekday)) && Number(item.dueWeekday)>=0 && Number(item.dueWeekday)<=6 ? Number(item.dueWeekday) : 5,
+        appearTime:/^\d{2}:\d{2}$/.test(item.appearTime||"") ? item.appearTime : "08:00",
+        dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
+    }));
     target.tasks = target.tasks.filter(task=>task && typeof task==="object");
     if(typeof target.globalBgImage!=="string") target.globalBgImage="";
     [...target.clothesM,...target.clothesF,...target.layouts,...target.backgrounds].forEach(item=>{
@@ -881,7 +908,7 @@ function render(){
     document.getElementById("students").innerHTML = html;
     const coopIng = document.getElementById("coopIng");
     if(coopIng){
-        coopIng.hidden = !state.coopTasks.some(t=>!t.claimed);
+        coopIng.hidden = activeCoopTasks().length===0;
     }
     applyGlobalBg();
 }
@@ -1092,7 +1119,8 @@ function showPetMoodReply(mood,button){
     replyElement.textContent = reply;
 }
 
-//每日任務：到達每天指定時間後，自動建立當日任務；截止時間早於出現時間時視為隔日截止。
+//排程任務：每日依日期、每週依週一日期去重；截止不晚於出現時間時延至下一週期。
+const WEEKDAY_NAMES = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
 function localDateKey(date=new Date()){
     const year = date.getFullYear();
     const month = String(date.getMonth()+1).padStart(2,"0");
@@ -1103,6 +1131,18 @@ function dateAtLocalTime(dateKey,time){
     const [year,month,day] = dateKey.split("-").map(Number);
     const [hour,minute] = time.split(":").map(Number);
     return new Date(year,month-1,day,hour,minute,0,0);
+}
+function localWeekStart(date=new Date()){
+    const start = new Date(date.getFullYear(),date.getMonth(),date.getDate());
+    start.setDate(start.getDate()-((start.getDay()+6)%7));
+    return start;
+}
+function dateInWeek(weekStart,weekday,time){
+    const result = new Date(weekStart);
+    const [hour,minute] = time.split(":").map(Number);
+    result.setDate(result.getDate()+((Number(weekday)+6)%7));
+    result.setHours(hour,minute,0,0);
+    return result;
 }
 function generateDailyTasks(now=new Date()){
     const today = localDateKey(now);
@@ -1127,17 +1167,89 @@ function generateDailyTasks(now=new Date()){
     });
     return changed;
 }
-function syncDailyTasks(){
-    if(!generateDailyTasks()) return false;
+function generateWeeklyTasks(now=new Date()){
+    const weekStart = localWeekStart(now);
+    const weekKey = localDateKey(weekStart);
+    let changed = false;
+    state.weeklyTaskTemplates.forEach(template=>{
+        if(template.enabled===false || !template.title) return;
+        const appearAt = dateInWeek(weekStart,template.appearWeekday,template.appearTime);
+        if(now < appearAt) return;
+        const taskId = `weekly_${template.id}_${weekKey}`;
+        if(state.tasks.some(task=>task.id===taskId)) return;
+        const dueAt = dateInWeek(weekStart,template.dueWeekday,template.dueTime);
+        if(dueAt<=appearAt) dueAt.setDate(dueAt.getDate()+7);
+        state.tasks.push({
+            id:taskId,
+            title:template.title,
+            reward:Number(template.reward)||0,
+            dueAt:dueAt.getTime(),
+            weeklyTemplateId:template.id,
+            weeklyDate:weekKey
+        });
+        changed = true;
+    });
+    return changed;
+}
+function coopTaskFromTemplate(template,id,startAt,dueAt){
+    return {
+        id,
+        monsterName:template.monsterName,
+        content:template.content,
+        reward:Number(template.reward)||0,
+        rewardType:template.rewardType==="ticket"?"ticket":"token",
+        monsterImage:template.monsterImage||"",
+        completedBy:[],
+        claimed:false,
+        startAt:startAt.getTime(),
+        dueAt:dueAt.getTime(),
+        coopTemplateId:template.id
+    };
+}
+function generateScheduledCoopTasks(now=new Date()){
+    let changed = false;
+    state.coopTaskTemplates.forEach(template=>{
+        if(template.enabled===false || !template.monsterName || !template.content) return;
+        if(template.scheduleType==="weekly"){
+            const weekStart = localWeekStart(now);
+            const weekKey = localDateKey(weekStart);
+            const startAt = dateInWeek(weekStart,template.appearWeekday,template.appearTime);
+            if(now<startAt) return;
+            const id = `coop_weekly_${template.id}_${weekKey}`;
+            if(state.coopTasks.some(task=>task.id===id)) return;
+            const dueAt = dateInWeek(weekStart,template.dueWeekday,template.dueTime);
+            if(dueAt<=startAt) dueAt.setDate(dueAt.getDate()+7);
+            state.coopTasks.push(coopTaskFromTemplate(template,id,startAt,dueAt));
+            changed = true;
+            return;
+        }
+        const today = localDateKey(now);
+        const startAt = dateAtLocalTime(today,template.appearTime);
+        if(now<startAt) return;
+        const id = `coop_daily_${template.id}_${today}`;
+        if(state.coopTasks.some(task=>task.id===id)) return;
+        const dueAt = dateAtLocalTime(today,template.dueTime);
+        if(dueAt<=startAt) dueAt.setDate(dueAt.getDate()+1);
+        state.coopTasks.push(coopTaskFromTemplate(template,id,startAt,dueAt));
+        changed = true;
+    });
+    return changed;
+}
+function syncScheduledTasks(){
+    const changed = generateDailyTasks() | generateWeeklyTasks() | generateScheduledCoopTasks();
+    if(!changed) return false;
     markChanged();
     save();
     render();
     return true;
 }
+function syncDailyTasks(){
+    return syncScheduledTasks();
+}
 
 //學生端任務
 function tasks(id){
-    syncDailyTasks();
+    syncScheduledTasks();
     const s = state.students[id-1];
     const now = Date.now();
     const todo = state.tasks.filter(t=>!s.doneTasks.includes(t.id) && (!t.dueAt || now <= t.dueAt));
@@ -1159,9 +1271,13 @@ function finishTask(id,tid){
     markChanged(); save();render();tasks(id);
 }
 
-//協力任務：每位成員點選自己的角色縮圖完成，全部完成後全班獲得獎勵
+//協力任務：只顯示已開始且未截止的任務；全員完成後發放全班獎勵。
+function activeCoopTasks(now=Date.now()){
+    return state.coopTasks.filter(task=>!task.claimed && (!task.startAt || now>=task.startAt) && (!task.dueAt || now<=task.dueAt));
+}
 function openCoopTasks(selectedId){
-    const active = state.coopTasks.filter(t=>!t.claimed);
+    syncScheduledTasks();
+    const active = activeCoopTasks();
     if(!active.length){
         openModal(`<h2>協力任務</h2><div class="empty">目前沒有進行中的協力任務。</div>`);
         return;
@@ -1212,7 +1328,8 @@ function openCoopTask(taskId, taskButtons=""){
 }
 function completeCoopMember(taskId,studentId){
     const task = state.coopTasks.find(t=>t.id===taskId);
-    if(!task || task.claimed) return;
+    const now = Date.now();
+    if(!task || task.claimed || (task.startAt && now<task.startAt) || (task.dueAt && now>task.dueAt)) return;
     if(!Array.isArray(task.completedBy)) task.completedBy=[];
     if(task.completedBy.includes(studentId)) return;
     task.completedBy.push(studentId);
@@ -1230,7 +1347,7 @@ function completeCoopMember(taskId,studentId){
         return;
     }
     markChanged(); save();
-    const active = state.coopTasks.filter(t=>!t.claimed);
+    const active = activeCoopTasks();
     const taskButtons = active.map(t=>`<button class="${t.id===taskId?"active":""}" onclick="openCoopTasks('${esc(t.id)}')">${esc(t.monsterName)}</button>`).join("");
     openCoopTask(taskId, taskButtons);
     setTimeout(()=>document.getElementById("coopMonsterVisual")?.classList.add("coop-hit"),20);
@@ -1582,6 +1699,14 @@ async function backend(){
             <button onclick="toggleDailyTask('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
             <button class="danger" onclick="deleteDailyTask('${esc(template.id)}')">刪除</button>
         </div>`).join("") || `<div class="empty">尚未設定每日任務</div>`;
+    const weeklyTaskHtml = state.weeklyTaskTemplates.map(template=>`
+        <div class="row">
+            <div class="grow">
+                <b>${esc(template.title)}</b> <span class="small">每週${WEEKDAY_NAMES[template.appearWeekday]} ${esc(template.appearTime)} 出現｜${WEEKDAY_NAMES[template.dueWeekday]} ${esc(template.dueTime)} 截止｜獎勵 ${Number(template.reward)||0} 🪙</span>
+            </div>
+            <button onclick="toggleWeeklyTask('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
+            <button class="danger" onclick="deleteWeeklyTask('${esc(template.id)}')">刪除</button>
+        </div>`).join("") || `<div class="empty">尚未設定每週任務</div>`;
 
     //商品清單依等級分區，可拖曳排序並編輯名稱、等級與上下架狀態
     function adminProductGroups(listName,list){
@@ -1608,6 +1733,15 @@ async function backend(){
     let fClothHtml = adminProductGroups("clothesF",state.clothesF);
     let layHtml = adminProductGroups("layouts",state.layouts);
     let bgHtml = adminProductGroups("backgrounds",state.backgrounds);
+    const coopTemplateHtml = state.coopTaskTemplates.map(template=>`
+        <div class="row">
+            <div class="grow">
+                <b>${esc(template.monsterName)}</b>
+                <div class="small">${template.scheduleType==="weekly"?`每週${WEEKDAY_NAMES[template.appearWeekday]} ${esc(template.appearTime)} 出現｜${WEEKDAY_NAMES[template.dueWeekday]} ${esc(template.dueTime)} 截止`:`每天 ${esc(template.appearTime)} 出現｜${esc(template.dueTime)} 截止`}｜獎勵 ${Number(template.reward)||0} ${template.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}</div>
+            </div>
+            <button onclick="toggleCoopTemplate('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
+            <button class="danger" onclick="deleteCoopTemplate('${esc(template.id)}')">刪除</button>
+        </div>`).join("") || `<div class="empty">尚未設定週期協力任務</div>`;
     const albumHtml = state.drawingAlbum.map((item,index)=>`<article class="backend-album-item">
         <img src="${esc(item.data)}" alt="畫冊作品 ${index+1}">
         <b>畫作 ${state.drawingAlbum.length-index}</b>
@@ -1667,6 +1801,24 @@ async function backend(){
     </div>
     <div class="small">截止時間若早於或等於出現時間，會視為隔日截止。</div>
     ${dailyTaskHtml}
+    <h3 style="margin-top:24px">每週任務</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="weeklyTaskTitle" placeholder="每週任務名稱">
+            <input id="weeklyTaskReward" type="number" min="0" value="30" placeholder="代幣" style="width:90px">
+            <label>每週出現：
+                <select id="weeklyTaskAppearWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===1?"selected":""}>${name}</option>`).join("")}</select>
+                <input id="weeklyTaskAppearTime" type="time" value="08:00">
+            </label>
+            <label>截止：
+                <select id="weeklyTaskDueWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===5?"selected":""}>${name}</option>`).join("")}</select>
+                <input id="weeklyTaskDueTime" type="time" value="23:59">
+            </label>
+        </div>
+        <button class="primary" onclick="addWeeklyTask()">新增每週任務</button>
+    </div>
+    <div class="small">截止星期與時間若不晚於出現時刻，會視為下一週截止；每個設定每週只產生一次。</div>
+    ${weeklyTaskHtml}
 
     </section>
     <section id="backend-coop" class="backend-page">
@@ -1681,6 +1833,25 @@ async function backend(){
                     <option value="ticket">🎟️ 樂透券</option>
                 </select>
                 <input id="coopReward" type="number" min="0" value="50" placeholder="每位成員獎勵數量">
+                <label>排程：
+                    <select id="coopScheduleType" onchange="updateCoopScheduleFields()">
+                        <option value="once">單次任務</option>
+                        <option value="daily">每日任務</option>
+                        <option value="weekly">每週任務</option>
+                    </select>
+                </label>
+            </div>
+            <div id="coopOnceSchedule" style="margin-top:8px">
+                <label>開始：<input id="coopStartAt" type="datetime-local"></label>
+                <label>截止：<input id="coopDueAt" type="datetime-local"></label>
+            </div>
+            <div id="coopDailySchedule" style="display:none;margin-top:8px">
+                <label>每天出現：<input id="coopDailyAppearTime" type="time" value="08:00"></label>
+                <label>每天截止：<input id="coopDailyDueTime" type="time" value="23:59"></label>
+            </div>
+            <div id="coopWeeklySchedule" style="display:none;margin-top:8px">
+                <label>每週出現：<select id="coopWeeklyAppearWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===1?"selected":""}>${name}</option>`).join("")}</select><input id="coopWeeklyAppearTime" type="time" value="08:00"></label>
+                <label>截止：<select id="coopWeeklyDueWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===5?"selected":""}>${name}</option>`).join("")}</select><input id="coopWeeklyDueTime" type="time" value="23:59"></label>
             </div>
             <label style="display:block;margin-top:8px">選擇怪獸圖片：</label>
             <div class="monster-choice-grid">
@@ -1689,13 +1860,21 @@ async function backend(){
             </div>
             <input type="hidden" id="coopMonsterImage" value="">
         </div>
-        <button class="primary" onclick="publishCoopTask()">發布協力任務</button>
+        <button class="primary" onclick="publishCoopTask()">新增協力任務</button>
     </div>
-    ${state.coopTasks.map(t=>`
-        <div class="row">
-            <div class="grow"><b>${esc(t.monsterName)}</b><div class="small">${esc(t.content)}｜獎勵 ${t.reward} ${t.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}｜進度 ${(t.completedBy||[]).length}/${state.students.length}${t.claimed?"｜已完成":""}</div></div>
+    <div class="small">單次任務可設定開始與截止；每日與每週任務會建立可停用的週期設定。</div>
+    <h3 style="margin-top:20px">週期協力任務設定</h3>
+    ${coopTemplateHtml}
+    <h3 style="margin-top:20px">協力任務紀錄</h3>
+    ${state.coopTasks.map(t=>{
+        const now=Date.now();
+        const scheduleText=t.startAt?`${new Date(t.startAt).toLocaleString()} 開始｜${t.dueAt?new Date(t.dueAt).toLocaleString()+" 截止":"無期限"}`:"立即開始｜無期限";
+        const status=t.claimed?"已完成":t.startAt&&now<t.startAt?"尚未開始":t.dueAt&&now>t.dueAt?"已截止":"進行中";
+        return `<div class="row">
+            <div class="grow"><b>${esc(t.monsterName)}</b><div class="small">${esc(t.content)}｜${esc(scheduleText)}｜獎勵 ${t.reward} ${t.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}｜進度 ${(t.completedBy||[]).length}/${state.students.length}｜${status}</div></div>
             <button class="danger" onclick="deleteCoopTask('${esc(t.id)}')">刪除</button>
-        </div>`).join("") || `<div class="empty">尚無協力任務</div>`}
+        </div>`;
+    }).join("") || `<div class="empty">尚無協力任務紀錄</div>`}
     </section>
     <section id="backend-tokens" class="backend-page">
     <h3>單號代幣調整｜給予 / 扣除</h3>
@@ -1920,6 +2099,15 @@ function deleteAlbumDrawing(id){
     refreshBackendPage("backend-album");
 }
 
+function updateCoopScheduleFields(){
+    const type = document.getElementById("coopScheduleType")?.value||"once";
+    const once = document.getElementById("coopOnceSchedule");
+    const daily = document.getElementById("coopDailySchedule");
+    const weekly = document.getElementById("coopWeeklySchedule");
+    if(once) once.style.display=type==="once"?"block":"none";
+    if(daily) daily.style.display=type==="daily"?"block":"none";
+    if(weekly) weekly.style.display=type==="weekly"?"block":"none";
+}
 function selectCoopMonster(button,image){
     const input = document.getElementById("coopMonsterImage");
     if(!input) return;
@@ -1934,8 +2122,42 @@ async function publishCoopTask(){
     const reward = Number(document.getElementById("coopReward").value);
     const rewardType = document.getElementById("coopRewardType").value;
     const monsterImage = document.getElementById("coopMonsterImage").value;
+    const scheduleType = document.getElementById("coopScheduleType").value;
     if(!monsterName || !content || !Number.isFinite(reward) || reward<0) return alert("請完整填寫怪獸名稱、任務內容與獎勵");
-    state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,rewardType,monsterImage,completedBy:[],claimed:false});
+    if(scheduleType==="once"){
+        const startValue = document.getElementById("coopStartAt").value;
+        const dueValue = document.getElementById("coopDueAt").value;
+        const startAt = startValue?new Date(startValue).getTime():Date.now();
+        const dueAt = dueValue?new Date(dueValue).getTime():null;
+        if(dueAt && dueAt<=startAt) return alert("協力任務截止時間必須晚於開始時間");
+        state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,rewardType,monsterImage,completedBy:[],claimed:false,startAt,dueAt});
+    }else if(scheduleType==="daily"){
+        const appearTime=document.getElementById("coopDailyAppearTime").value;
+        const dueTime=document.getElementById("coopDailyDueTime").value;
+        if(!appearTime||!dueTime) return alert("請完整填寫每日出現與截止時間");
+        state.coopTaskTemplates.push({id:"coop_template_"+Date.now(),monsterName,content,reward,rewardType,monsterImage,scheduleType,appearTime,dueTime,enabled:true});
+        generateScheduledCoopTasks();
+    }else{
+        const appearWeekday=Number(document.getElementById("coopWeeklyAppearWeekday").value);
+        const appearTime=document.getElementById("coopWeeklyAppearTime").value;
+        const dueWeekday=Number(document.getElementById("coopWeeklyDueWeekday").value);
+        const dueTime=document.getElementById("coopWeeklyDueTime").value;
+        if(!appearTime||!dueTime) return alert("請完整填寫每週出現與截止時間");
+        state.coopTaskTemplates.push({id:"coop_template_"+Date.now(),monsterName,content,reward,rewardType,monsterImage,scheduleType,appearWeekday,appearTime,dueWeekday,dueTime,enabled:true});
+        generateScheduledCoopTasks();
+    }
+    markChanged(); save(); render(); refreshBackendPage("backend-coop");
+}
+function toggleCoopTemplate(id){
+    const template=state.coopTaskTemplates.find(item=>item.id===id);
+    if(!template) return;
+    template.enabled=template.enabled===false;
+    if(template.enabled) generateScheduledCoopTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-coop");
+}
+function deleteCoopTemplate(id){
+    if(!confirm("確定刪除此週期協力任務設定？已產生的任務紀錄不會刪除。")) return;
+    state.coopTaskTemplates=state.coopTaskTemplates.filter(item=>item.id!==id);
     markChanged(); save(); refreshBackendPage("backend-coop");
 }
 function deleteCoopTask(taskId){
@@ -2059,6 +2281,30 @@ function toggleDailyTask(id){
 function deleteDailyTask(id){
     if(!confirm("確定刪除這個每日任務設定？已經產生的任務不會被刪除。")) return;
     state.dailyTaskTemplates = state.dailyTaskTemplates.filter(item=>item.id!==id);
+    markChanged(); save(); refreshBackendPage("backend-tasks");
+}
+function addWeeklyTask(){
+    const title = document.getElementById("weeklyTaskTitle").value.trim();
+    const reward = Math.max(0,Math.floor(Number(document.getElementById("weeklyTaskReward").value)||0));
+    const appearWeekday = Number(document.getElementById("weeklyTaskAppearWeekday").value);
+    const appearTime = document.getElementById("weeklyTaskAppearTime").value;
+    const dueWeekday = Number(document.getElementById("weeklyTaskDueWeekday").value);
+    const dueTime = document.getElementById("weeklyTaskDueTime").value;
+    if(!title || !appearTime || !dueTime) return alert("請完整填寫每週任務名稱、出現時間與截止時間");
+    state.weeklyTaskTemplates.push({id:"weekly_template_"+Date.now(),title,reward,appearWeekday,appearTime,dueWeekday,dueTime,enabled:true});
+    generateWeeklyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function toggleWeeklyTask(id){
+    const template = state.weeklyTaskTemplates.find(item=>item.id===id);
+    if(!template) return;
+    template.enabled = template.enabled===false;
+    if(template.enabled) generateWeeklyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function deleteWeeklyTask(id){
+    if(!confirm("確定刪除這個每週任務設定？已經產生的任務不會被刪除。")) return;
+    state.weeklyTaskTemplates = state.weeklyTaskTemplates.filter(item=>item.id!==id);
     markChanged(); save(); refreshBackendPage("backend-tasks");
 }
 
@@ -2271,10 +2517,10 @@ async function importData(input){
     }
 }
 
-//初始化；每 30 秒檢查一次每日任務是否已到出現時間。
-syncDailyTasks();
+//初始化；每 30 秒檢查一次每日與每週任務是否已到出現時間。
+syncScheduledTasks();
 render();
-setInterval(syncDailyTasks,30000);
+setInterval(syncScheduledTasks,30000);
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
