@@ -441,6 +441,7 @@ if(!state){
         coopTasks:[],
         drawings:[],
         drawingAlbum:[],
+        dailyTaskTemplates:[],
         globalBgImage:"",
         lastSaved:null
     };
@@ -465,6 +466,13 @@ function normalizeState(target){
         target.drawings = target.drawings.slice(0,3);
     }
     if(!Array.isArray(target.tasks)) target.tasks=[];
+    if(!Array.isArray(target.dailyTaskTemplates)) target.dailyTaskTemplates=[];
+    target.dailyTaskTemplates = target.dailyTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
+        ...item,
+        enabled:item.enabled!==false,
+        appearTime:/^\d{2}:\d{2}$/.test(item.appearTime||"") ? item.appearTime : "08:00",
+        dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
+    }));
     target.clothesM = target.clothesM.filter(item=>item && typeof item==="object");
     target.clothesF = target.clothesF.filter(item=>item && typeof item==="object");
     target.layouts = target.layouts.filter(item=>item && typeof item==="object");
@@ -1084,8 +1092,52 @@ function showPetMoodReply(mood,button){
     replyElement.textContent = reply;
 }
 
+//每日任務：到達每天指定時間後，自動建立當日任務；截止時間早於出現時間時視為隔日截止。
+function localDateKey(date=new Date()){
+    const year = date.getFullYear();
+    const month = String(date.getMonth()+1).padStart(2,"0");
+    const day = String(date.getDate()).padStart(2,"0");
+    return `${year}-${month}-${day}`;
+}
+function dateAtLocalTime(dateKey,time){
+    const [year,month,day] = dateKey.split("-").map(Number);
+    const [hour,minute] = time.split(":").map(Number);
+    return new Date(year,month-1,day,hour,minute,0,0);
+}
+function generateDailyTasks(now=new Date()){
+    const today = localDateKey(now);
+    let changed = false;
+    state.dailyTaskTemplates.forEach(template=>{
+        if(template.enabled===false || !template.title) return;
+        const appearAt = dateAtLocalTime(today,template.appearTime);
+        if(now < appearAt) return;
+        const taskId = `daily_${template.id}_${today}`;
+        if(state.tasks.some(task=>task.id===taskId)) return;
+        let dueAt = dateAtLocalTime(today,template.dueTime);
+        if(dueAt<=appearAt) dueAt.setDate(dueAt.getDate()+1);
+        state.tasks.push({
+            id:taskId,
+            title:template.title,
+            reward:Number(template.reward)||0,
+            dueAt:dueAt.getTime(),
+            dailyTemplateId:template.id,
+            dailyDate:today
+        });
+        changed = true;
+    });
+    return changed;
+}
+function syncDailyTasks(){
+    if(!generateDailyTasks()) return false;
+    markChanged();
+    save();
+    render();
+    return true;
+}
+
 //學生端任務
 function tasks(id){
+    syncDailyTasks();
     const s = state.students[id-1];
     const now = Date.now();
     const todo = state.tasks.filter(t=>!s.doneTasks.includes(t.id) && (!t.dueAt || now <= t.dueAt));
@@ -1522,6 +1574,14 @@ async function backend(){
             <button class="danger" onclick="deleteTask('${esc(t.id)}')">刪除任務</button>
         </div>`;
     }).join("") || `<div class="empty">尚無任務</div>`;
+    const dailyTaskHtml = state.dailyTaskTemplates.map(template=>`
+        <div class="row">
+            <div class="grow">
+                <b>${esc(template.title)}</b> <span class="small">每天 ${esc(template.appearTime)} 出現｜${esc(template.dueTime)} 截止｜獎勵 ${Number(template.reward)||0} 🪙</span>
+            </div>
+            <button onclick="toggleDailyTask('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
+            <button class="danger" onclick="deleteDailyTask('${esc(template.id)}')">刪除</button>
+        </div>`).join("") || `<div class="empty">尚未設定每日任務</div>`;
 
     //商品清單依等級分區，可拖曳排序並編輯名稱、等級與上下架狀態
     function adminProductGroups(listName,list){
@@ -1595,6 +1655,18 @@ async function backend(){
         <button class="primary" onclick="addTask()">新增任務</button>
     </div>
     ${taskListHtml}
+    <h3 style="margin-top:24px">每日任務</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="dailyTaskTitle" placeholder="每日任務名稱">
+            <input id="dailyTaskReward" type="number" min="0" value="10" placeholder="代幣" style="width:90px">
+            <label>每天出現：<input id="dailyTaskAppearTime" type="time" value="08:00"></label>
+            <label>每天截止：<input id="dailyTaskDueTime" type="time" value="23:59"></label>
+        </div>
+        <button class="primary" onclick="addDailyTask()">新增每日任務</button>
+    </div>
+    <div class="small">截止時間若早於或等於出現時間，會視為隔日截止。</div>
+    ${dailyTaskHtml}
 
     </section>
     <section id="backend-coop" class="backend-page">
@@ -1967,6 +2039,28 @@ function deleteTask(tid){
     state.tasks = state.tasks.filter(t=>t.id!==tid);
     markChanged(); save(); refreshBackendPage("backend-tasks");
 }
+function addDailyTask(){
+    const title = document.getElementById("dailyTaskTitle").value.trim();
+    const reward = Math.max(0,Math.floor(Number(document.getElementById("dailyTaskReward").value)||0));
+    const appearTime = document.getElementById("dailyTaskAppearTime").value;
+    const dueTime = document.getElementById("dailyTaskDueTime").value;
+    if(!title || !appearTime || !dueTime) return alert("請完整填寫每日任務名稱、出現時間與截止時間");
+    state.dailyTaskTemplates.push({id:"daily_template_"+Date.now(),title,reward,appearTime,dueTime,enabled:true});
+    generateDailyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function toggleDailyTask(id){
+    const template = state.dailyTaskTemplates.find(item=>item.id===id);
+    if(!template) return;
+    template.enabled = template.enabled===false;
+    if(template.enabled) generateDailyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function deleteDailyTask(id){
+    if(!confirm("確定刪除這個每日任務設定？已經產生的任務不會被刪除。")) return;
+    state.dailyTaskTemplates = state.dailyTaskTemplates.filter(item=>item.id!==id);
+    markChanged(); save(); refreshBackendPage("backend-tasks");
+}
 
 //學生管理
 function setStudentGender(id,gender){
@@ -2177,8 +2271,10 @@ async function importData(input){
     }
 }
 
-//初始化
+//初始化；每 30 秒檢查一次每日任務是否已到出現時間。
+syncDailyTasks();
 render();
+setInterval(syncDailyTasks,30000);
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
