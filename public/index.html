@@ -1233,11 +1233,21 @@ function switchClosetTab(id,tab){
     }
     if(tab==="layouts"){
         const list = state.layouts.filter(x=>s.ownedLayout.includes(x.id));
-        html = groupedClosetCards(list,p=>`<div class="product">
+        const defaultPetCard = `<section class="shop-level level-r">
+            <div class="shop-level-header"><h3>預設寵物</h3><span>永久擁有</span></div>
+            <div class="shopgrid">
+                <div class="product">
+                    <div class="pic"><img src="${esc(DEFAULT_PET_IMAGE)}" alt="${esc(DEFAULT_PET_NAME)}"></div>
+                    <b>${esc(DEFAULT_PET_NAME)}</b>
+                    <div><button onclick="equipDefaultPet(${id})" ${s.equippedLayout.length===0?"disabled":""}>${s.equippedLayout.length===0?"使用中":"使用"}</button></div>
+                </div>
+            </div>
+        </section>`;
+        html = defaultPetCard + groupedClosetCards(list,p=>`<div class="product">
             <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🐾"}</div>
             <b>${esc(p.name)}</b>
             <div><button onclick="toggleEquipLayout(${id},'${esc(p.id)}')">${s.equippedLayout.includes(p.id)?"卸下":"穿上"}</button></div>
-        </div>`,"還沒有寵物");
+        </div>`,"還沒有其他寵物");
     }
     if(tab==="bgs"){
         const list = state.backgrounds.filter(x=>s.ownedBg.includes(x.id));
@@ -1261,6 +1271,12 @@ function equipClothes(id,pid){
 function toggleEquipLayout(id,pid){
     const s = state.students[id-1];
     s.equippedLayout = s.equippedLayout.includes(pid) ? [] : [pid];
+    markChanged(); save(); render(); switchClosetTab(id,"layouts");
+}
+function equipDefaultPet(id){
+    const s = state.students[id-1];
+    if(!s || s.equippedLayout.length===0) return;
+    s.equippedLayout = [];
     markChanged(); save(); render(); switchClosetTab(id,"layouts");
 }
 function equipBg(id,pid){
