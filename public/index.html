@@ -160,13 +160,12 @@ input[type="number"]{width:85px}
 .pet-mood-button:focus-visible{outline:4px solid #efb1a5;outline-offset:3px}
 .pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:clamp(11px,1.55vw,16px);line-height:1.15;white-space:nowrap;letter-spacing:-1px}
 .pet-mood-button b{font-size:14px}
-.pet-stage{display:flex;flex-direction:column;align-items:center;min-width:0}
-.pet-mood-reply{position:relative;width:100%;min-height:96px;box-sizing:border-box;margin-bottom:24px;padding:18px;background:#fffdf3;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:19px;font-weight:700;line-height:1.75;letter-spacing:.5px;text-align:left}
-.pet-mood-reply::before{content:"";position:absolute;right:42px;bottom:-18px;width:28px;height:28px;background:#fffdf3;border-right:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg)}
+.pet-stage{display:flex;flex-direction:column;align-items:center;width:min(230px,55vw);min-width:0;margin:auto}
+.pet-mood-reply{--reply-color:#fffdf3;position:relative;width:100%;min-height:96px;box-sizing:border-box;margin-bottom:24px;padding:18px;background:var(--reply-color);border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:19px;font-weight:700;line-height:1.75;letter-spacing:.5px;text-align:left;transition:background-color .18s ease}
+.pet-mood-reply::before{content:"";position:absolute;right:42px;bottom:-18px;width:28px;height:28px;background:var(--reply-color);border-right:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg);transition:background-color .18s ease}
 .pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
 .pet-mood-reply p{margin:8px 0 0}
-.pet-interaction-image{display:block;width:min(230px,55vw);height:230px;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
-.pet-stage h3{margin:13px 0 0}
+.pet-interaction-image{display:block;width:100%;height:230px;box-sizing:border-box;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
 @media(max-width:700px){.pet-interaction{grid-template-columns:1fr}.pet-stage{order:-1}.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr))}.pet-interaction-image{height:180px}.pet-mood-reply{max-width:430px}}
 .product-admin{align-items:flex-start}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
@@ -873,7 +872,7 @@ function openPetMood(id){
         openModal(`<h2>${id}號｜寵物心情互動</h2><div class="empty">尚未裝備寵物，請先到衣櫃選擇一隻寵物。</div>`);
         return;
     }
-    const moodColors = ["#ffd36e","#ff9f9f","#ffb45e","#9ed7d3","#efd57b","#c4b3e8","#9fc4e7","#8fa5c8","#ef9b88","#b9c0c8","#8fb5db","#b798c7"];
+    const moodColors = ["#ffd43b","#ff6b9a","#ff8c42","#66d9c4","#ffe66d","#b197fc","#4dabf7","#6c7a9c","#ff7043","#adb5bd","#5c7cfa","#9c36b5"];
     const moodButtons = Object.keys(PET_MOOD_RESPONSES).map((mood,index)=>`
         <button class="pet-mood-button" style="--mood-color:${moodColors[index]}" onclick="showPetMoodReply('${mood}',this)" aria-label="選擇${mood}心情" aria-pressed="false">
             <span aria-hidden="true">${PET_MOOD_ICONS[mood]}</span><b>${mood}</b>
@@ -900,6 +899,7 @@ function showPetMoodReply(mood,button){
         item.classList.toggle("selected",selected);
         item.setAttribute("aria-pressed",String(selected));
     });
+    replyElement.style.setProperty("--reply-color",button?.style.getPropertyValue("--mood-color")||"#fffdf3");
     const reply = responses[Math.floor(Math.random()*responses.length)];
     replyElement.textContent = reply;
 }
@@ -1213,33 +1213,43 @@ function closetPreviewHtml(id){
         ${pet?`<img src="${esc(pet.image)}" alt="${esc(pet.name)}">`:`<div class="closet-pet-empty">尚未裝備寵物</div>`}
     </div>`;
 }
+function groupedClosetCards(list,card,emptyText){
+    if(!list.length) return `<div class="empty">${emptyText}</div>`;
+    return LEVEL_ORDER.map(level=>{
+        const items = list.filter(item=>(item.level||"R")===level);
+        return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
+            <div class="shop-level-header"><h3><span class="level-badge">${level}</span>${level} 等級</h3><span>${items.length} 件</span></div>
+            <div class="shopgrid">${items.map(card).join("")}</div>
+        </section>` : "";
+    }).join("");
+}
 function switchClosetTab(id,tab){
     const s = state.students[id-1];
     const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
     let html="";
     if(tab==="clothes"){
         const list = clothPool.filter(x=>s.ownedClothes.includes(x.id));
-        html = `<div class="shopgrid">${list.map(p=>`<div class="product">
+        html = groupedClosetCards(list,p=>`<div class="product">
             <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"👗"}</div>
             <b>${esc(p.name)}</b>
             <div><button onclick="equipClothes(${id},'${esc(p.id)}')">${s.equippedClothes===p.id?"脫下":"穿上"}</button></div>
-        </div>`).join("")||`<div class="empty">還沒有服裝</div>`}</div>`;
+        </div>`,"還沒有服裝");
     }
     if(tab==="layouts"){
         const list = state.layouts.filter(x=>s.ownedLayout.includes(x.id));
-        html = `<div class="shopgrid">${list.map(p=>`<div class="product">
+        html = groupedClosetCards(list,p=>`<div class="product">
             <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🐾"}</div>
             <b>${esc(p.name)}</b>
             <div><button onclick="toggleEquipLayout(${id},'${esc(p.id)}')">${s.equippedLayout.includes(p.id)?"卸下":"穿上"}</button></div>
-        </div>`).join("")||`<div class="empty">還沒有寵物</div>`}</div>`;
+        </div>`,"還沒有寵物");
     }
     if(tab==="bgs"){
         const list = state.backgrounds.filter(x=>s.ownedBg.includes(x.id));
-        html = `<div class="shopgrid">${list.map(p=>`<div class="product">
+        html = groupedClosetCards(list,p=>`<div class="product">
             <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🖼"}</div>
             <b>${esc(p.name)}</b>
             <div><button onclick="equipBg(${id},'${esc(p.id)}')">${s.equippedBg===p.id?"移除":"設為背景"}</button></div>
-        </div>`).join("")||`<div class="empty">還沒有背景</div>`}</div>`;
+        </div>`,"還沒有背景");
     }
     document.getElementById("closetTabContent").innerHTML = html;
     document.getElementById("closetPreview").innerHTML = closetPreviewHtml(id);
@@ -1458,6 +1468,7 @@ async function backend(){
             </label>
             <span class="grow">🪙 ${s.tokens}　🎟️ ${s.lotteryTickets||0}</span>
             <button onclick="editToken(${s.id})">設定代幣</button>
+            <button onclick="editLotteryTicket(${s.id})">設定樂透券</button>
             <button class="warning" onclick="resetStudentCloset(${s.id})">重置衣櫃</button>
         </div>`).join("")}
     </div>
@@ -1769,6 +1780,15 @@ function editToken(id){
     const n = Number(val);
     if(isNaN(n)) return alert("請輸入數字");
     s.tokens = n;
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+function editLotteryTicket(id){
+    const s = state.students[id-1];
+    const val = prompt(`覆蓋設定${id}號樂透券，現在：${s.lotteryTickets||0}`, s.lotteryTickets||0);
+    if(val===null) return;
+    const n = Math.floor(Number(val));
+    if(!Number.isFinite(n) || n<0) return alert("請輸入大於或等於 0 的整數");
+    s.lotteryTickets = n;
     markChanged(); save(); render(); refreshBackendPage("backend-members");
 }
 function addTokenOne(){
