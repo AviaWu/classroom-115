@@ -418,7 +418,7 @@ async function shareGame(){
 }
 
 // 內建男生服裝：直接使用 public/images/boy/ 的圖片，避免每次載入重複建立商品
-function seedBuiltinBoyClothes(){
+function seedBuiltinBoyClothes(persist=true){
     const removedIds = state.clothesM.filter(item=>item.image==="/images/boy/b0.png").map(item=>item.id);
     let changed = removedIds.length>0;
     if(changed){
@@ -453,13 +453,14 @@ function seedBuiltinBoyClothes(){
             changed = true;
         }
     });
-    if(changed) save();
+    if(changed && persist) save();
+    return changed;
 }
 
 seedBuiltinBoyClothes();
 
 // 內建女生服裝：直接使用 public/images/girl/ 的圖片，避免每次載入重複建立商品
-function seedBuiltinGirlClothes(){
+function seedBuiltinGirlClothes(persist=true){
     const removedIds = state.clothesF.filter(item=>item.image==="/images/girl/g0.png").map(item=>item.id);
     let changed = removedIds.length>0;
     if(changed){
@@ -494,13 +495,14 @@ function seedBuiltinGirlClothes(){
             changed = true;
         }
     });
-    if(changed) save();
+    if(changed && persist) save();
+    return changed;
 }
 
 seedBuiltinGirlClothes();
 
 // 內建寵物商品：直接使用 public/images/dec/ 的全部 PNG 圖片，避免重複建立商品
-function seedBuiltinLayouts(){
+function seedBuiltinLayouts(persist=true){
     const filenames = Array.from({length:25}, (_,index)=>`d (${index+1}).png`);
     let changed = false;
     filenames.forEach((filename,index)=>{
@@ -521,13 +523,14 @@ function seedBuiltinLayouts(){
             changed = true;
         }
     });
-    if(changed) save();
+    if(changed && persist) save();
+    return changed;
 }
 
 seedBuiltinLayouts();
 
 // 內建背景商品：直接使用 public/images/bgm/ 的全部 JPG 圖片，避免重複建立商品
-function seedBuiltinBackgrounds(){
+function seedBuiltinBackgrounds(persist=true){
     const filenames = Array.from({length:27}, (_,index)=>`bg (${index+1}).jpg`);
     const removedItems = state.backgrounds.filter(item=>/^\/images\/bgm\/ba%20\(\d+\)\.png$/i.test(item.image||""));
     const removedIds = removedItems.map(item=>item.id);
@@ -553,10 +556,28 @@ function seedBuiltinBackgrounds(){
             changed = true;
         }
     });
-    if(changed) save();
+    if(changed && persist) save();
+    return changed;
 }
 
 seedBuiltinBackgrounds();
+
+// 雲端進度載入後，以目前 HTML 內建商品清單補齊商品，再回寫 Firebase。
+// 僅調整商品目錄；學生代幣、任務、衣櫃與裝備進度均會保留。
+function reconcileBuiltinCatalog(){
+    const changed = [
+        seedBuiltinBoyClothes(false),
+        seedBuiltinGirlClothes(false),
+        seedBuiltinLayouts(false),
+        seedBuiltinBackgrounds(false)
+    ].some(Boolean);
+    if(changed){
+        state.lastSaved = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        render();
+    }
+    return changed;
+}
 
 function markChanged(){
     unsavedChange = true;
@@ -1786,9 +1807,11 @@ render();
   try{
     await signInAnonymously(auth);
     const initialSnapshot = await get(gameRef);
+    let catalogChanged = false;
     if(initialSnapshot.exists()){
       applyingRemote = true;
       const loaded = applyCloudState(initialSnapshot.val());
+      if(loaded) catalogChanged = reconcileBuiltinCatalog();
       applyingRemote = false;
       status.textContent = loaded ? "☁️ 已載入雲端進度" : "💾 雲端資料異常，使用本機存檔";
     }else{
@@ -1796,20 +1819,30 @@ render();
       status.textContent = "☁️ 已建立雲端存檔";
     }
     cloudReady = true;
+    if(catalogChanged){
+      await set(gameRef, state);
+      status.textContent = "☁️ 已同步 HTML 商品更新";
+    }
 
     onValue(gameRef, snapshot=>{
       if(!cloudReady || !snapshot.exists()) return;
+      let shouldSyncCatalog = false;
       try{
         const remoteState = snapshot.val();
         if(remoteState?.lastSaved === state.lastSaved) return;
         applyingRemote = true;
-        if(applyCloudState(remoteState)) status.textContent = "☁️ 已取得最新進度";
-        else status.textContent = "💾 雲端資料異常，使用本機存檔";
+        if(applyCloudState(remoteState)){
+          shouldSyncCatalog = reconcileBuiltinCatalog();
+          status.textContent = "☁️ 已取得最新進度";
+        }else{
+          status.textContent = "💾 雲端資料異常，使用本機存檔";
+        }
       }catch(error){
         showCloudError(error);
       }finally{
         applyingRemote = false;
       }
+      if(shouldSyncCatalog) window.firebaseGameStore.queueSave(state);
     }, showCloudError);
   }catch(error){
     window.firebaseGameStore.available = false;
