@@ -1400,15 +1400,11 @@ function openCoopTask(taskId, taskButtons=""){
         const pool = s.gender==="M" ? state.clothesM : state.clothesF;
         const equipped = pool.find(x=>x.id===s.equippedClothes);
         const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
-        const activePet = state.layouts.find(x=>s.equippedLayout.includes(x.id)) || {image:DEFAULT_PET_IMAGE};
         const image = equipped?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
         const bgImage = eqBg?.image || "";
         const bgHtml = bgImage ? `<div class="bg-layer" style="background-image:url('${esc(bgImage)}')"></div>` : "";
-        const layoutHtml = activePet
-            ? `<div class="layout-item" style="z-index:3;background-image:url('${esc(activePet.image)}')"></div>`
-            : "";
         return `<button class="coop-member ${done?"done":""}" ${done?"disabled":""} onclick="completeCoopMember('${esc(task.id)}',${s.id})">
-            <div class="coop-avatar"><div class="avatar">${bgHtml}<div class="character" style="background-image:url('${esc(image)}')"></div>${layoutHtml}</div></div>
+            <div class="coop-avatar"><div class="avatar">${bgHtml}<div class="character" style="background-image:url('${esc(image)}')"></div></div></div>
             <span>${s.id}${done?" ✓":""}</span>
         </button>`;
     }).join("");
@@ -1471,9 +1467,25 @@ function groupedShopCards(id,list,card){
         </section>` : "";
     }).join("") || `<div class="empty">尚無商品</div>`;
 }
+function wardrobeCollection(student,type){
+    if(type==="clothes") return student.ownedClothes;
+    if(type==="layout") return student.ownedLayout;
+    if(type==="background") return student.ownedBg;
+    return null;
+}
+function itemOwnedByStudent(student,type,itemId){
+    const collection = wardrobeCollection(student,type);
+    return Array.isArray(collection) && collection.includes(itemId);
+}
+function addItemToWardrobe(student,type,itemId){
+    const collection = wardrobeCollection(student,type);
+    if(!Array.isArray(collection) || collection.includes(itemId)) return false;
+    collection.push(itemId);
+    return true;
+}
 function clothCard(id,p){
     const s = state.students[id-1];
-    const own = s.ownedClothes.includes(p.id);
+    const own = itemOwnedByStudent(s,"clothes",p.id);
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"👗"}</div>
         <b>${esc(p.name)}</b>
@@ -1484,7 +1496,7 @@ function clothCard(id,p){
 }
 function layCard(id,p){
     const s = state.students[id-1];
-    const own = s.ownedLayout.includes(p.id);
+    const own = itemOwnedByStudent(s,"layout",p.id);
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"✨"}</div>
         <b>${esc(p.name)}</b>
@@ -1495,7 +1507,7 @@ function layCard(id,p){
 }
 function bgCard(id,p){
     const s = state.students[id-1];
-    const own = s.ownedBg.includes(p.id);
+    const own = itemOwnedByStudent(s,"background",p.id);
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"🖼"}</div>
         <b>${esc(p.name)}</b>
@@ -1563,17 +1575,8 @@ function drawLottery(id){
     const pool = levelPrizes.length ? levelPrizes : prizes;
     const prize = pool[Math.floor(Math.random()*pool.length)];
     s.lotteryTickets -= 1;
-    let duplicate = false;
-    if(prize.type==="clothes"){
-        duplicate = s.ownedClothes.includes(prize.item.id);
-        if(!duplicate) s.ownedClothes.push(prize.item.id);
-    }else if(prize.type==="layout"){
-        duplicate = s.ownedLayout.includes(prize.item.id);
-        if(!duplicate) s.ownedLayout.push(prize.item.id);
-    }else{
-        duplicate = s.ownedBg.includes(prize.item.id);
-        if(!duplicate) s.ownedBg.push(prize.item.id);
-    }
+    const addedToWardrobe = addItemToWardrobe(s,prize.type,prize.item.id);
+    const duplicate = !addedToWardrobe;
     if(duplicate) s.tokens += 20;
     markChanged(); save(); render();
     const machine = document.getElementById("gachaMachine");
