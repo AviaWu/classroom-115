@@ -6,7 +6,7 @@
       "classroom-115": {
         "progress": {
           ".read": "auth != null",
-          ".write": "auth != null",
+          ".write": "auth != null && (!data.exists() || !data.child('lastSaved').isString() || (newData.child('lastSaved').isString() && newData.child('lastSaved').val() >= data.child('lastSaved').val()))",
           ".validate": "newData.hasChildren(['students', 'lastSaved'])",
           "students": {
             ".validate": "newData.hasChildren(['0'])"
