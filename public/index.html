@@ -451,6 +451,8 @@ if(!state){
         backgrounds:[],
         coopTasks:[],
         coopTaskTemplates:[],
+        deletedTaskIds:[],
+        deletedCoopTaskIds:[],
         drawings:[],
         drawingAlbum:[],
         dailyTaskTemplates:[],
@@ -471,6 +473,10 @@ function normalizeState(target){
     if(!Array.isArray(target.backgrounds)) target.backgrounds=[];
     if(!Array.isArray(target.coopTasks)) target.coopTasks=[];
     if(!Array.isArray(target.coopTaskTemplates)) target.coopTaskTemplates=[];
+    if(!Array.isArray(target.deletedTaskIds)) target.deletedTaskIds=[];
+    if(!Array.isArray(target.deletedCoopTaskIds)) target.deletedCoopTaskIds=[];
+    target.deletedTaskIds = [...new Set(target.deletedTaskIds.filter(id=>typeof id==="string"))];
+    target.deletedCoopTaskIds = [...new Set(target.deletedCoopTaskIds.filter(id=>typeof id==="string"))];
     if(!Array.isArray(target.drawings)) target.drawings=[];
     if(!Array.isArray(target.drawingAlbum)) target.drawingAlbum=[];
     target.drawings = target.drawings.filter(item=>item && typeof item.data==="string");
@@ -862,6 +868,17 @@ function save(){
         }
         return false;
     }
+}
+async function flushSavedState(){
+    if(!save()) return false;
+    try{
+        if(typeof window.firebaseGameStore.flush==="function"){
+            await window.firebaseGameStore.flush();
+        }
+    }catch(error){
+        console.error("等待雲端同步失敗，本機刪除紀錄已保留",error);
+    }
+    return true;
 }
 
 function applyCloudState(cloudState){
@@ -1266,7 +1283,7 @@ function generateDailyTasks(now=new Date()){
         const appearAt = dateAtLocalTime(today,template.appearTime);
         if(now < appearAt) return;
         const taskId = `daily_${template.id}_${today}`;
-        if(state.tasks.some(task=>task.id===taskId)) return;
+        if(state.deletedTaskIds.includes(taskId) || state.tasks.some(task=>task.id===taskId)) return;
         let dueAt = dateAtLocalTime(today,template.dueTime);
         if(dueAt<=appearAt) dueAt.setDate(dueAt.getDate()+1);
         state.tasks.push({
@@ -1290,7 +1307,7 @@ function generateWeeklyTasks(now=new Date()){
         const appearAt = dateInWeek(weekStart,template.appearWeekday,template.appearTime);
         if(now < appearAt) return;
         const taskId = `weekly_${template.id}_${weekKey}`;
-        if(state.tasks.some(task=>task.id===taskId)) return;
+        if(state.deletedTaskIds.includes(taskId) || state.tasks.some(task=>task.id===taskId)) return;
         const dueAt = dateInWeek(weekStart,template.dueWeekday,template.dueTime);
         if(dueAt<=appearAt) dueAt.setDate(dueAt.getDate()+7);
         state.tasks.push({
@@ -1330,7 +1347,7 @@ function generateScheduledCoopTasks(now=new Date()){
             const startAt = dateInWeek(weekStart,template.appearWeekday,template.appearTime);
             if(now<startAt) return;
             const id = `coop_weekly_${template.id}_${weekKey}`;
-            if(state.coopTasks.some(task=>task.id===id)) return;
+            if(state.deletedCoopTaskIds.includes(id) || state.coopTasks.some(task=>task.id===id)) return;
             const dueAt = dateInWeek(weekStart,template.dueWeekday,template.dueTime);
             if(dueAt<=startAt) dueAt.setDate(dueAt.getDate()+7);
             state.coopTasks.push(coopTaskFromTemplate(template,id,startAt,dueAt));
@@ -1341,7 +1358,7 @@ function generateScheduledCoopTasks(now=new Date()){
         const startAt = dateAtLocalTime(today,template.appearTime);
         if(now<startAt) return;
         const id = `coop_daily_${template.id}_${today}`;
-        if(state.coopTasks.some(task=>task.id===id)) return;
+        if(state.deletedCoopTaskIds.includes(id) || state.coopTasks.some(task=>task.id===id)) return;
         const dueAt = dateAtLocalTime(today,template.dueTime);
         if(dueAt<=startAt) dueAt.setDate(dueAt.getDate()+1);
         state.coopTasks.push(coopTaskFromTemplate(template,id,startAt,dueAt));
@@ -2277,10 +2294,13 @@ function deleteCoopTemplate(id){
     state.coopTaskTemplates=state.coopTaskTemplates.filter(item=>item.id!==id);
     markChanged(); save(); refreshBackendPage("backend-coop");
 }
-function deleteCoopTask(taskId){
+async function deleteCoopTask(taskId){
     if(!confirm("確定刪除此協力任務？")) return;
+    if(!state.deletedCoopTaskIds.includes(taskId)) state.deletedCoopTaskIds.push(taskId);
     state.coopTasks = state.coopTasks.filter(t=>t.id!==taskId);
-    markChanged(); save(); refreshBackendPage("backend-coop");
+    markChanged();
+    refreshBackendPage("backend-coop");
+    await flushSavedState();
 }
 
 function moveItem(listName,id,direction){
@@ -2373,10 +2393,16 @@ function addTask(){
     });
     markChanged(); save(); refreshBackendPage("backend-tasks");
 }
-function deleteTask(tid){
+async function deleteTask(tid){
     if(!confirm("確定刪除這個任務？已完成紀錄會一併失效。")) return;
+    if(!state.deletedTaskIds.includes(tid)) state.deletedTaskIds.push(tid);
     state.tasks = state.tasks.filter(t=>t.id!==tid);
-    markChanged(); save(); refreshBackendPage("backend-tasks");
+    state.students.forEach(student=>{
+        student.doneTasks = student.doneTasks.filter(id=>id!==tid);
+    });
+    markChanged();
+    refreshBackendPage("backend-tasks");
+    await flushSavedState();
 }
 function addDailyTask(){
     const title = document.getElementById("dailyTaskTitle").value.trim();
