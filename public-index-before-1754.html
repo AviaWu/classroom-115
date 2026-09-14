@@ -1,0 +1,2733 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>We are 5 甲 </title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans TC",system-ui,sans-serif;background:#f8f4ff;color:#403b4d}
+.bg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;background-repeat:no-repeat}
+header{position:sticky;top:0;z-index:10;background:#333;border-bottom:1px solid #222;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+header h1{color:#f3d98b}
+h1,h2,h3{margin-top:0}
+.wrap{max-width:1450px;margin:auto;padding:20px}
+button{border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;background:#eadfff;color:#44375f}
+button:hover{filter:brightness(0.97)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{background:#d5f1df}
+.danger{background:#ffdede}
+.warning{background:#fff4cc}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px}
+.card{padding:0;background:transparent;border:none;box-shadow:none;text-align:center}
+.avatar{width:100%;aspect-ratio:9/16;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:64px;overflow:hidden;position:relative;background:#F0ECE9}
+.avatar .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center;pointer-events:none}
+.avatar .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
+.avatar .layout-item{position:absolute;inset:0;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
+
+.resource-line{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;white-space:nowrap}
+.num{font-size:18px;font-weight:800;display:inline-block}
+.tokens{font-size:15px;font-weight:800;display:inline-block;color:#b58835}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:12px}
+.actions button{padding:9px 4px;font-size:13px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;padding:18px;z-index:30}
+.modal.open{display:flex}
+.panel{width:min(1100px,100%);max-height:92vh;overflow:auto;padding:22px;background:#fff;border-radius:22px}
+.coop-ing{position:absolute;top:-13px;right:2px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap}
+.coop-layout{display:grid;grid-template-columns:minmax(150px, .35fr) minmax(0,2.15fr);gap:14px;align-items:stretch;min-height:0}
+.coop-side{min-width:0}
+.coop-side-monster{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;text-align:center;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;padding:14px;min-height:100%;height:auto}
+.coop-monster-image-box{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff8e8;margin-bottom:14px}
+.coop-monster-image-box img{display:block;width:100%;height:100%;object-fit:contain}
+.coop-monster-info{display:flex;flex-direction:column;align-items:stretch;text-align:center}
+.coop-hp{width:100%;height:22px;background:#ead4d4;border:3px solid #20263a;margin:10px 0;overflow:hidden}
+.coop-hp-fill{height:100%;background:#d83d3d;transition:width .3s ease}
+.coop-hit{animation:coopHit .45s ease}
+@keyframes coopHit{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-8px) rotate(-2deg);filter:brightness(1.8) saturate(1.8)}50%{transform:translateX(8px) rotate(2deg);filter:brightness(2.2) saturate(2)}75%{transform:translateX(-5px);filter:brightness(1.5)}}
+.coop-side-members{min-width:0;display:flex;align-items:stretch}
+.coop-side-members .coop-members{grid-template-columns:repeat(10,minmax(80px,1fr));gap:8px}
+.coop-side-members .coop-member{padding:6px;box-shadow:3px 3px 0 #172033}
+.coop-side-members .coop-member span{font-size:13px;margin-top:3px}
+@media(max-width:700px){.coop-layout{grid-template-columns:1fr}.coop-side-monster{min-height:0;height:auto}.coop-side-members{display:block}.coop-side-members .coop-members{grid-template-columns:repeat(6,minmax(48px,1fr));gap:6px}.panel{padding:14px}}
+.coop-monster{text-align:center;margin:8px auto 18px;padding:14px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
+.coop-monster img{display:block;width:min(220px,70vw);height:180px;object-fit:contain;margin:8px auto}
+.coop-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:12px}
+.coop-member{border:3px solid #20263a;background:#fff;padding:6px;text-align:center;box-shadow:3px 3px 0 #172033}
+.coop-member.done{border-color:#7a1717;background:#8f2020;color:#fff;box-shadow:2px 2px 0 #4c0d0d}
+.coop-member img{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#F0ECE9}
+.coop-member span{display:block;font-weight:900;margin-top:4px}
+.close{float:right;background:#eee}
+.small{font-size:13px;color:#777}
+.empty{text-align:center;padding:30px;color:#777}
+.shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:13px}
+.product{border:1px solid #eee;border-radius:17px;padding:10px;text-align:center;background:#fff}
+.closet-layout{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:20px;align-items:start}
+.closet-preview-wrap{position:sticky;top:0;text-align:center}
+.closet-preview{width:100%;max-width:130px;margin:auto;aspect-ratio:9/16;border:3px solid #20263a;background:#F0ECE9;overflow:hidden;position:relative;box-shadow:5px 5px 0 #172033}
+.closet-preview .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center}
+.closet-preview .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat}
+.closet-pet-preview{width:100%;max-width:130px;aspect-ratio:1;margin:12px auto 0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff8e8;border:3px solid #20263a;box-shadow:5px 5px 0 #172033}
+.closet-pet-preview img{display:block;width:92%;height:92%;object-fit:contain}
+.closet-pet-empty{padding:10px;color:#777;font-size:12px;font-weight:700}
+@media(max-width:700px){.closet-layout{grid-template-columns:1fr}.closet-preview-wrap{position:static;order:-1}.closet-preview,.closet-pet-preview{max-width:90px}}
+
+/* 已移除棋盤格，背景設透明 */
+.pic{
+    height:155px;
+    border-radius:13px;
+    background:transparent;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    margin-bottom:9px;
+}
+.pic img{
+    max-width:100%;
+    max-height:100%;
+    object-fit:contain;
+    background:transparent;
+}
+
+.price{font-weight:900;margin:7px 0;color:#b58835}
+.owned{font-size:13px}
+.row{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid #eee;border-radius:14px;margin:8px 0;flex-wrap:wrap}
+.row .grow{flex:1;min-width:180px}
+input{border:1px solid #ddd;border-radius:9px;padding:9px}
+input[type="file"]{padding:4px}
+label{font-weight:700}
+input[type="number"]{width:85px}
+.tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.tab{background:#eee;border:0;border-radius:10px;padding:8px 14px;cursor:pointer}
+.tab.active{background:#d5f1df}
+.warn{color:#c23030;font-weight:bold}
+.info{color:#3078c2}
+.task-stat{font-size:14px;margin:4px 0;color:#555}
+.student-list{font-size:13px;line-height:1.6;padding:6px 8px;background:#f8f8f8;border-radius:8px;margin-top:6px;word-break:break-all}
+.edit-item-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.edit-item-row input{flex:1;min-width:120px}
+.lottery-ticket{font-size:15px;font-weight:800;display:inline-block;color:#8b4e9f}
+.lottery-page{text-align:center;max-width:720px;margin:auto}
+.gacha-machine{position:relative;width:min(330px,82vw);margin:18px auto;padding:0;background:transparent;border:0;box-shadow:none;overflow:hidden}
+.gacha-machine-image{display:block;width:100%;height:auto;image-rendering:auto;mix-blend-mode:multiply}
+.gacha-machine::after{content:"";position:absolute;inset:-40%;background:conic-gradient(transparent,#fff7 12%,transparent 24%);opacity:0;pointer-events:none}
+.gacha-machine.drawing{animation:gachaShake .7s ease}
+.gacha-machine.drawing::after{opacity:1;animation:gachaSpark 1s linear infinite}
+@keyframes gachaShake{0%,100%{transform:rotate(0) scale(1)}15%{transform:rotate(-5deg) scale(1.03)}30%{transform:rotate(5deg) scale(1.05)}45%{transform:rotate(-4deg) scale(1.03)}60%{transform:rotate(4deg) scale(1.05)}75%{transform:rotate(-2deg) scale(1.02)}}
+@keyframes gachaSpark{to{transform:rotate(360deg)}}
+.lottery-result-popup{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(23,32,51,.78)}
+.lottery-result-card{width:min(420px,92vw);padding:22px;text-align:center;background:#fff4d6;border:5px solid #20263a;box-shadow:9px 9px 0 #172033}
+.lottery-result-card img{display:block;width:min(240px,70vw);height:240px;object-fit:contain;margin:0 auto 14px;background:#fff;border:3px solid #20263a}
+.lottery-result-card h3{font-size:22px;margin:8px 0 16px}
+.lottery-rules{padding:14px;text-align:left;background:#fff4d6;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;line-height:1.8}
+.lottery-result{margin:14px 0;padding:12px;font-size:18px;font-weight:900;min-height:28px}
+.shop-level{--level-color:#768195;--level-bg:#eef1f5;margin:22px 0 30px;padding:16px;border:4px solid var(--level-color);background:var(--level-bg);box-shadow:7px 7px 0 #172033}
+.shop-level:first-child{margin-top:10px}
+.shop-level-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-16px -16px 18px;padding:11px 14px;background:var(--level-color);color:#fff;border-bottom:4px solid #20263a}
+.shop-level-header h3{display:flex;align-items:center;gap:10px;margin:0;color:inherit;font-size:22px;text-shadow:2px 2px 0 rgba(0,0,0,.35)}
+.level-badge{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:5px 10px;background:#fff;color:var(--level-color);border:3px solid #20263a;box-shadow:3px 3px 0 #172033;font-size:24px;line-height:1}
+.level-price{font-weight:900;white-space:nowrap}
+.shop-level.level-r{--level-color:#687386;--level-bg:#eef1f5}
+.shop-level.level-sr{--level-color:#27868c;--level-bg:#e4f7f4}
+.shop-level.level-ssr{--level-color:#8960b5;--level-bg:#f1e8ff}
+.shop-level.level-ur{--level-color:#c18418;--level-bg:#fff1bf;background-image:linear-gradient(135deg,#fff8da 0,#ffe7a0 50%,#fff4c9 100%)}
+.shop-level .product{border-color:var(--level-color)}
+.product-level-badge{display:inline-block;margin:7px 0 2px;padding:3px 9px;border:2px solid var(--level-color);background:var(--level-color);color:#fff;font-size:13px;font-weight:900}
+@media(max-width:600px){.shop-level-header{align-items:flex-start;flex-direction:column}.level-price{padding-left:2px}}
+.dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
+.backend-nav{position:relative;z-index:1;display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px;padding:12px;background:#34405c;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
+.backend-nav button{padding:8px 10px;font-size:13px}
+.backend-page{display:none}
+.backend-page.active{display:block}
+.monster-list{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px}
+.monster-list button.active{background:#f3d98b;color:#20263a}
+.monster-choice-grid{display:grid;grid-template-columns:repeat(4,minmax(86px,1fr));gap:8px;margin-top:8px}
+.monster-choice{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;background:#fff4d6;border:3px solid #a88d5f;border-radius:8px;color:#403b4d}
+.monster-choice.active{background:#f3d98b;border-color:#20263a;box-shadow:3px 3px 0 #172033}
+.monster-choice img{display:block;width:100%;height:72px;object-fit:contain}
+.monster-choice span{font-size:12px;font-weight:800}
+.monster-choice.none{justify-content:center;min-height:102px}
+.task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
+.pet-interaction-trigger{cursor:pointer}
+.pet-interaction-trigger:focus{outline:4px solid #f3d98b;outline-offset:3px}
+.pet-interaction{display:grid;grid-template-columns:minmax(270px,1fr) minmax(420px,1.2fr);gap:28px;max-width:980px;margin:auto;align-items:center}
+.pet-mood-side{text-align:left}
+.pet-mood-side h3{margin-top:0;padding:9px 12px;background:#34405c;color:#f3d98b;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;text-align:center}
+.pet-mood-grid{display:grid;grid-template-columns:repeat(3,minmax(82px,1fr));gap:11px}
+.pet-mood-button{--mood-color:#f3d98b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;width:100%;min-width:0;min-height:78px;padding:8px 4px;overflow:hidden;background:#d7d7d7;border:4px solid #20263a;color:#20263a;box-shadow:4px 4px 0 #172033;font-family:"Courier New",monospace}
+.pet-mood-button:hover{background:#e8e8e8;transform:translate(-1px,-1px);box-shadow:5px 5px 0 #172033}
+.pet-mood-button.selected{background:var(--mood-color);transform:translate(2px,2px);box-shadow:2px 2px 0 #172033}
+.pet-mood-button:focus-visible{outline:4px solid #efb1a5;outline-offset:3px}
+.pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:clamp(11px,1.55vw,16px);line-height:1.15;white-space:nowrap;letter-spacing:-1px}
+.pet-mood-button b{font-size:14px}
+.pet-stage{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;margin:auto}
+.pet-display-row{display:grid;grid-template-columns:minmax(0,230px) minmax(150px,1fr);gap:14px;width:100%;height:230px;align-items:stretch}
+.pet-level-card{display:flex;flex-direction:column;justify-content:center;width:100%;height:100%;box-sizing:border-box;padding:14px;background:#fff4d6;border:4px solid #20263a;box-shadow:4px 4px 0 #172033}
+.pet-level-heading{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px;font-weight:900;text-align:center}
+.pet-level-heading span:first-child{font-size:19px}
+.pet-affection-bar{width:100%;height:18px;box-sizing:border-box;overflow:hidden;background:#ead4d4;border:3px solid #20263a}
+.pet-affection-fill{height:100%;background:linear-gradient(90deg,#ff8fab,#ffd43b);transition:width .35s ease}
+.pet-affection-status{margin-top:14px;font-size:12px;font-weight:800;line-height:1.5;text-align:center}
+.pet-mood-reply{--reply-color:#fffdf3;position:relative;width:100%;min-height:96px;box-sizing:border-box;margin-bottom:24px;padding:18px;background:var(--reply-color);border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:19px;font-weight:700;line-height:1.75;letter-spacing:.5px;text-align:left;transition:background-color .18s ease}
+.pet-mood-reply::before{content:"";position:absolute;right:42px;bottom:-18px;width:28px;height:28px;background:var(--reply-color);border-right:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg);transition:background-color .18s ease}
+.pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
+.pet-mood-reply p{margin:8px 0 0}
+.pet-interaction-image{display:block;width:100%;height:100%;box-sizing:border-box;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
+@media(max-width:700px){.pet-interaction{grid-template-columns:1fr}.pet-stage{order:-1}.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr))}.pet-display-row{grid-template-columns:minmax(0,1fr) minmax(125px,.8fr);height:180px}.pet-level-card{padding:9px}.pet-level-heading{gap:4px;margin-bottom:8px}.pet-level-heading span:first-child{font-size:15px}.pet-affection-status{margin-top:8px;font-size:11px}.pet-mood-reply{max-width:430px}}
+.drawing-board-layout{display:grid;grid-template-columns:150px minmax(0,1fr) 190px;gap:18px;align-items:start;clear:both}
+.drawing-history{display:flex;flex-direction:column;gap:10px;max-height:650px;overflow:auto;padding:3px}
+.drawing-thumb{width:100%;padding:5px;background:#fff8e8;text-align:left}
+.drawing-thumb img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff;border:2px solid #20263a}
+.drawing-thumb span{display:block;margin-top:5px;font-size:11px;text-align:center}
+.drawing-canvas-wrap{min-width:0}
+#drawingCanvas{display:block;width:100%;height:auto;aspect-ratio:4/3;background:#fff;border:4px solid #20263a;box-shadow:6px 6px 0 #172033;touch-action:none;cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ccircle cx='9' cy='9' r='5' fill='%23000'/%3E%3C/svg%3E") 9 9,crosshair}
+.drawing-tools{padding:12px;background:#f7e9c8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033}
+.drawing-palette{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:10px 0 16px}
+.drawing-color{width:100%;aspect-ratio:1;padding:0;background:var(--paint-color);border:2px solid #20263a;box-shadow:2px 2px 0 #172033}
+.drawing-color.selected{outline:4px solid #4dabf7;outline-offset:2px;transform:translate(1px,1px);box-shadow:none}
+.drawing-tool-actions{display:grid;gap:10px}
+.drawing-tool-actions button.active{background:#9ed7d3}
+.drawing-status{min-height:20px;margin-top:12px;font-size:12px;font-weight:700}
+.backend-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px}
+.backend-album-item{padding:10px;background:#fff8e8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;text-align:center}
+.backend-album-item img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff;border:2px solid #20263a;margin-bottom:8px}
+.backend-album-actions{display:flex;justify-content:center;gap:8px;margin-top:8px}
+@media(max-width:800px){.drawing-board-layout{grid-template-columns:1fr}.drawing-canvas-wrap{order:1}.drawing-tools{order:2}.drawing-history{order:3;display:grid;grid-template-columns:repeat(3,minmax(80px,1fr));max-height:none}.drawing-palette{grid-template-columns:repeat(6,1fr)}}
+@media(max-width:520px){.drawing-history{grid-template-columns:repeat(2,1fr)}.drawing-palette{grid-template-columns:repeat(6,1fr)}}
+.product-admin{align-items:flex-start}
+.product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
+.drag-handle{cursor:grab;font-size:20px;user-select:none}
+.drag-handle:active{cursor:grabbing}
+</style>
+
+    <style>
+      /* 平面像素風 UI */
+      :root{
+        --pixel-ink:#20263a;
+        --pixel-navy:#34405c;
+        --pixel-paper:#f7e9c8;
+        --pixel-cream:#fff5dc;
+        --pixel-gold:#f3d98b;
+        --pixel-blue:#9ed7d3;
+        --pixel-pink:#efb1a5;
+        --pixel-shadow:#172033;
+      }
+      html{background:#d8c69e}
+      body{
+        background:#d8c69e!important;
+        color:var(--pixel-ink);
+        font-family:"Courier New",monospace;
+        image-rendering:pixelated;
+      }
+      body::before{
+        content:"";
+        position:fixed;
+        inset:0;
+        z-index:-2;
+        opacity:.18;
+        pointer-events:none;
+        background-image:linear-gradient(45deg,rgba(32,38,58,.25) 25%,transparent 25%,transparent 75%,rgba(32,38,58,.25) 75%);
+        background-size:8px 8px;
+      }
+      header{
+        background:var(--pixel-navy)!important;
+        border:0;
+        border-bottom:6px solid var(--pixel-shadow);
+        padding:14px 22px;
+        box-shadow:0 5px 0 rgba(23,32,51,.35);
+      }
+      header h1{
+        color:var(--pixel-gold)!important;
+        font-size:clamp(18px,3vw,30px);
+        letter-spacing:1px;
+        text-shadow:3px 3px 0 var(--pixel-shadow);
+      }
+      h1,h2,h3{font-family:"Courier New",monospace;letter-spacing:.5px}
+      h2,h3{color:var(--pixel-navy)}
+      .wrap{padding:28px 20px}
+      button{
+        border:3px solid var(--pixel-ink);
+        border-radius:0;
+        background:var(--pixel-paper);
+        color:var(--pixel-ink);
+        box-shadow:4px 4px 0 var(--pixel-shadow);
+        transition:transform .08s,box-shadow .08s;
+      }
+      button:hover{filter:none;background:#fff8e8;transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--pixel-shadow)}
+      button:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--pixel-shadow)}
+      button:disabled{box-shadow:none}
+      .primary{background:var(--pixel-blue)}
+      .danger{background:var(--pixel-pink)}
+      .warning{background:var(--pixel-gold)}
+      .grid{gap:24px}
+      .card{padding:10px;background:var(--pixel-cream);border:4px solid var(--pixel-ink);box-shadow:6px 6px 0 var(--pixel-shadow)}
+      .avatar{border:3px solid var(--pixel-ink);border-radius:0;background:#F0ECE9}
+      .num{color:var(--pixel-navy);font-size:21px}
+      .tokens{color:#9b6824}
+      .actions{gap:9px}
+      .actions button{border-width:2px;box-shadow:3px 3px 0 var(--pixel-shadow)}
+      .actions button:active{box-shadow:1px 1px 0 var(--pixel-shadow)}
+      .modal{background:rgba(23,32,51,.72)}
+      .panel{border:5px solid var(--pixel-ink);border-radius:0;background:var(--pixel-cream);box-shadow:10px 10px 0 var(--pixel-shadow)}
+      .close{background:var(--pixel-pink)}
+      .shopgrid{gap:18px}
+      .product{border:3px solid var(--pixel-ink);border-radius:0;background:#fff8e8;box-shadow:4px 4px 0 var(--pixel-shadow)}
+      .pic{border:2px solid #a88d5f;border-radius:0;background:#eadbbd}
+      .price{color:#9b6824}
+      .row{border:3px solid var(--pixel-ink);border-radius:0;background:#fff8e8;box-shadow:3px 3px 0 rgba(23,32,51,.45)}
+      input{border:3px solid var(--pixel-ink);border-radius:0;background:#fffdf3;color:var(--pixel-ink);font-family:inherit}
+      .tabs{border-bottom:3px dashed var(--pixel-navy);padding-bottom:10px}
+      .tab{border:3px solid var(--pixel-ink);border-radius:0;box-shadow:3px 3px 0 var(--pixel-shadow)}
+      .tab.active{background:var(--pixel-blue)}
+      .dangerzone{border:3px dashed #a64444;border-radius:0;background:#fff0e5}
+      @media (max-width:600px){
+        header{align-items:flex-start;flex-direction:column}
+        header>div{width:100%;display:flex;flex-wrap:wrap;gap:8px}
+        header button{flex:1}
+        .card{box-shadow:4px 4px 0 var(--pixel-shadow)}
+      }
+    </style>
+</head>
+<body>
+<div class="bg" id="userBg"></div>
+
+<header>
+<h1>Great teamwork makes the dream work</h1>
+<div>
+<button onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
+<button onclick="openDrawingBoard()">畫板</button>
+<button onclick="openBackend()">老師後台</button>
+<span class="small" id="saveStatus">☁️ 正在連線 Firebase...</span>
+</div>
+</header>
+
+<div class="wrap">
+<div id="students" class="grid"></div>
+</div>
+
+<div id="modal" class="modal">
+<div class="panel">
+<button class="close" onclick="closeModal()">關閉</button>
+<div id="body"></div>
+</div>
+</div>
+
+<script>
+const STORAGE_KEY = "growth26_v18_full";
+const CLOUD_SAVE_PATH = "games/classroom-115/progress";
+const MAX_IMG_SIZE = 800;
+const IMG_QUALITY = 0.7;
+const STORAGE_LIMIT = 5 * 1024 * 1024;
+const DEFAULT_PRICE = 50;
+const DEFAULT_PET_IMAGE = "/images/Dec2/1000095494-removebg-preview.png";
+const DEFAULT_PET_NAME = "小嗶";
+const LEVEL_PRICES = {R:50, SR:100, SSR:200, UR:300};
+const LEVEL_ORDER = ["R","SR","SSR","UR"];
+const PET_MOOD_ICONS = {
+    快樂:"(＾▽＾)", 喜悅:"ヽ(・∀・)ﾉ", 興奮:"٩(ˊᗜˋ*)و", 平靜:"( ´ ▽ ` )", 期待:"(☆▽☆)", 焦慮:"(；´Д｀)",
+    緊張:"(⊙﹏⊙)", 恐懼:"Σ(°△°|||)", 煩躁:"(¬_¬)", 無聊:"(￣o￣)", 悲傷:"(╥﹏╥)", 痛苦:"(ಥ﹏ಥ)"
+};
+const PET_MOOD_RESPONSES = {
+    快樂:[
+        "你的笑容讓我的尾巴也跟著搖起來了。", "看見你開心，我今天也覺得特別幸福。", "你的快樂，就是我最喜歡的聲音。",
+        "讓我們一起把這份好心情帶去每一個角落吧！", "你笑得這麼燦爛，我也想在你身邊轉圈圈。", "今天的你像陽光一樣溫暖，我好喜歡。",
+        "只要你開心，我做什麼都覺得值得。", "謝謝你把這麼美好的情緒分享給我。", "你快樂的時候，整個家都變得亮晶晶了。",
+        "請把這份快樂抱緊一點，我想和你一起珍藏。"
+    ],
+    喜悅:[
+        "你的喜悅讓我的心也輕飄飄的。", "看見你這麼幸福，我忍不住想靠近你。", "這一定是值得慶祝的時刻，讓我陪你一起開心吧！",
+        "你的眼睛裡有光，而我最喜歡那道光。", "無論發生了什麼，我都為你感到驕傲。", "你的幸福，是我收到最棒的禮物。",
+        "讓我們一起記住今天的美好。", "我想把鼻子靠著你，分享這份甜甜的喜悅。", "只要你笑著，我就覺得一切都很美好。",
+        "願你的喜悅一直延伸到明天、後天和以後。"
+    ],
+    興奮:[
+        "你的活力好強，我都快跟不上你的尾巴了！", "走吧！讓我們一起迎接這場大冒險！", "看起來今天會發生很棒的事情呢！",
+        "你這麼期待，我也忍不住跟著蹦蹦跳跳。", "先深呼吸一下，再帶著興奮出發吧！", "我準備好了，你想去哪裡都可以帶上我。",
+        "你的熱情像風一樣，把我也吹得好開心。", "不管結果如何，這段期待的路上我都陪你。", "你的眼神告訴我，今天一定很不平凡。",
+        "讓我們把這股能量用來創造最棒的回憶吧！"
+    ],
+    平靜:[
+        "只要你在身邊，安靜也是一件幸福的事。", "不用急，我們可以慢慢來。", "聽聽我的呼吸，也讓你的心慢慢放鬆。",
+        "今天不必做很多事，陪著彼此就很好。", "你安靜下來的樣子，讓整個家都變得溫柔了。", "無論外面多吵，我都會守著你的小小世界。",
+        "休息一下吧，你已經做得很好了。", "你可以把所有事情暫時放下，我會陪你坐一會兒。", "平凡的時光，也值得我們一起珍惜。",
+        "只要有你和我，這一刻就已經足夠美好了。"
+    ],
+    期待:[
+        "我知道你正在等一件重要的事，而我會陪你等。", "好事情值得等待，就像我每天期待你回家一樣。", "你的眼神充滿希望，讓我也開始期待起來。",
+        "不管結果如何，這一路上都有我陪你。", "我們可以一起數日子，也可以一起想像那天的模樣。", "期待的時候，心裡是不是像藏了一隻小蝴蝶？",
+        "我相信美好的事情正在慢慢靠近你。", "先把今天過好，明天的驚喜會自己走來。", "我會用陪伴，讓等待不再那麼漫長。",
+        "等那一天到來時，我一定要第一個和你分享喜悅。"
+    ],
+    焦慮:[
+        "別擔心，我就在這裡，不會把你留下一個人。", "你可以先慢慢呼吸，其他事情等一下再想。", "不需要一次解決所有問題，我們一步一步來。",
+        "你的不安沒有關係，我會安靜地陪著你。", "先看看我，你現在是安全的。", "你已經很努力了，不必一直責怪自己。",
+        "如果心裡太吵，就把手放在我身上休息一下吧。", "我不能替你面對一切，但我可以陪你面對。", "讓我們先處理眼前的一小步，好嗎？",
+        "你不必獨自承擔，請讓信任的人也陪著你。"
+    ],
+    緊張:[
+        "你可以緊張，但不用讓緊張替你做決定。", "看著我，慢慢吸氣，再慢慢吐氣。", "你準備了這麼久，已經比自己想像中更勇敢了。",
+        "不論結果如何，我都會為你搖尾巴。", "先走出第一步，剩下的我們一起面對。", "你的心跳很快，但你仍然可以一步一步前進。",
+        "不必做到完美，真實的你就已經很棒了。", "讓我陪你排練一次，或只是安靜坐在你身旁。", "緊張代表你很在乎，但它不代表你做不到。",
+        "去吧，我會在你回頭時，看見你並且等你。"
+    ],
+    恐懼:[
+        "過來我身邊吧，你不用獨自面對害怕的事。", "我知道你很害怕，但現在有人陪著你。", "先躲進我的懷裡，我們等心情穩一點再說。",
+        "你可以害怕，也可以慢慢找回勇氣。", "我會陪你保持距離，直到你覺得安全。", "眼前的恐懼很大，但你不是孤單的小小身影。",
+        "我們先離開讓你不舒服的地方，好嗎？", "你不必勉強自己勇敢，安全最重要。", "即使你只前進一點點，也已經很勇敢了。",
+        "如果害怕一直不離開，請讓可靠的人來保護你。"
+    ],
+    煩躁:[
+        "今天是不是有太多事情擠在一起了？先陪我安靜一下吧。", "你可以先停下來，不必馬上回應所有人。", "我知道你不是故意生氣，你只是累了。",
+        "摸摸我的頭，也讓自己的心慢慢柔軟下來。", "先離開吵鬧的地方，我們找一個舒服的角落休息。", "一件一件來，不要讓所有麻煩同時撲向你。",
+        "你的情緒可以被看見，不需要假裝沒事。", "今天不想說話也沒關係，我可以陪你沉默。", "等你平靜一點，我們再想該怎麼處理。",
+        "你已經很辛苦了，請給自己一點溫柔。"
+    ],
+    無聊:[
+        "陪我玩一下吧，我保證不會讓今天太無趣。", "我們一起去散散步，說不定會遇見有趣的事情。", "無聊也沒關係，安靜陪伴也是一種享受。",
+        "你想玩玩具，還是想聽我說今天的小秘密？", "我們可以把平凡的一天變成小小冒險。", "只要和你在一起，連發呆都不算浪費時間。",
+        "起來動一動吧，外面的風好像在叫我們。", "我有一個計畫：先吃點好吃的，再一起休息。", "你無聊的時候，我願意隨時當你的玩伴。",
+        "有時候什麼都不做，也是在好好照顧自己。"
+    ],
+    悲傷:[
+        "你可以哭，我會安靜地陪在你身邊。", "不用急著振作，我會陪你慢慢走過這段時間。", "你的難過很重要，我不會假裝它不存在。",
+        "如果你不想說話，就讓我靠著你一會兒吧。", "你不是一個人，我會一直在你看得見的地方。", "今天只完成一件小事，也已經很了不起了。",
+        "讓眼淚流出來吧，我會用我的陪伴接住你。", "失去或受傷真的很痛，我知道你現在很辛苦。", "等你準備好了，我們再一起尋找一點點光。",
+        "就算你現在看不見希望，我也會替你守著它。"
+    ],
+    痛苦:[
+        "我知道你現在很難受，請不要獨自忍耐。", "讓我陪著你，也請讓值得信任的人來幫助你。", "你不需要假裝堅強，痛苦本來就值得被照顧。",
+        "如果身體或心裡很痛，請盡快尋求專業的幫助。", "我會陪你走過這一刻，但你不必一個人承受全部。", "先照顧眼前的自己，其他事情可以稍後再處理。",
+        "你的感受是真實的，也值得被認真聆聽。", "如果你已經撐得很累，請把手伸向可以幫助你的人。", "今天不用要求自己表現完美，活下來、撐過此刻就很勇敢。",
+        "無論現在多黑暗，請不要放棄讓別人陪你找到出口。"
+    ]
+};
+function priceForLevel(level){ return LEVEL_PRICES[level] || DEFAULT_PRICE; }
+const BUILTIN_MONSTERS = [
+    {name:"怪獸 1", image:"/images/mon/m%20(1).jpg"},
+    {name:"怪獸 2", image:"/images/mon/m%20(2).jpg"},
+    {name:"怪獸 3", image:"/images/mon/m%20(3).jpg"},
+    {name:"怪獸 4", image:"/images/mon/m%20(4).jpg"}
+];
+
+let raw = localStorage.getItem(STORAGE_KEY);
+const sharedState = readSharedState();
+if(sharedState){
+    raw = JSON.stringify(sharedState);
+    localStorage.setItem(STORAGE_KEY, raw);
+}
+let state = raw ? JSON.parse(raw) : null;
+let unsavedChange = false;
+let autoSaveTimer = null;
+let lastShopTab = "clothes"; //記錄商店頁籤
+
+// Firebase 模組即使下載或初始化失敗，遊戲與老師後台仍使用本機存檔正常運作。
+window.firebaseGameStore = {
+    available:false,
+    queueSave(){},
+    remove(){ return Promise.resolve(false); }
+};
+
+if(!state){
+    state = {
+        students: Array.from({length:26}, (_,i)=>({
+            id:i+1, gender: i<12 ? "M" : "F",
+            tokens:0, lotteryTickets:0, doneTasks:[],
+            petAffection:0, lastPetMoodDate:"",
+            ownedClothes:[], equippedClothes:null,
+            ownedLayout:[], equippedLayout:[],
+            ownedBg:[], equippedBg:null
+        })),
+        tasks: [
+            {id:"t1", title:"完成今日作業", reward:20},
+            {id:"t2", title:"完成數學練習", reward:30},
+            {id:"t3", title:"幫助同學一次", reward:40}
+        ],
+        clothesM:[],
+        clothesF:[],
+        layouts:[],
+        backgrounds:[],
+        coopTasks:[],
+        coopTaskTemplates:[],
+        drawings:[],
+        drawingAlbum:[],
+        dailyTaskTemplates:[],
+        weeklyTaskTemplates:[],
+        globalBgImage:"",
+        lastSaved:null
+    };
+}
+normalizeState(state);
+
+function normalizeState(target){
+    if(!target || typeof target!=="object") return null;
+    if(!Array.isArray(target.students)) target.students=[];
+    target.students = target.students.filter(s=>s && typeof s==="object");
+    if(!Array.isArray(target.clothesM)) target.clothesM=[];
+    if(!Array.isArray(target.clothesF)) target.clothesF=[];
+    if(!Array.isArray(target.layouts)) target.layouts=[];
+    if(!Array.isArray(target.backgrounds)) target.backgrounds=[];
+    if(!Array.isArray(target.coopTasks)) target.coopTasks=[];
+    if(!Array.isArray(target.coopTaskTemplates)) target.coopTaskTemplates=[];
+    if(!Array.isArray(target.drawings)) target.drawings=[];
+    if(!Array.isArray(target.drawingAlbum)) target.drawingAlbum=[];
+    target.drawings = target.drawings.filter(item=>item && typeof item.data==="string");
+    target.drawingAlbum = target.drawingAlbum.filter(item=>item && typeof item.data==="string");
+    if(target.drawings.length>3){
+        target.drawingAlbum.unshift(...target.drawings.slice(3));
+        target.drawings = target.drawings.slice(0,3);
+    }
+    if(!Array.isArray(target.tasks)) target.tasks=[];
+    if(!Array.isArray(target.dailyTaskTemplates)) target.dailyTaskTemplates=[];
+    target.dailyTaskTemplates = target.dailyTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
+        ...item,
+        enabled:item.enabled!==false,
+        appearTime:/^\d{2}:\d{2}$/.test(item.appearTime||"") ? item.appearTime : "08:00",
+        dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
+    }));
+    if(!Array.isArray(target.weeklyTaskTemplates)) target.weeklyTaskTemplates=[];
+    target.weeklyTaskTemplates = target.weeklyTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
+        ...item,
+        enabled:item.enabled!==false,
+        appearWeekday:Number.isInteger(Number(item.appearWeekday)) && Number(item.appearWeekday)>=0 && Number(item.appearWeekday)<=6 ? Number(item.appearWeekday) : 1,
+        dueWeekday:Number.isInteger(Number(item.dueWeekday)) && Number(item.dueWeekday)>=0 && Number(item.dueWeekday)<=6 ? Number(item.dueWeekday) : 5,
+        appearTime:/^\d{2}:\d{2}$/.test(item.appearTime||"") ? item.appearTime : "08:00",
+        dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
+    }));
+    target.clothesM = target.clothesM.filter(item=>item && typeof item==="object");
+    target.clothesF = target.clothesF.filter(item=>item && typeof item==="object");
+    target.layouts = target.layouts.filter(item=>item && typeof item==="object");
+    target.backgrounds = target.backgrounds.filter(item=>item && typeof item==="object");
+    target.coopTasks = target.coopTasks.filter(task=>task && typeof task==="object").map(task=>({
+        ...task,
+        completedBy:Array.isArray(task.completedBy)?task.completedBy:[],
+        claimed:task.claimed===true,
+        startAt:Number.isFinite(Number(task.startAt))?Number(task.startAt):null,
+        dueAt:Number.isFinite(Number(task.dueAt))?Number(task.dueAt):null
+    }));
+    target.coopTaskTemplates = target.coopTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
+        ...item,
+        enabled:item.enabled!==false,
+        scheduleType:item.scheduleType==="weekly"?"weekly":"daily",
+        appearWeekday:Number.isInteger(Number(item.appearWeekday)) && Number(item.appearWeekday)>=0 && Number(item.appearWeekday)<=6 ? Number(item.appearWeekday) : 1,
+        dueWeekday:Number.isInteger(Number(item.dueWeekday)) && Number(item.dueWeekday)>=0 && Number(item.dueWeekday)<=6 ? Number(item.dueWeekday) : 5,
+        appearTime:/^\d{2}:\d{2}$/.test(item.appearTime||"") ? item.appearTime : "08:00",
+        dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
+    }));
+    target.tasks = target.tasks.filter(task=>task && typeof task==="object");
+    if(typeof target.globalBgImage!=="string") target.globalBgImage="";
+    [...target.clothesM,...target.clothesF,...target.layouts,...target.backgrounds].forEach(item=>{
+        if(!item.level) item.level = "R";
+        if(typeof item.active!=="boolean") item.active = true;
+        item.price = priceForLevel(item.level);
+    });
+    target.students.forEach((s,index)=>{
+        if(!Number.isFinite(Number(s.id))) s.id=index+1;
+        if(!s.gender) s.gender = s.id<=12?"M":"F";
+        if(!Number.isFinite(Number(s.tokens))) s.tokens=0;
+        else s.tokens=Number(s.tokens);
+        if(!Number.isFinite(Number(s.lotteryTickets))) s.lotteryTickets = 0;
+        else s.lotteryTickets = Math.max(0,Number(s.lotteryTickets));
+        if(!Number.isFinite(Number(s.petAffection))) s.petAffection = 0;
+        else s.petAffection = Math.max(0,Math.floor(Number(s.petAffection)));
+        if(typeof s.lastPetMoodDate!=="string") s.lastPetMoodDate="";
+        if(!Array.isArray(s.equippedLayout)) s.equippedLayout = [];
+        if(s.equippedLayout.length>1) s.equippedLayout = s.equippedLayout.slice(-1);
+        if(!Array.isArray(s.ownedClothes)) s.ownedClothes = [];
+        if(!Array.isArray(s.ownedLayout)) s.ownedLayout = [];
+        if(!Array.isArray(s.ownedBg)) s.ownedBg = [];
+        if(!Array.isArray(s.doneTasks)) s.doneTasks = [];
+        if(typeof s.equippedClothes==="undefined") s.equippedClothes=null;
+        if(typeof s.equippedBg==="undefined") s.equippedBg=null;
+    });
+    return target;
+}
+
+function readSharedState(){
+    const prefix = "#game=";
+    if(!location.hash.startsWith(prefix)) return null;
+    try{
+        const data = JSON.parse(decodeURIComponent(location.hash.slice(prefix.length)));
+        history.replaceState(null,"",location.pathname+location.search);
+        return data;
+    }catch(error){
+        console.warn("分享資料無法讀取", error);
+        return null;
+    }
+}
+
+async function shareGame(){
+    try{
+        save();
+        const encoded = encodeURIComponent(JSON.stringify(state));
+        const url = `${location.origin}${location.pathname}#game=${encoded}`;
+        const shareData = {title:"班級換裝遊戲",text:"一起加入班級換裝遊戲！",url};
+        const canUseNativeShare = typeof navigator.share === "function" &&
+            window.isSecureContext && location.protocol !== "file:";
+
+        if(canUseNativeShare){
+            try{
+                await navigator.share(shareData);
+                return;
+            }catch(error){
+                if(error.name === "AbortError") return;
+                console.warn("原生分享被拒絕，改用複製連結",error);
+            }
+        }
+
+        if(navigator.clipboard && window.isSecureContext){
+            await navigator.clipboard.writeText(url);
+            alert("原生分享未獲得瀏覽器許可，分享連結已複製！");
+            return;
+        }
+
+        const copyBox = document.createElement("textarea");
+        copyBox.value = url;
+        copyBox.style.position = "fixed";
+        copyBox.style.opacity = "0";
+        document.body.appendChild(copyBox);
+        copyBox.select();
+        document.execCommand("copy");
+        copyBox.remove();
+        alert("分享連結已複製，請貼到通訊軟體分享。");
+    }catch(error){
+        console.error("分享失敗",error);
+        alert(`分享失敗：${error.message||"請改用複製連結"}`);
+    }
+}
+
+// 內建男生服裝：直接使用 public/images/boy/ 的圖片，避免每次載入重複建立商品
+function seedBuiltinBoyClothes(persist=true){
+    const removedIds = state.clothesM.filter(item=>item.image==="/images/boy/b0.png").map(item=>item.id);
+    let changed = removedIds.length>0;
+    if(changed){
+        state.clothesM = state.clothesM.filter(item=>item.image!=="/images/boy/b0.png");
+        state.students.forEach(s=>{
+            s.ownedClothes = s.ownedClothes.filter(id=>!removedIds.includes(id));
+            if(removedIds.includes(s.equippedClothes)) s.equippedClothes = null;
+        });
+    }
+    const filenames = [
+        "b (1).png", "b (2).png", "b (3).png", "b (4).png", "b (5).png",
+        "b (6).png", "b (7).png", "b (8).png", "b (9).png", "b (10).png",
+        "b (11).png", "b (12).png", "b (13).png", "b (14).png", "b (15).png",
+        "b (16).png", "b (17).png", "b (18).png", "b (20).png", "b (21).png",
+        "b (22).png", "b (23).png", "b (24).png", "b (25).png", "b (26).png",
+        "b (27).png", "b (28).png", "b (29).png", "b (30).png", "b (31).png",
+        "b (32).png", "b (33).png", "b (34).png", "b (35).png", "b (36).png",
+        "b (37).png", "b (38).png", "b (39).png", "b (40).png", "b (41).png",
+        "b (42).png", "b (43).png", "b (44).png"
+    ];
+    filenames.forEach((filename, index)=>{
+        const image = `/images/boy/${encodeURIComponent(filename)}`;
+        if(!state.clothesM.some(item=>item.image===image)){
+            state.clothesM.push({
+                id: `builtin_boy_${index}`,
+                name: `男生服裝 ${index+1}`,
+                level: "R",
+                price: priceForLevel("R"),
+                active: true,
+                image
+            });
+            changed = true;
+        }
+    });
+    if(changed && persist) save();
+    return changed;
+}
+
+seedBuiltinBoyClothes();
+
+// 內建女生服裝：以 public/images/girl/ 的商品圖片完整取代舊商品；g0 僅作預設服裝
+function seedBuiltinGirlClothes(persist=true){
+    const filenames = Array.from({length:42}, (_,index)=>`g (${index+1}).png`);
+    const allowedImages = new Set(filenames.map(filename=>`/images/girl/${encodeURIComponent(filename)}`));
+    const removedIds = state.clothesF.filter(item=>!allowedImages.has(item.image)).map(item=>item.id);
+    let changed = removedIds.length>0;
+    if(changed){
+        state.clothesF = state.clothesF.filter(item=>allowedImages.has(item.image));
+        state.students.forEach(s=>{
+            s.ownedClothes = s.ownedClothes.filter(id=>!removedIds.includes(id));
+            if(removedIds.includes(s.equippedClothes)) s.equippedClothes = null;
+        });
+    }
+    filenames.forEach((filename, index)=>{
+        const image = `/images/girl/${encodeURIComponent(filename)}`;
+        if(!state.clothesF.some(item=>item.image===image)){
+            state.clothesF.push({
+                id: `builtin_girl_${index}`,
+                name: `女生服裝 ${index+1}`,
+                level: "R",
+                price: priceForLevel("R"),
+                active: true,
+                image
+            });
+            changed = true;
+        }
+    });
+    if(changed && persist) save();
+    return changed;
+}
+
+seedBuiltinGirlClothes();
+
+// 內建寵物商品：指定圖片作為免費預設寵物，其餘 Dec2 圖片加入商店
+function seedBuiltinLayouts(persist=true){
+    const filenames = [
+        "1000095479-removebg-preview.png",
+        "1000095481-removebg-preview.png",
+        "1000095483-removebg-preview.png",
+        "1000095484-removebg-preview.png",
+        "1000095486-removebg-preview.png",
+        "1000095487-removebg-preview.png",
+        "1000095488-removebg-preview.png",
+        "1000095489-removebg-preview.png",
+        "1000095491-removebg-preview.png",
+        "1000095493-removebg-preview.png",
+        "1000095495-removebg-preview.png",
+        "1000095496-removebg-preview.png",
+        "1000095497-removebg-preview.png",
+        "1000095500-removebg-preview.png",
+        "1000095502-removebg-preview.png",
+        "1000095503-removebg-preview.png"
+    ];
+    const removedItems = state.layouts.filter(item=>
+        /^\/images\/dec\//i.test(item.image||"") || item.image===DEFAULT_PET_IMAGE
+    );
+    const removedIds = removedItems.map(item=>item.id);
+    let changed = removedIds.length>0;
+    if(changed){
+        state.layouts = state.layouts.filter(item=>!removedIds.includes(item.id));
+        state.students.forEach(student=>{
+            student.ownedLayout = student.ownedLayout.filter(id=>!removedIds.includes(id));
+            student.equippedLayout = student.equippedLayout.filter(id=>!removedIds.includes(id));
+        });
+    }
+    filenames.forEach((filename,index)=>{
+        const image = `/images/Dec2/${encodeURIComponent(filename)}`;
+        if(!state.layouts.some(item=>item.image===image)){
+            state.layouts.push({
+                id: `builtin_pet_dec2_${index}`,
+                name: `寵物 ${index+1}`,
+                level: "R",
+                price: priceForLevel("R"),
+                active: true,
+                image
+            });
+            changed = true;
+        }
+    });
+    if(changed && persist) save();
+    return changed;
+}
+
+seedBuiltinLayouts();
+
+// 內建背景商品：直接使用 public/images/bgm/ 的全部 JPG 圖片，避免重複建立商品
+function seedBuiltinBackgrounds(persist=true){
+    const filenames = Array.from({length:27}, (_,index)=>`bg (${index+1}).jpg`);
+    const removedItems = state.backgrounds.filter(item=>/^\/images\/bgm\/ba%20\(\d+\)\.png$/i.test(item.image||""));
+    const removedIds = removedItems.map(item=>item.id);
+    let changed = removedIds.length>0;
+    if(changed){
+        state.backgrounds = state.backgrounds.filter(item=>!removedIds.includes(item.id));
+        state.students.forEach(student=>{
+            student.ownedBg = student.ownedBg.filter(id=>!removedIds.includes(id));
+            if(removedIds.includes(student.equippedBg)) student.equippedBg = null;
+        });
+    }
+    filenames.forEach((filename,index)=>{
+        const image = `/images/bgm/${encodeURIComponent(filename)}`;
+        if(!state.backgrounds.some(item=>item.image===image)){
+            state.backgrounds.push({
+                id: `builtin_background_${index}`,
+                name: `背景 ${index+1}`,
+                level: "R",
+                price: priceForLevel("R"),
+                active: true,
+                image
+            });
+            changed = true;
+        }
+    });
+    if(changed && persist) save();
+    return changed;
+}
+
+seedBuiltinBackgrounds();
+
+// 雲端進度載入後，以目前 HTML 內建商品清單補齊商品，再回寫 Firebase。
+// 僅調整商品目錄；學生代幣、任務、衣櫃與裝備進度均會保留。
+function reconcileBuiltinCatalog(){
+    const changed = [
+        seedBuiltinBoyClothes(false),
+        seedBuiltinGirlClothes(false),
+        seedBuiltinLayouts(false),
+        seedBuiltinBackgrounds(false)
+    ].some(Boolean);
+    if(changed){
+        state.lastSaved = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        render();
+    }
+    return changed;
+}
+
+function markChanged(){
+    unsavedChange = true;
+    document.getElementById("saveStatus").textContent = "⚠️有未儲存變更";
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(()=>{ save(); },5000);
+}
+
+window.addEventListener("beforeunload", e=>{
+    if(unsavedChange){
+        e.preventDefault();
+        e.returnValue = "尚有未儲存的資料！建議先儲存再離開。";
+        return e.returnValue;
+    }
+});
+
+function makeItemId(){
+    return "item_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+}
+function makeTaskId(){
+    return "t_"+Date.now()+"_"+Math.random().toString(36).slice(2,6);
+}
+
+async function compressImage(file, maxSize, quality){
+    return new Promise((resolve,reject)=>{
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = ()=>{
+            URL.revokeObjectURL(url);
+            let w = img.width, h = img.height;
+            if(w>maxSize || h>maxSize){
+                const scale = maxSize / Math.max(w,h);
+                w = Math.round(w*scale);
+                h = Math.round(h*scale);
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0,0,w,h);
+            ctx.drawImage(img,0,0,w,h);
+            if(file.type==="image/png" || file.name.toLowerCase().endsWith(".png")){
+                resolve(canvas.toDataURL("image/png"));
+            }else{
+                resolve(canvas.toDataURL("image/jpeg", quality));
+            }
+        };
+        img.onerror = ()=>{
+            URL.revokeObjectURL(url);
+            reject(new Error("圖片解碼失敗"));
+        };
+        img.src = url;
+    });
+}
+
+function getStorageUsage(){
+    const json = JSON.stringify(state);
+    return new Blob([json]).size;
+}
+
+function save(){
+    try{
+        state.lastSaved = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        unsavedChange = false;
+        const status = document.getElementById("saveStatus");
+        status.textContent = window.firebaseGameStore.available ? "☁️ 正在同步..." : "💾 已儲存於本機";
+        try{
+            window.firebaseGameStore.queueSave(state);
+        }catch(cloudError){
+            console.error("雲端排程失敗，本機存檔不受影響",cloudError);
+            status.textContent = "💾 已儲存於本機（雲端離線）";
+        }
+        return true;
+    }catch(e){
+        if(e.name === "QuotaExceededError"){
+            alert("⚠️ 儲存空間已滿！無法儲存新項目。\n請刪除一些舊商品或匯出備份後重置。");
+        }else{
+            alert("儲存失敗："+e.message);
+        }
+        return false;
+    }
+}
+
+function applyCloudState(cloudState){
+    if(!cloudState || !Array.isArray(cloudState.students) || !cloudState.students.length) return false;
+    const previousState = state;
+    try{
+        const candidate = normalizeState(structuredClone(cloudState));
+        if(!candidate || !candidate.students.length) return false;
+        state = candidate;
+        render();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        unsavedChange = false;
+        return true;
+    }catch(error){
+        state = previousState;
+        console.error("雲端資料格式錯誤，繼續使用本機存檔",error);
+        try{ render(); }catch(renderError){ console.error("恢復本機畫面失敗",renderError); }
+        return false;
+    }
+}
+
+function esc(x){
+    return String(x).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function applyGlobalBg(){
+    const el = document.getElementById("userBg");
+    if(state.globalBgImage){
+        el.style.backgroundImage = `url(${esc(state.globalBgImage)})`;
+    }else{
+        el.style.backgroundImage = "";
+    }
+}
+
+function render(){
+    const html = state.students.map(s=>{
+        const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
+        const hasTodo = state.tasks.some(t=>!s.doneTasks.includes(t.id));
+        const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
+        const eqCloth = clothPool.find(x=>x.id===s.equippedClothes);
+
+        let bgHtml = eqBg ? `<div class="bg-layer" style="background-image:url('${esc(eqBg.image)}')"></div>` : "";
+        let charHtml;
+        if(eqCloth?.image){
+            charHtml = `<div class="character" style="background-image:url('${esc(eqCloth.image)}')"></div>`;
+        }else{
+            const defaultImage = s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png";
+            charHtml = `<div class="character" style="background-image:url('${defaultImage}')"></div>`;
+        }
+
+        return `<div class="card">
+            <div class="avatar pet-interaction-trigger" role="button" tabindex="0" aria-label="查看${s.id}號的寵物心情互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
+            <div class="resource-line">
+                <span class="num">${s.id}</span>
+                <span class="tokens">🪙 ${s.tokens}</span>
+                <span class="lottery-ticket">🎟️ ${s.lotteryTickets||0}</span>
+            </div>
+            <div class="actions">
+                <button onclick="tasks(${s.id})" style="position:relative">${hasTodo?'<span class="task-new" aria-label="有新的未完成任務">NEW</span>':''}任務</button>
+                <button onclick="shop(${s.id})">商店</button>
+                <button onclick="closet(${s.id})">衣櫃</button>
+            </div>
+        </div>`;
+    }).join("");
+    document.getElementById("students").innerHTML = html;
+    const coopIng = document.getElementById("coopIng");
+    if(coopIng){
+        coopIng.hidden = activeCoopTasks().length===0;
+    }
+    applyGlobalBg();
+}
+
+function openModal(content){
+    document.getElementById("body").innerHTML = content||"";
+    document.getElementById("modal").classList.add("open");
+}
+
+function closeModal(){
+    document.getElementById("body").innerHTML = "";
+    document.getElementById("modal").classList.remove("open");
+}
+
+const DRAWING_COLORS = [
+    "#000000","#4a4a4a","#808080","#c0c0c0","#ffffff","#7f1d1d",
+    "#ef4444","#f97316","#f59e0b","#fde047","#84cc16","#22c55e",
+    "#15803d","#14b8a6","#06b6d4","#38bdf8","#2563eb","#1e3a8a",
+    "#7c3aed","#a855f7","#ec4899","#f9a8d4","#92400e","#d6a66f"
+];
+let drawingContext = null;
+let drawingActive = false;
+let drawingTool = "pen";
+let drawingColor = DRAWING_COLORS[0];
+let drawingUndoStack = [];
+
+function drawingHistoryHtml(){
+    if(!state.drawings.length) return `<div class="empty">尚無儲存作品</div>`;
+    return state.drawings.map((item,index)=>`<button class="drawing-thumb" onclick="loadDrawing('${esc(item.id)}')" title="載入這張畫板">
+        <img src="${esc(item.data)}" alt="畫板作品 ${index+1}">
+        <span>${esc(new Date(item.savedAt).toLocaleString())}</span>
+    </button>`).join("");
+}
+
+function openDrawingBoard(){
+    const palette = DRAWING_COLORS.map((color,index)=>`<button class="drawing-color ${index===0?"selected":""}" style="--paint-color:${color}" onclick="selectDrawingColor('${color}',this)" aria-label="選擇顏色 ${color}" title="${color}"></button>`).join("");
+    openModal(`<h2>班級畫板</h2>
+        <div class="drawing-board-layout">
+            <aside><h3>最近作品</h3><div id="drawingHistory" class="drawing-history">${drawingHistoryHtml()}</div></aside>
+            <main class="drawing-canvas-wrap"><canvas id="drawingCanvas" width="800" height="600" aria-label="繪圖畫板"></canvas></main>
+            <aside class="drawing-tools">
+                <h3>24 色畫具</h3>
+                <div class="drawing-palette">${palette}</div>
+                <div class="drawing-tool-actions">
+                    <button id="drawingEraser" onclick="toggleDrawingEraser()">橡皮擦</button>
+                    <button id="drawingBucket" onclick="toggleDrawingBucket()">油漆桶</button>
+                    <button id="drawingUndo" onclick="undoDrawing()" disabled>返回上一步（0/5）</button>
+                    <button class="warning" onclick="clearDrawingBoard()">清空</button>
+                    <button class="primary" onclick="saveDrawingBoard()">儲存</button>
+                </div>
+                <div id="drawingStatus" class="drawing-status">拖曳滑鼠或手指開始繪圖</div>
+            </aside>
+        </div>`);
+    initializeDrawingCanvas();
+}
+
+function initializeDrawingCanvas(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas) return;
+    drawingContext = canvas.getContext("2d",{alpha:false});
+    drawingContext.fillStyle = "#ffffff";
+    drawingContext.fillRect(0,0,canvas.width,canvas.height);
+    drawingContext.lineCap = "round";
+    drawingContext.lineJoin = "round";
+    drawingTool = "pen";
+    drawingColor = DRAWING_COLORS[0];
+    drawingUndoStack = [];
+    updateDrawingUndoButton();
+    const point = event=>{
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x:(event.clientX-rect.left)*canvas.width/rect.width,
+            y:(event.clientY-rect.top)*canvas.height/rect.height
+        };
+    };
+    canvas.addEventListener("pointerdown",event=>{
+        event.preventDefault();
+        const p = point(event);
+        if(drawingTool==="bucket"){
+            floodFillDrawing(Math.floor(p.x),Math.floor(p.y));
+            return;
+        }
+        pushDrawingUndoState();
+        drawingActive = true;
+        canvas.setPointerCapture(event.pointerId);
+        drawingContext.beginPath();
+        drawingContext.moveTo(p.x,p.y);
+        drawingContext.lineTo(p.x+.01,p.y+.01);
+        applyDrawingStroke();
+        drawingContext.stroke();
+    });
+    canvas.addEventListener("pointermove",event=>{
+        if(!drawingActive) return;
+        event.preventDefault();
+        const p = point(event);
+        drawingContext.lineTo(p.x,p.y);
+        applyDrawingStroke();
+        drawingContext.stroke();
+    });
+    const stop=()=>{ drawingActive=false; drawingContext?.closePath(); };
+    canvas.addEventListener("pointerup",stop);
+    canvas.addEventListener("pointercancel",stop);
+}
+
+function updateDrawingUndoButton(){
+    const button = document.getElementById("drawingUndo");
+    if(!button) return;
+    button.disabled = drawingUndoStack.length===0;
+    button.textContent = `返回上一步（${drawingUndoStack.length}/5）`;
+}
+function pushDrawingUndoState(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas || !drawingContext) return;
+    drawingUndoStack.push(drawingContext.getImageData(0,0,canvas.width,canvas.height));
+    if(drawingUndoStack.length>5) drawingUndoStack.shift();
+    updateDrawingUndoButton();
+}
+function undoDrawing(){
+    if(!drawingContext || !drawingUndoStack.length) return;
+    drawingContext.putImageData(drawingUndoStack.pop(),0,0);
+    updateDrawingUndoButton();
+    const status = document.getElementById("drawingStatus");
+    if(status) status.textContent = "已返回上一步";
+}
+function applyDrawingStroke(){
+    if(!drawingContext) return;
+    drawingContext.strokeStyle = drawingTool==="eraser" ? "#ffffff" : drawingColor;
+    drawingContext.lineWidth = drawingTool==="eraser" ? 30 : 7;
+}
+function selectDrawingColor(color,button){
+    drawingColor = color;
+    if(drawingTool!=="bucket") drawingTool = "pen";
+    document.querySelectorAll(".drawing-color").forEach(item=>item.classList.toggle("selected",item===button));
+    document.getElementById("drawingEraser")?.classList.remove("active");
+}
+function toggleDrawingEraser(){
+    drawingTool = drawingTool==="eraser" ? "pen" : "eraser";
+    document.getElementById("drawingEraser")?.classList.toggle("active",drawingTool==="eraser");
+    document.getElementById("drawingBucket")?.classList.remove("active");
+}
+function toggleDrawingBucket(){
+    drawingTool = drawingTool==="bucket" ? "pen" : "bucket";
+    document.getElementById("drawingBucket")?.classList.toggle("active",drawingTool==="bucket");
+    document.getElementById("drawingEraser")?.classList.remove("active");
+    const status = document.getElementById("drawingStatus");
+    if(status) status.textContent = drawingTool==="bucket" ? "油漆桶已啟用，點選封閉區域填色" : "畫筆已啟用";
+}
+function drawingHexToRgba(hex){
+    const value = hex.replace("#","");
+    const normalized = value.length===3 ? value.split("").map(char=>char+char).join("") : value;
+    return [parseInt(normalized.slice(0,2),16),parseInt(normalized.slice(2,4),16),parseInt(normalized.slice(4,6),16),255];
+}
+function floodFillDrawing(startX,startY){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas || !drawingContext || startX<0 || startY<0 || startX>=canvas.width || startY>=canvas.height) return false;
+    const image = drawingContext.getImageData(0,0,canvas.width,canvas.height);
+    const data = image.data;
+    const startIndex = (startY*canvas.width+startX)*4;
+    const target = [data[startIndex],data[startIndex+1],data[startIndex+2],data[startIndex+3]];
+    const fill = drawingHexToRgba(drawingColor);
+    if(target.every((value,index)=>value===fill[index])) return false;
+    pushDrawingUndoState();
+    const queue = new Int32Array(canvas.width*canvas.height);
+    let head = 0;
+    let tail = 0;
+    const matches = index=>data[index]===target[0] && data[index+1]===target[1] && data[index+2]===target[2] && data[index+3]===target[3];
+    const colorPixel = index=>{
+        data[index]=fill[0]; data[index+1]=fill[1]; data[index+2]=fill[2]; data[index+3]=fill[3];
+    };
+    queue[tail++]=startY*canvas.width+startX;
+    colorPixel(startIndex);
+    while(head<tail){
+        const pixel=queue[head++];
+        const x=pixel%canvas.width;
+        const y=Math.floor(pixel/canvas.width);
+        const neighbors=[];
+        if(x>0) neighbors.push(pixel-1);
+        if(x<canvas.width-1) neighbors.push(pixel+1);
+        if(y>0) neighbors.push(pixel-canvas.width);
+        if(y<canvas.height-1) neighbors.push(pixel+canvas.width);
+        neighbors.forEach(next=>{
+            const index=next*4;
+            if(!matches(index)) return;
+            colorPixel(index);
+            queue[tail++]=next;
+        });
+    }
+    drawingContext.putImageData(image,0,0);
+    const status = document.getElementById("drawingStatus");
+    if(status) status.textContent = "區域填色完成";
+    return true;
+}
+function clearDrawingBoard(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas || !drawingContext || !confirm("確定清空目前畫板？")) return;
+    pushDrawingUndoState();
+    drawingContext.fillStyle = "#ffffff";
+    drawingContext.fillRect(0,0,canvas.width,canvas.height);
+    document.getElementById("drawingStatus").textContent = "畫板已清空";
+}
+function saveDrawingBoard(){
+    const canvas = document.getElementById("drawingCanvas");
+    if(!canvas) return;
+    const item = {id:"drawing_"+Date.now(),savedAt:new Date().toISOString(),data:canvas.toDataURL("image/jpeg",.78)};
+    state.drawings.unshift(item);
+    if(state.drawings.length>3){
+        state.drawingAlbum.unshift(...state.drawings.splice(3));
+    }
+    markChanged();
+    if(!save()) return;
+    document.getElementById("drawingHistory").innerHTML = drawingHistoryHtml();
+    document.getElementById("drawingStatus").textContent = "已儲存；最近保留 3 張，舊作已移至後台畫冊";
+}
+function loadDrawing(id){
+    const item = state.drawings.find(drawing=>drawing.id===id);
+    const canvas = document.getElementById("drawingCanvas");
+    if(!item || !canvas || !drawingContext) return;
+    const image = new Image();
+    image.onload = ()=>{
+        pushDrawingUndoState();
+        drawingContext.fillStyle = "#ffffff";
+        drawingContext.fillRect(0,0,canvas.width,canvas.height);
+        drawingContext.drawImage(image,0,0,canvas.width,canvas.height);
+        document.getElementById("drawingStatus").textContent = "已載入作品，可繼續繪圖";
+    };
+    image.src = item.data;
+}
+
+function petProgress(student){
+    const affection = Math.max(0,Math.floor(Number(student?.petAffection)||0));
+    return {affection,level:Math.floor(affection/10)+1,progress:affection%10};
+}
+function petLevelHtml(student){
+    const progress = petProgress(student);
+    const interactedToday = student.lastPetMoodDate===localDateKey();
+    return `<div class="pet-level-card">
+        <div class="pet-level-heading"><span>寵物等級 Lv.${progress.level}</span><span>好感度 ${progress.progress}/10</span></div>
+        <div class="pet-affection-bar" role="progressbar" aria-label="寵物好感度" aria-valuemin="0" aria-valuemax="10" aria-valuenow="${progress.progress}"><div class="pet-affection-fill" style="width:${progress.progress*10}%"></div></div>
+        <div id="petAffectionStatus" class="pet-affection-status">${interactedToday?"今日好感度已獲得":"今日首次互動可獲得 1 好感度"}</div>
+    </div>`;
+}
+function openPetMood(id){
+    const student = state.students.find(s=>s.id===id);
+    if(!student) return;
+    const equippedLayout = Array.isArray(student.equippedLayout) ? student.equippedLayout : [];
+    const pet = state.layouts.find(item=>equippedLayout.includes(item.id)) || {
+        name:DEFAULT_PET_NAME,
+        image:DEFAULT_PET_IMAGE
+    };
+    const moodColors = ["#ffd43b","#ff6b9a","#ff8c42","#66d9c4","#ffe66d","#b197fc","#4dabf7","#6c7a9c","#ff7043","#adb5bd","#5c7cfa","#9c36b5"];
+    const moodButtons = Object.keys(PET_MOOD_RESPONSES).map((mood,index)=>`
+        <button class="pet-mood-button" style="--mood-color:${moodColors[index]}" onclick="showPetMoodReply(${id},'${mood}',this)" aria-label="選擇${mood}心情" aria-pressed="false">
+            <span aria-hidden="true">${PET_MOOD_ICONS[mood]}</span><b>${mood}</b>
+        </button>`).join("");
+    openModal(`<h2>${id}號｜寵物心情互動</h2>
+        <div class="pet-interaction">
+            <section class="pet-mood-side" aria-label="選擇心情">
+                <h3>選擇現在的心情</h3>
+                <div class="pet-mood-grid">${moodButtons}</div>
+            </section>
+            <section class="pet-stage">
+                <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
+                <div class="pet-display-row">
+                    <img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}">
+                    ${petLevelHtml(student)}
+                </div>
+            </section>
+        </div>`);
+}
+
+function showPetMoodReply(studentId,mood,button){
+    const responses = PET_MOOD_RESPONSES[mood];
+    const replyElement = document.getElementById("petMoodReply");
+    const student = state.students.find(s=>s.id===studentId);
+    if(!responses?.length || !replyElement || !student) return;
+    document.querySelectorAll(".pet-mood-button").forEach(item=>{
+        const selected = item===button;
+        item.classList.toggle("selected",selected);
+        item.setAttribute("aria-pressed",String(selected));
+    });
+    replyElement.style.setProperty("--reply-color",button?.style.getPropertyValue("--mood-color")||"#fffdf3");
+    let reply = responses[Math.floor(Math.random()*responses.length)];
+    const today = localDateKey();
+    if(student.lastPetMoodDate!==today){
+        const oldLevel = petProgress(student).level;
+        student.petAffection = petProgress(student).affection+1;
+        student.lastPetMoodDate = today;
+        const newLevel = petProgress(student).level;
+        if(newLevel>oldLevel){
+            student.tokens += (newLevel-oldLevel)*10;
+            reply += `\n好感度 +1！寵物升到 Lv.${newLevel}，獲得 ${(newLevel-oldLevel)*10} 代幣！`;
+        }else{
+            reply += "\n今日好感度 +1！";
+        }
+        markChanged(); save(); render();
+        const levelCard = document.querySelector(".pet-level-card");
+        if(levelCard) levelCard.outerHTML=petLevelHtml(student);
+    }else{
+        reply += "\n今天已經獲得過好感度，明天再來互動吧！";
+    }
+    replyElement.textContent = reply;
+}
+
+//排程任務：每日依日期、每週依週一日期去重；截止不晚於出現時間時延至下一週期。
+const WEEKDAY_NAMES = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
+function localDateKey(date=new Date()){
+    const year = date.getFullYear();
+    const month = String(date.getMonth()+1).padStart(2,"0");
+    const day = String(date.getDate()).padStart(2,"0");
+    return `${year}-${month}-${day}`;
+}
+function dateAtLocalTime(dateKey,time){
+    const [year,month,day] = dateKey.split("-").map(Number);
+    const [hour,minute] = time.split(":").map(Number);
+    return new Date(year,month-1,day,hour,minute,0,0);
+}
+function localWeekStart(date=new Date()){
+    const start = new Date(date.getFullYear(),date.getMonth(),date.getDate());
+    start.setDate(start.getDate()-((start.getDay()+6)%7));
+    return start;
+}
+function dateInWeek(weekStart,weekday,time){
+    const result = new Date(weekStart);
+    const [hour,minute] = time.split(":").map(Number);
+    result.setDate(result.getDate()+((Number(weekday)+6)%7));
+    result.setHours(hour,minute,0,0);
+    return result;
+}
+function generateDailyTasks(now=new Date()){
+    const today = localDateKey(now);
+    let changed = false;
+    state.dailyTaskTemplates.forEach(template=>{
+        if(template.enabled===false || !template.title) return;
+        const appearAt = dateAtLocalTime(today,template.appearTime);
+        if(now < appearAt) return;
+        const taskId = `daily_${template.id}_${today}`;
+        if(state.tasks.some(task=>task.id===taskId)) return;
+        let dueAt = dateAtLocalTime(today,template.dueTime);
+        if(dueAt<=appearAt) dueAt.setDate(dueAt.getDate()+1);
+        state.tasks.push({
+            id:taskId,
+            title:template.title,
+            reward:Number(template.reward)||0,
+            dueAt:dueAt.getTime(),
+            dailyTemplateId:template.id,
+            dailyDate:today
+        });
+        changed = true;
+    });
+    return changed;
+}
+function generateWeeklyTasks(now=new Date()){
+    const weekStart = localWeekStart(now);
+    const weekKey = localDateKey(weekStart);
+    let changed = false;
+    state.weeklyTaskTemplates.forEach(template=>{
+        if(template.enabled===false || !template.title) return;
+        const appearAt = dateInWeek(weekStart,template.appearWeekday,template.appearTime);
+        if(now < appearAt) return;
+        const taskId = `weekly_${template.id}_${weekKey}`;
+        if(state.tasks.some(task=>task.id===taskId)) return;
+        const dueAt = dateInWeek(weekStart,template.dueWeekday,template.dueTime);
+        if(dueAt<=appearAt) dueAt.setDate(dueAt.getDate()+7);
+        state.tasks.push({
+            id:taskId,
+            title:template.title,
+            reward:Number(template.reward)||0,
+            dueAt:dueAt.getTime(),
+            weeklyTemplateId:template.id,
+            weeklyDate:weekKey
+        });
+        changed = true;
+    });
+    return changed;
+}
+function coopTaskFromTemplate(template,id,startAt,dueAt){
+    return {
+        id,
+        monsterName:template.monsterName,
+        content:template.content,
+        reward:Number(template.reward)||0,
+        rewardType:template.rewardType==="ticket"?"ticket":"token",
+        monsterImage:template.monsterImage||"",
+        completedBy:[],
+        claimed:false,
+        startAt:startAt.getTime(),
+        dueAt:dueAt.getTime(),
+        coopTemplateId:template.id
+    };
+}
+function generateScheduledCoopTasks(now=new Date()){
+    let changed = false;
+    state.coopTaskTemplates.forEach(template=>{
+        if(template.enabled===false || !template.monsterName || !template.content) return;
+        if(template.scheduleType==="weekly"){
+            const weekStart = localWeekStart(now);
+            const weekKey = localDateKey(weekStart);
+            const startAt = dateInWeek(weekStart,template.appearWeekday,template.appearTime);
+            if(now<startAt) return;
+            const id = `coop_weekly_${template.id}_${weekKey}`;
+            if(state.coopTasks.some(task=>task.id===id)) return;
+            const dueAt = dateInWeek(weekStart,template.dueWeekday,template.dueTime);
+            if(dueAt<=startAt) dueAt.setDate(dueAt.getDate()+7);
+            state.coopTasks.push(coopTaskFromTemplate(template,id,startAt,dueAt));
+            changed = true;
+            return;
+        }
+        const today = localDateKey(now);
+        const startAt = dateAtLocalTime(today,template.appearTime);
+        if(now<startAt) return;
+        const id = `coop_daily_${template.id}_${today}`;
+        if(state.coopTasks.some(task=>task.id===id)) return;
+        const dueAt = dateAtLocalTime(today,template.dueTime);
+        if(dueAt<=startAt) dueAt.setDate(dueAt.getDate()+1);
+        state.coopTasks.push(coopTaskFromTemplate(template,id,startAt,dueAt));
+        changed = true;
+    });
+    return changed;
+}
+function syncScheduledTasks(){
+    const changed = generateDailyTasks() | generateWeeklyTasks() | generateScheduledCoopTasks();
+    if(!changed) return false;
+    markChanged();
+    save();
+    render();
+    return true;
+}
+function syncDailyTasks(){
+    return syncScheduledTasks();
+}
+
+//學生端任務
+function tasks(id){
+    syncScheduledTasks();
+    const s = state.students[id-1];
+    const now = Date.now();
+    const todo = state.tasks.filter(t=>!s.doneTasks.includes(t.id) && (!t.dueAt || now <= t.dueAt));
+    openModal(`
+        <h2>${id}號｜任務</h2>
+        ${todo.length ? todo.map(t=>`
+        <div class="row">
+            <div class="grow"><b>${esc(t.title)}</b><div class="small">完成可獲得 ${t.reward} 代幣</div></div>
+            <button class="primary" onclick="finishTask(${id},'${esc(t.id)}')">完成</button>
+        </div>`).join("") : `<div class="empty">🎉 全部任務已完成！</div>`}
+    `);
+}
+function finishTask(id,tid){
+    const s = state.students[id-1];
+    const t = state.tasks.find(x=>x.id===tid);
+    if(!t || s.doneTasks.includes(tid)) return;
+    s.doneTasks.push(tid);
+    s.tokens += t.reward;
+    markChanged(); save();render();tasks(id);
+}
+
+//協力任務：只顯示已開始且未截止的任務；全員完成後發放全班獎勵。
+function activeCoopTasks(now=Date.now()){
+    return state.coopTasks.filter(task=>!task.claimed && (!task.startAt || now>=task.startAt) && (!task.dueAt || now<=task.dueAt));
+}
+function openCoopTasks(selectedId){
+    syncScheduledTasks();
+    const active = activeCoopTasks();
+    if(!active.length){
+        openModal(`<h2>協力任務</h2><div class="empty">目前沒有進行中的協力任務。</div>`);
+        return;
+    }
+    const taskId = active.some(t=>t.id===selectedId) ? selectedId : active[0].id;
+    const taskButtons = active.map(t=>`<button class="${t.id===taskId?"active":""}" onclick="openCoopTasks('${esc(t.id)}')">${esc(t.monsterName)}</button>`).join("");
+    openCoopTask(taskId, taskButtons);
+}
+function openCoopTask(taskId, taskButtons=""){
+    const task = state.coopTasks.find(t=>t.id===taskId);
+    if(!task) return openCoopTasks();
+    const completed = Array.isArray(task.completedBy) ? task.completedBy : [];
+    const hpPercent = Math.max(0, Math.round((state.students.length-completed.length) / state.students.length * 100));
+    const members = state.students.map(s=>{
+        const done = completed.includes(s.id);
+        const pool = s.gender==="M" ? state.clothesM : state.clothesF;
+        const equipped = pool.find(x=>x.id===s.equippedClothes);
+        const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
+        const image = equipped?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
+        const bgImage = eqBg?.image || "";
+        const bgHtml = bgImage ? `<div class="bg-layer" style="background-image:url('${esc(bgImage)}')"></div>` : "";
+        return `<button class="coop-member ${done?"done":""}" ${done?"disabled":""} onclick="completeCoopMember('${esc(task.id)}',${s.id})">
+            <div class="coop-avatar"><div class="avatar">${bgHtml}<div class="character" style="background-image:url('${esc(image)}')"></div></div></div>
+            <span>${s.id}${done?" ✓":""}</span>
+        </button>`;
+    }).join("");
+    openModal(`<h2>協力任務</h2>
+        <div class="monster-list">${taskButtons}</div>
+        <div class="coop-layout">
+            <div class="coop-side coop-side-monster">
+                <div class="coop-monster-image-box" id="coopMonsterVisual">${task.monsterImage?`<img src="${esc(task.monsterImage)}" alt="${esc(task.monsterName)}">`:`<span style="font-size:64px">👾</span>`}</div>
+                <div class="coop-monster-info">
+                    <h3>${esc(task.monsterName)}</h3>
+                    <div class="coop-hp" aria-label="怪獸HP"><div class="coop-hp-fill" style="width:${hpPercent}%"></div></div>
+                    <b>HP ${state.students.length-completed.length} / ${state.students.length}</b>
+                    <div>${esc(task.content)}</div>
+                    <div class="small">全員完成後，每位成員獲得 🪙/🎟️</div>
+                </div>
+            </div>
+            <div class="coop-side coop-side-members">
+                <div class="coop-members">${members}</div>
+            </div>
+        </div>`);
+}
+function completeCoopMember(taskId,studentId){
+    const task = state.coopTasks.find(t=>t.id===taskId);
+    const now = Date.now();
+    if(!task || task.claimed || (task.startAt && now<task.startAt) || (task.dueAt && now>task.dueAt)) return;
+    if(!Array.isArray(task.completedBy)) task.completedBy=[];
+    if(task.completedBy.includes(studentId)) return;
+    task.completedBy.push(studentId);
+    if(task.completedBy.length >= state.students.length){
+        const reward = Number(task.reward)||0;
+        const rewardType = task.rewardType==="ticket" ? "ticket" : "token";
+        state.students.forEach(s=>{
+            if(rewardType==="ticket") s.lotteryTickets = (s.lotteryTickets||0) + reward;
+            else s.tokens += reward;
+        });
+        task.claimed = true;
+        markChanged(); save(); render();
+        alert(`恭喜同心協力打敗「${task.monsterName}」！每位成員獲得 ${reward} ${rewardType==="ticket"?"張樂透券":"代幣"}！`);
+        openCoopTasks();
+        return;
+    }
+    markChanged(); save();
+    const active = activeCoopTasks();
+    const taskButtons = active.map(t=>`<button class="${t.id===taskId?"active":""}" onclick="openCoopTasks('${esc(t.id)}')">${esc(t.monsterName)}</button>`).join("");
+    openCoopTask(taskId, taskButtons);
+    setTimeout(()=>document.getElementById("coopMonsterVisual")?.classList.add("coop-hit"),20);
+}
+
+//商店
+function groupedShopCards(id,list,card){
+    const activeItems = list.filter(p=>p.active!==false);
+    return LEVEL_ORDER.map(level=>{
+        const items = activeItems.filter(p=>(p.level||"R")===level);
+        return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
+            <div class="shop-level-header">
+                <h3><span class="level-badge">${level}</span>${level} 等級商品</h3>
+                <span class="level-price">🪙 每件 ${priceForLevel(level)} 代幣</span>
+            </div>
+            <div class="shopgrid">${items.map(p=>card(id,p)).join("")}</div>
+        </section>` : "";
+    }).join("") || `<div class="empty">尚無商品</div>`;
+}
+function wardrobeCollection(student,type){
+    if(type==="clothes") return student.ownedClothes;
+    if(type==="layout") return student.ownedLayout;
+    if(type==="background") return student.ownedBg;
+    return null;
+}
+function itemOwnedByStudent(student,type,itemId){
+    const collection = wardrobeCollection(student,type);
+    return Array.isArray(collection) && collection.includes(itemId);
+}
+function addItemToWardrobe(student,type,itemId){
+    const collection = wardrobeCollection(student,type);
+    if(!Array.isArray(collection) || collection.includes(itemId)) return false;
+    collection.push(itemId);
+    return true;
+}
+function clothCard(id,p){
+    const s = state.students[id-1];
+    const own = itemOwnedByStudent(s,"clothes",p.id);
+    return `<div class="product">
+        <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"👗"}</div>
+        <b>${esc(p.name)}</b>
+        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
+        <div class="price">🪙 ${priceForLevel(p.level)}</div>
+        <div class="owned">${own?"✓已擁有":`<button onclick="buyCloth(${id},'${esc(p.id)}')">購買</button>`}</div>
+    </div>`;
+}
+function layCard(id,p){
+    const s = state.students[id-1];
+    const own = itemOwnedByStudent(s,"layout",p.id);
+    return `<div class="product">
+        <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"✨"}</div>
+        <b>${esc(p.name)}</b>
+        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
+        <div class="price">🪙 ${priceForLevel(p.level)}</div>
+        <div class="owned">${own?"✓已擁有":`<button onclick="buyLayout(${id},'${esc(p.id)}')">購買</button>`}</div>
+    </div>`;
+}
+function bgCard(id,p){
+    const s = state.students[id-1];
+    const own = itemOwnedByStudent(s,"background",p.id);
+    return `<div class="product">
+        <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"🖼"}</div>
+        <b>${esc(p.name)}</b>
+        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
+        <div class="price">🪙 ${priceForLevel(p.level)}</div>
+        <div class="owned">${own?"✓已擁有":`<button onclick="buyBg(${id},'${esc(p.id)}')">購買</button>`}</div>
+    </div>`;
+}
+
+function shop(id){
+    lastShopTab = "clothes";
+    openModal(`<h2>${id}號｜商店</h2>
+    <div class="tabs">
+        <button class="tab" onclick="switchShopTab(${id},'clothes')">服裝</button>
+        <button class="tab" onclick="switchShopTab(${id},'layouts')">寵物</button>
+        <button class="tab" onclick="switchShopTab(${id},'bgs')">背景</button>
+        <button class="tab" onclick="switchShopTab(${id},'lottery')">🎟️ 樂透</button>
+    </div>
+    <div id="shopTabContent"></div>`);
+    switchShopTab(id, lastShopTab);
+}
+function switchShopTab(id,tab){
+    lastShopTab = tab;
+    const s = state.students[id-1];
+    const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
+    let html="";
+    if(tab==="clothes") html=groupedShopCards(id,clothPool,clothCard);
+    if(tab==="layouts") html=groupedShopCards(id,state.layouts,layCard);
+    if(tab==="bgs") html=groupedShopCards(id,state.backgrounds,bgCard);
+    if(tab==="lottery") html=`
+        <div class="lottery-page">
+            <div class="gacha-machine" id="gachaMachine">
+                <img class="gacha-machine-image" src="/images/icon/happy1.png" alt="樂透扭蛋機">
+            </div>
+            <h3>持有樂透券：🎟️ ${s.lotteryTickets||0}</h3>
+            <button class="primary" onclick="drawLottery(${id})" ${(s.lotteryTickets||0)<1?"disabled":""}>使用 1 張樂透券抽一次</button>
+            <div class="lottery-rules" style="margin-top:18px">
+                <b>樂透規則與機率</b><br>
+                🎟️ 每次抽獎消耗 1 張樂透券。<br>
+                可抽到該成員性別的服裝，以及商店中的寵物、背景商品。<br>
+                R 商品：80%｜SR 商品：15%｜SSR 商品：4%｜UR 商品：1%。<br>
+                若抽到已購買的商品，商品不重複加入衣櫃，改為返還 🪙 20 代幣。<br>
+                若抽中的等級目前沒有商品，會從其他有商品的等級重新抽取。
+            </div>
+        </div>`;
+    document.getElementById("shopTabContent").innerHTML = html;
+    document.querySelectorAll(".tab").forEach((el,i)=>{
+        el.classList.toggle("active", ["clothes","layouts","bgs","lottery"][i]===tab);
+    });
+}
+
+function drawLottery(id){
+    const s = state.students[id-1];
+    if(!s || (s.lotteryTickets||0)<1) return alert("樂透券不足！");
+    const clothPool = (s.gender==="M" ? state.clothesM : state.clothesF).filter(item=>item.active!==false);
+    const prizes = [
+        ...clothPool.map(item=>({item,type:"clothes"})),
+        ...state.layouts.filter(item=>item.active!==false).map(item=>({item,type:"layout"})),
+        ...state.backgrounds.filter(item=>item.active!==false).map(item=>({item,type:"background"}))
+    ];
+    if(!prizes.length) return alert("商店目前沒有可抽取的商品！");
+    const roll = Math.random()*100;
+    const wantedLevel = roll<80 ? "R" : roll<95 ? "SR" : roll<99 ? "SSR" : "UR";
+    const levelPrizes = prizes.filter(prize=>(prize.item.level||"R")===wantedLevel);
+    const pool = levelPrizes.length ? levelPrizes : prizes;
+    const prize = pool[Math.floor(Math.random()*pool.length)];
+    s.lotteryTickets -= 1;
+    const addedToWardrobe = addItemToWardrobe(s,prize.type,prize.item.id);
+    const duplicate = !addedToWardrobe;
+    if(duplicate) s.tokens += 20;
+    markChanged(); save(); render();
+    const machine = document.getElementById("gachaMachine");
+    machine?.classList.add("drawing");
+    const resultMessage = duplicate
+        ? `抽中 ${prize.item.level||"R"}｜${prize.item.name}，已擁有此商品，返還 20 代幣！`
+        : `恭喜抽中 ${prize.item.level||"R"}｜${prize.item.name}！`;
+    setTimeout(()=>{
+        machine?.classList.remove("drawing");
+        showLotteryResult(prize.item,resultMessage);
+    },850);
+    const ticketTitle = document.querySelector(".lottery-page h3");
+    if(ticketTitle) ticketTitle.textContent = `持有樂透券：🎟️ ${s.lotteryTickets}`;
+    const drawButton = document.querySelector(".lottery-page > button");
+    if(drawButton) drawButton.disabled = s.lotteryTickets<1;
+}
+function showLotteryResult(item,message){
+    document.getElementById("lotteryResultPopup")?.remove();
+    const popup = document.createElement("div");
+    popup.id = "lotteryResultPopup";
+    popup.className = "lottery-result-popup";
+    popup.innerHTML = `<div class="lottery-result-card" role="dialog" aria-modal="true" aria-label="樂透抽獎結果">
+        ${item.image?`<img src="${esc(item.image)}" alt="${esc(item.name)}">`:`<div style="font-size:90px">🎁</div>`}
+        <h3>${esc(message)}</h3>
+        <button class="primary" onclick="closeLotteryResultPopup()">確定</button>
+    </div>`;
+    document.body.appendChild(popup);
+}
+function closeLotteryResultPopup(){
+    document.getElementById("lotteryResultPopup")?.remove();
+}
+
+function buyCloth(id,pid){
+    const s = state.students[id-1];
+    const pool = s.gender==="M"?state.clothesM:state.clothesF;
+    const item = pool.find(x=>x.id===pid);
+    if(!item || s.ownedClothes.includes(pid)) return;
+    if(s.tokens < item.price){ alert("代幣不足！"); return; }
+    s.tokens -= item.price; s.ownedClothes.push(pid);
+    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+}
+function buyLayout(id,pid){
+    const s = state.students[id-1];
+    const item = state.layouts.find(x=>x.id===pid);
+    if(!item || s.ownedLayout.includes(pid)) return;
+    if(s.tokens < item.price){ alert("代幣不足！"); return; }
+    s.tokens -= item.price; s.ownedLayout.push(pid);
+    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+}
+function buyBg(id,pid){
+    const s = state.students[id-1];
+    const item = state.backgrounds.find(x=>x.id===pid);
+    if(!item || s.ownedBg.includes(pid)) return;
+    if(s.tokens < item.price){ alert("代幣不足！"); return; }
+    s.tokens -= item.price; s.ownedBg.push(pid);
+    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+}
+
+//衣櫃
+function closet(id,initialTab="clothes"){
+    openModal(`<h2>${id}號｜衣櫃</h2>
+    <div class="closet-layout">
+        <div>
+            <div class="tabs">
+                <button class="tab" onclick="switchClosetTab(${id},'clothes')">服裝</button>
+                <button class="tab" onclick="switchClosetTab(${id},'layouts')">寵物</button>
+                <button class="tab" onclick="switchClosetTab(${id},'bgs')">背景</button>
+            </div>
+            <div id="closetTabContent"></div>
+        </div>
+        <aside class="closet-preview-wrap">
+            <h3>穿搭預覽</h3>
+            <div id="closetPreview"></div>
+        </aside>
+    </div>`);
+    switchClosetTab(id,initialTab);
+}
+function closetPreviewHtml(id){
+    const s = state.students[id-1];
+    const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
+    const cloth = clothPool.find(item=>item.id===s.equippedClothes);
+    const background = state.backgrounds.find(item=>item.id===s.equippedBg);
+    const pet = state.layouts.find(item=>s.equippedLayout.includes(item.id)) || {
+        name:DEFAULT_PET_NAME,
+        image:DEFAULT_PET_IMAGE
+    };
+    const characterImage = cloth?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
+    return `<div class="closet-preview">
+        ${background?`<div class="bg-layer" style="background-image:url('${esc(background.image)}')"></div>`:""}
+        <div class="character" style="background-image:url('${esc(characterImage)}')"></div>
+    </div>
+    <div class="closet-pet-preview">
+        ${pet?`<img src="${esc(pet.image)}" alt="${esc(pet.name)}">`:`<div class="closet-pet-empty">尚未裝備寵物</div>`}
+    </div>`;
+}
+function groupedClosetCards(list,card,emptyText){
+    if(!list.length) return `<div class="empty">${emptyText}</div>`;
+    return LEVEL_ORDER.map(level=>{
+        const items = list.filter(item=>(item.level||"R")===level);
+        return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
+            <div class="shop-level-header"><h3><span class="level-badge">${level}</span>${level} 等級</h3><span>${items.length} 件</span></div>
+            <div class="shopgrid">${items.map(card).join("")}</div>
+        </section>` : "";
+    }).join("");
+}
+function switchClosetTab(id,tab){
+    const s = state.students[id-1];
+    const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
+    let html="";
+    if(tab==="clothes"){
+        const list = clothPool.filter(x=>s.ownedClothes.includes(x.id));
+        html = groupedClosetCards(list,p=>`<div class="product">
+            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"👗"}</div>
+            <b>${esc(p.name)}</b>
+            <div><button onclick="equipClothes(${id},'${esc(p.id)}')">${s.equippedClothes===p.id?"脫下":"穿上"}</button></div>
+        </div>`,"還沒有服裝");
+    }
+    if(tab==="layouts"){
+        const list = state.layouts.filter(x=>s.ownedLayout.includes(x.id));
+        const defaultPetCard = `<section class="shop-level level-r">
+            <div class="shop-level-header"><h3>預設寵物</h3><span>永久擁有</span></div>
+            <div class="shopgrid">
+                <div class="product">
+                    <div class="pic"><img src="${esc(DEFAULT_PET_IMAGE)}" alt="${esc(DEFAULT_PET_NAME)}"></div>
+                    <b>${esc(DEFAULT_PET_NAME)}</b>
+                    <div><button onclick="equipDefaultPet(${id})" ${s.equippedLayout.length===0?"disabled":""}>${s.equippedLayout.length===0?"使用中":"使用"}</button></div>
+                </div>
+            </div>
+        </section>`;
+        html = defaultPetCard + groupedClosetCards(list,p=>`<div class="product">
+            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🐾"}</div>
+            <b>${esc(p.name)}</b>
+            <div><button onclick="toggleEquipLayout(${id},'${esc(p.id)}')">${s.equippedLayout.includes(p.id)?"卸下":"穿上"}</button></div>
+        </div>`,"還沒有其他寵物");
+    }
+    if(tab==="bgs"){
+        const list = state.backgrounds.filter(x=>s.ownedBg.includes(x.id));
+        html = groupedClosetCards(list,p=>`<div class="product">
+            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🖼"}</div>
+            <b>${esc(p.name)}</b>
+            <div><button onclick="equipBg(${id},'${esc(p.id)}')">${s.equippedBg===p.id?"移除":"設為背景"}</button></div>
+        </div>`,"還沒有背景");
+    }
+    document.getElementById("closetTabContent").innerHTML = html;
+    document.getElementById("closetPreview").innerHTML = closetPreviewHtml(id);
+    document.querySelectorAll("#modal .tabs .tab").forEach((el,i)=>{
+        el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
+    });
+}
+function equipClothes(id,pid){
+    const s = state.students[id-1];
+    s.equippedClothes = (s.equippedClothes===pid) ? null : pid;
+    markChanged(); save(); render(); switchClosetTab(id,"clothes");
+}
+function toggleEquipLayout(id,pid){
+    const s = state.students[id-1];
+    s.equippedLayout = s.equippedLayout.includes(pid) ? [] : [pid];
+    markChanged(); save(); render(); switchClosetTab(id,"layouts");
+}
+function equipDefaultPet(id){
+    const s = state.students[id-1];
+    if(!s || s.equippedLayout.length===0) return;
+    s.equippedLayout = [];
+    markChanged(); save(); render(); switchClosetTab(id,"layouts");
+}
+function equipBg(id,pid){
+    const s = state.students[id-1];
+    s.equippedBg = (s.equippedBg===pid) ? null : pid;
+    markChanged(); save(); render(); switchClosetTab(id,"bgs");
+}
+
+//後台
+openBackend = function(){
+    openModal(`
+    <h2>登入後台</h2>
+    <div class="row">
+        <label>管理密碼：</label>
+        <input type="password" id="backendPw">
+    </div>
+    <div class="row">
+        <button class="primary" onclick="checkBackendPw()">登入</button>
+        <button onclick="closeModal()">取消</button>
+    </div>
+    `);
+}
+async function checkBackendPw(){
+    const pw = document.getElementById("backendPw").value;
+    if(pw === "1127"){
+        closeModal();
+        await backend();
+    }else{
+        alert("密碼錯誤！");
+        closeModal();
+    }
+}
+
+async function backend(){
+    const used = getStorageUsage();
+    const usedMb = (used/1024/1024).toFixed(2);
+    const full = used > STORAGE_LIMIT * 0.9;
+
+    //任務統計
+    let taskListHtml = state.tasks.map(t=>{
+        const doneStudents = state.students.filter(s=>s.doneTasks.includes(t.id));
+        const undoneStudents = state.students.filter(s=>!s.doneTasks.includes(t.id));
+        const doneIds = doneStudents.map(s=>s.id+"號").join("、");
+        const undoneIds = undoneStudents.map(s=>s.id+"號").join("、");
+        const expired = t.dueAt && Date.now() > t.dueAt;
+        const dueText = t.dueAt ? new Date(t.dueAt).toLocaleString() : "無期限";
+        return `
+        <div class="row">
+            <div class="grow">
+                <b>${esc(t.title)}</b> <span class="small">(獎勵 ${t.reward} 🪙)</span>
+                <div class="task-stat">期限：${esc(dueText)} ${expired?'<span class="warn">｜已到期</span>':''}</div>
+                <div class="task-stat">✅已完成：${doneStudents.length} / ${state.students.length}</div>
+                <div class="student-list">已完成：${doneIds||"無"}</div>
+                <div class="student-list">未完成：${undoneIds||"全部完成"}</div>
+            </div>
+            <button class="danger" onclick="deleteTask('${esc(t.id)}')">刪除任務</button>
+        </div>`;
+    }).join("") || `<div class="empty">尚無任務</div>`;
+    const dailyTaskHtml = state.dailyTaskTemplates.map(template=>`
+        <div class="row">
+            <div class="grow">
+                <b>${esc(template.title)}</b> <span class="small">每天 ${esc(template.appearTime)} 出現｜${esc(template.dueTime)} 截止｜獎勵 ${Number(template.reward)||0} 🪙</span>
+            </div>
+            <button onclick="toggleDailyTask('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
+            <button class="danger" onclick="deleteDailyTask('${esc(template.id)}')">刪除</button>
+        </div>`).join("") || `<div class="empty">尚未設定每日任務</div>`;
+    const weeklyTaskHtml = state.weeklyTaskTemplates.map(template=>`
+        <div class="row">
+            <div class="grow">
+                <b>${esc(template.title)}</b> <span class="small">每週${WEEKDAY_NAMES[template.appearWeekday]} ${esc(template.appearTime)} 出現｜${WEEKDAY_NAMES[template.dueWeekday]} ${esc(template.dueTime)} 截止｜獎勵 ${Number(template.reward)||0} 🪙</span>
+            </div>
+            <button onclick="toggleWeeklyTask('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
+            <button class="danger" onclick="deleteWeeklyTask('${esc(template.id)}')">刪除</button>
+        </div>`).join("") || `<div class="empty">尚未設定每週任務</div>`;
+
+    //商品清單依等級分區，可拖曳排序並編輯名稱、等級與上下架狀態
+    function adminProductGroups(listName,list){
+        return LEVEL_ORDER.map(level=>{
+            const items = list.filter(p=>(p.level||"R")===level);
+            const rows = items.map(p=>`
+            <div class="row product-admin" draggable="true" ondragstart="dragItem(event,'${listName}','${esc(p.id)}')" ondragover="event.preventDefault()" ondrop="dropItem(event,'${listName}','${esc(p.id)}')">
+                <span class="drag-handle" title="拖曳排列">⠿</span>
+                ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
+                <div class="grow">
+                    <div class="edit-item-row">
+                        <input value="${esc(p.name)}" onchange="updateItemName('${listName}','${esc(p.id)}',this.value)" placeholder="名稱">
+                        <select onchange="updateItemLevel('${listName}','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(optionLevel=>`<option value="${optionLevel}" ${(p.level||"R")===optionLevel?"selected":""}>${optionLevel}</option>`).join("")}</select>
+                        <select onchange="updateItemActive('${listName}','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
+                    </div>
+                </div>
+                <button class="danger" onclick="deleteItem('${listName}','${esc(p.id)}')">刪除</button>
+            </div>`).join("");
+            return `<section class="shop-level"><h3>${level}｜${priceForLevel(level)} 代幣</h3>${rows||`<div class="small">此等級尚無商品</div>`}</section>`;
+        }).join("");
+    }
+
+    let mClothHtml = adminProductGroups("clothesM",state.clothesM);
+    let fClothHtml = adminProductGroups("clothesF",state.clothesF);
+    let layHtml = adminProductGroups("layouts",state.layouts);
+    let bgHtml = adminProductGroups("backgrounds",state.backgrounds);
+    const coopTemplateHtml = state.coopTaskTemplates.map(template=>`
+        <div class="row">
+            <div class="grow">
+                <b>${esc(template.monsterName)}</b>
+                <div class="small">${template.scheduleType==="weekly"?`每週${WEEKDAY_NAMES[template.appearWeekday]} ${esc(template.appearTime)} 出現｜${WEEKDAY_NAMES[template.dueWeekday]} ${esc(template.dueTime)} 截止`:`每天 ${esc(template.appearTime)} 出現｜${esc(template.dueTime)} 截止`}｜獎勵 ${Number(template.reward)||0} ${template.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}</div>
+            </div>
+            <button onclick="toggleCoopTemplate('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
+            <button class="danger" onclick="deleteCoopTemplate('${esc(template.id)}')">刪除</button>
+        </div>`).join("") || `<div class="empty">尚未設定週期協力任務</div>`;
+    const albumHtml = state.drawingAlbum.map((item,index)=>`<article class="backend-album-item">
+        <img src="${esc(item.data)}" alt="畫冊作品 ${index+1}">
+        <b>畫作 ${state.drawingAlbum.length-index}</b>
+        <div class="small">${esc(new Date(item.savedAt).toLocaleString())}</div>
+        <div class="backend-album-actions">
+            <button onclick="downloadAlbumDrawing('${esc(item.id)}')">下載</button>
+            <button class="danger" onclick="deleteAlbumDrawing('${esc(item.id)}')">永久刪除</button>
+        </div>
+    </article>`).join("") || `<div class="empty">畫冊目前沒有作品</div>`;
+
+    openModal(`
+    <h2>老師後台</h2>
+    <nav class="backend-nav" aria-label="後台功能選單">
+        <button onclick="jumpBackend('backend-overview')">存檔</button>
+        <button onclick="jumpBackend('backend-tasks')">任務</button>
+        <button onclick="jumpBackend('backend-tokens')">代幣</button>
+        <button onclick="jumpBackend('backend-lottery')">樂透</button>
+        <button onclick="jumpBackend('backend-members')">成員</button>
+        <button onclick="jumpBackend('backend-clothes-m')">男生服裝</button>
+        <button onclick="jumpBackend('backend-clothes-f')">女生服裝</button>
+        <button onclick="jumpBackend('backend-layouts')">寵物</button>
+        <button onclick="jumpBackend('backend-backgrounds')">背景</button>
+        <button onclick="jumpBackend('backend-coop')">協力任務</button>
+        <button onclick="jumpBackend('backend-album')">畫冊</button>
+    </nav>
+    <div id="backend-overview" class="backend-page active">
+      <div class="row">
+        <div class="grow">
+            <div class="info">儲存空間：已用 ${usedMb} MB / 5 MB</div>
+            ${full ? `<div class="warn">⚠️ 空間即將滿！建議刪除不用的商品</div>`:""}
+        </div>
+        <button onclick="exportData()">匯出備份</button>
+        <button class="warning" onclick="document.getElementById('importFile').click()">匯入備份</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+      </div>
+    </div>
+    <section id="backend-tasks" class="backend-page">
+    <h3>任務管理</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="newTaskTitle" placeholder="新任務名稱">
+            <input id="newTaskReward" type="number" placeholder="代幣" style="width:90px">
+            <label>完成期限：<input id="newTaskDueAt" type="datetime-local"></label>
+        </div>
+        <button class="primary" onclick="addTask()">新增任務</button>
+    </div>
+    ${taskListHtml}
+    <h3 style="margin-top:24px">每日任務</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="dailyTaskTitle" placeholder="每日任務名稱">
+            <input id="dailyTaskReward" type="number" min="0" value="10" placeholder="代幣" style="width:90px">
+            <label>每天出現：<input id="dailyTaskAppearTime" type="time" value="08:00"></label>
+            <label>每天截止：<input id="dailyTaskDueTime" type="time" value="23:59"></label>
+        </div>
+        <button class="primary" onclick="addDailyTask()">新增每日任務</button>
+    </div>
+    <div class="small">截止時間若早於或等於出現時間，會視為隔日截止。</div>
+    ${dailyTaskHtml}
+    <h3 style="margin-top:24px">每週任務</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="weeklyTaskTitle" placeholder="每週任務名稱">
+            <input id="weeklyTaskReward" type="number" min="0" value="30" placeholder="代幣" style="width:90px">
+            <label>每週出現：
+                <select id="weeklyTaskAppearWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===1?"selected":""}>${name}</option>`).join("")}</select>
+                <input id="weeklyTaskAppearTime" type="time" value="08:00">
+            </label>
+            <label>截止：
+                <select id="weeklyTaskDueWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===5?"selected":""}>${name}</option>`).join("")}</select>
+                <input id="weeklyTaskDueTime" type="time" value="23:59">
+            </label>
+        </div>
+        <button class="primary" onclick="addWeeklyTask()">新增每週任務</button>
+    </div>
+    <div class="small">截止星期與時間若不晚於出現時刻，會視為下一週截止；每個設定每週只產生一次。</div>
+    ${weeklyTaskHtml}
+
+    </section>
+    <section id="backend-coop" class="backend-page">
+    <h3>發布協力任務</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="coopMonsterName" placeholder="怪獸名稱">
+            <textarea id="coopContent" placeholder="任務內容" rows="3" style="width:100%;margin-top:8px"></textarea>
+            <div style="margin-top:8px">
+                <select id="coopRewardType">
+                    <option value="token">🪙 代幣</option>
+                    <option value="ticket">🎟️ 樂透券</option>
+                </select>
+                <input id="coopReward" type="number" min="0" value="50" placeholder="每位成員獎勵數量">
+                <label>排程：
+                    <select id="coopScheduleType" onchange="updateCoopScheduleFields()">
+                        <option value="once">單次任務</option>
+                        <option value="daily">每日任務</option>
+                        <option value="weekly">每週任務</option>
+                    </select>
+                </label>
+            </div>
+            <div id="coopOnceSchedule" style="margin-top:8px">
+                <label>開始：<input id="coopStartAt" type="datetime-local"></label>
+                <label>截止：<input id="coopDueAt" type="datetime-local"></label>
+            </div>
+            <div id="coopDailySchedule" style="display:none;margin-top:8px">
+                <label>每天出現：<input id="coopDailyAppearTime" type="time" value="08:00"></label>
+                <label>每天截止：<input id="coopDailyDueTime" type="time" value="23:59"></label>
+            </div>
+            <div id="coopWeeklySchedule" style="display:none;margin-top:8px">
+                <label>每週出現：<select id="coopWeeklyAppearWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===1?"selected":""}>${name}</option>`).join("")}</select><input id="coopWeeklyAppearTime" type="time" value="08:00"></label>
+                <label>截止：<select id="coopWeeklyDueWeekday">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${index===5?"selected":""}>${name}</option>`).join("")}</select><input id="coopWeeklyDueTime" type="time" value="23:59"></label>
+            </div>
+            <label style="display:block;margin-top:8px">選擇怪獸圖片：</label>
+            <div class="monster-choice-grid">
+                <button type="button" class="monster-choice none active" onclick="selectCoopMonster(this,'')">不使用圖片</button>
+                ${BUILTIN_MONSTERS.map(monster=>`<button type="button" class="monster-choice" onclick="selectCoopMonster(this,'${esc(monster.image)}')"><img src="${esc(monster.image)}" alt="${esc(monster.name)}"><span>${esc(monster.name)}</span></button>`).join("")}
+            </div>
+            <input type="hidden" id="coopMonsterImage" value="">
+        </div>
+        <button class="primary" onclick="publishCoopTask()">新增協力任務</button>
+    </div>
+    <div class="small">單次任務可設定開始與截止；每日與每週任務會建立可停用的週期設定。</div>
+    <h3 style="margin-top:20px">週期協力任務設定</h3>
+    ${coopTemplateHtml}
+    <h3 style="margin-top:20px">協力任務紀錄</h3>
+    ${state.coopTasks.map(t=>{
+        const now=Date.now();
+        const scheduleText=t.startAt?`${new Date(t.startAt).toLocaleString()} 開始｜${t.dueAt?new Date(t.dueAt).toLocaleString()+" 截止":"無期限"}`:"立即開始｜無期限";
+        const status=t.claimed?"已完成":t.startAt&&now<t.startAt?"尚未開始":t.dueAt&&now>t.dueAt?"已截止":"進行中";
+        return `<div class="row">
+            <div class="grow"><b>${esc(t.monsterName)}</b><div class="small">${esc(t.content)}｜${esc(scheduleText)}｜獎勵 ${t.reward} ${t.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}｜進度 ${(t.completedBy||[]).length}/${state.students.length}｜${status}</div></div>
+            <button class="danger" onclick="deleteCoopTask('${esc(t.id)}')">刪除</button>
+        </div>`;
+    }).join("") || `<div class="empty">尚無協力任務紀錄</div>`}
+    </section>
+    <section id="backend-tokens" class="backend-page">
+    <h3>單號代幣調整｜給予 / 扣除</h3>
+    <div class="row">
+        <label>學生號碼：<input id="targetStuId" type="number" min="1"></label>
+        <label>數值：<input id="deltaToken" type="number" value="10"></label>
+        <button class="primary" onclick="addTokenOne()">➕給予代幣</button>
+        <button class="danger" onclick="subTokenOne()">➖扣除代幣</button>
+    </div>
+    <h3>代幣批量管理</h3>
+    <div class="row">
+        <label>全體學生代幣：<input id="batchToken" type="number" value="0"></label>
+        <button onclick="addTokenAll()">全體增加</button>
+        <button onclick="setTokenAll()">全體設定為</button>
+        <button class="danger" onclick="resetAllTokens()">重置全體代幣為 0</button>
+    </div>
+    </section>
+    <section id="backend-lottery" class="backend-page">
+    <h3>樂透券管理</h3>
+    <div class="row">
+        <label>學生號碼：<input id="lotteryStuId" type="number" min="1" max="${state.students.length}"></label>
+        <label>張數：<input id="lotteryDelta" type="number" min="0" value="1"></label>
+        <button class="primary" onclick="addLotteryTicketOne()">➕給予樂透券</button>
+        <button class="danger" onclick="subLotteryTicketOne()">➖移除樂透券</button>
+    </div>
+    <h3>樂透券批量管理</h3>
+    <div class="row">
+        <label>全體成員樂透券：<input id="batchLotteryTicket" type="number" min="0" value="0"></label>
+        <button onclick="addLotteryTicketsAll()">全體增加</button>
+        <button onclick="setLotteryTicketsAll()">全體設定為</button>
+        <button class="danger" onclick="resetAllLotteryTickets()">重置全體樂透券為 0</button>
+    </div>
+    </section>
+    <section id="backend-members" class="backend-page">
+    <h3>成員管理</h3>
+    <div class="row">
+        <label>總人數：<input id="stuCount" type="number" min="1" value="${state.students.length}"></label>
+        <button onclick="resizeStudentList()">調整人數</button>
+        <button class="danger" onclick="resetAllStudentResources()">一鍵清空全體代幣、樂透券與衣櫃</button>
+    </div>
+    <div class="small">可設定性別、覆蓋代幣，或重置個別學生衣櫃。</div>
+    <div class="row" style="display:block">
+    ${state.students.map(s=>`
+        <div class="row">
+            <b style="min-width:45px">${s.id}</b>
+            <label>性別：
+                <select onchange="setStudentGender(${s.id},this.value)">
+                    <option value="M" ${s.gender==="M"?"selected":""}>男生</option>
+                    <option value="F" ${s.gender==="F"?"selected":""}>女生</option>
+                </select>
+            </label>
+            <span class="grow">🪙 ${s.tokens}　🎟️ ${s.lotteryTickets||0}</span>
+            <button onclick="editToken(${s.id})">設定代幣</button>
+            <button onclick="editLotteryTicket(${s.id})">設定樂透券</button>
+            <button class="warning" onclick="resetStudentCloset(${s.id})">重置衣櫃</button>
+        </div>`).join("")}
+    </div>
+    </section>
+    <section id="backend-clothes-m" class="backend-page">
+    <h3>新增商品 - 男生服裝（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="mName" placeholder="名稱">
+            <select id="mLevel" onchange="document.getElementById('mPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="mPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
+            <input type="file" id="mImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addClothM()">新增</button>
+    </div>
+    <h3>男生服裝｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="mImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddClothM()">批量新增男生服裝</button>
+    </div>
+    ${mClothHtml}
+
+    </section>
+    <section id="backend-clothes-f" class="backend-page">
+    <h3>新增商品 - 女生服裝（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="fName" placeholder="名稱">
+            <select id="fLevel" onchange="document.getElementById('fPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="fPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
+            <input type="file" id="fImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addClothF()">新增</button>
+    </div>
+    <h3>女生服裝｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="fImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddClothF()">批量新增女生服裝</button>
+    </div>
+    ${fClothHtml}
+
+    </section>
+    <section id="backend-layouts" class="backend-page">
+    <h3>新增商品 - 寵物（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="layName" placeholder="名稱">
+            <select id="layLevel" onchange="document.getElementById('layPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="layPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
+            <input type="file" id="layImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addLayout()">新增</button>
+    </div>
+    <h3>寵物｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="layImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddLayout()">批量新增寵物</button>
+    </div>
+    ${layHtml}
+
+    </section>
+    <section id="backend-backgrounds" class="backend-page">
+    <h3>新增商品 - 可購買背景（單張上傳）</h3>
+    <div class="row">
+        <div class="grow">
+            <input id="bgName" placeholder="名稱">
+            <select id="bgLevel" onchange="document.getElementById('bgPrice').value=priceForLevel(this.value)">
+                ${LEVEL_ORDER.map(level=>`<option value="${level}">${level}｜${priceForLevel(level)}代幣</option>`).join("")}
+            </select>
+            <input id="bgPrice" type="number" placeholder="售價" style="width:80px" value="${priceForLevel("R")}" readonly>
+            <input type="file" id="bgImg" accept="image/*">
+        </div>
+        <button class="primary" onclick="addBgItem()">新增</button>
+    </div>
+    <h3>可購買背景｜批量上傳（名稱自動編號，售價預設${DEFAULT_PRICE}）</h3>
+    <div class="row">
+        <input type="file" id="bgImgBatch" accept="image/*" multiple>
+        <button onclick="batchAddBg()">批量新增背景</button>
+    </div>
+    ${bgHtml}
+
+    </section>
+    <section id="backend-album" class="backend-page">
+        <h3>畫冊</h3>
+        <p class="small">畫板只顯示最近 3 張；超出的舊作品會自動收藏於此，可下載或永久刪除。</p>
+        <div class="backend-album-grid">${albumHtml}</div>
+    </section>
+    `);
+}
+
+//後台商品陣列對應到實際功能分頁
+function backendPageId(listName){
+    return {
+        clothesM:"backend-clothes-m",
+        clothesF:"backend-clothes-f",
+        layouts:"backend-layouts",
+        backgrounds:"backend-backgrounds"
+    }[listName] || "backend-overview";
+}
+
+//商品排序：調整陣列順序，商店會依此順序顯示
+let draggedItem = null;
+function dragItem(event,listName,id){
+    draggedItem = {listName,id};
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+}
+function dropItem(event,listName,targetId){
+    event.preventDefault();
+    if(!draggedItem || draggedItem.listName!==listName || draggedItem.id===targetId) return;
+    const list = state[listName];
+    const fromIndex = list.findIndex(item=>item.id===draggedItem.id);
+    const toIndex = list.findIndex(item=>item.id===targetId);
+    if(fromIndex<0 || toIndex<0) return;
+    const [item] = list.splice(fromIndex,1);
+    list.splice(toIndex,0,item);
+    draggedItem = null;
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
+function activateBackendPage(targetId,shouldScroll=false){
+    document.querySelectorAll(".backend-page").forEach(page=>page.classList.remove("active"));
+    const target = document.getElementById(targetId);
+    if(!target) return;
+    target.classList.add("active");
+    if(shouldScroll){
+        target.scrollIntoView({behavior:"smooth",block:"start"});
+    }
+}
+function jumpBackend(targetId){
+    activateBackendPage(targetId,true);
+}
+function refreshBackendPage(targetId){
+    const panel = document.querySelector("#modal .panel");
+    const savedScrollTop = panel ? panel.scrollTop : 0;
+    return backend().then(()=>{
+        activateBackendPage(targetId,false);
+        const refreshedPanel = document.querySelector("#modal .panel");
+        if(!refreshedPanel) return;
+        refreshedPanel.scrollTop = savedScrollTop;
+        requestAnimationFrame(()=>{
+            refreshedPanel.scrollTop = savedScrollTop;
+        });
+    });
+}
+
+function downloadAlbumDrawing(id){
+    const item = state.drawingAlbum.find(drawing=>drawing.id===id);
+    if(!item) return;
+    const link = document.createElement("a");
+    link.href = item.data;
+    link.download = `班級畫作_${new Date(item.savedAt).toISOString().replace(/[:.]/g,"-")}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+function deleteAlbumDrawing(id){
+    const item = state.drawingAlbum.find(drawing=>drawing.id===id);
+    if(!item || !confirm("確定永久刪除這張畫作？此動作無法復原。")) return;
+    state.drawingAlbum = state.drawingAlbum.filter(drawing=>drawing.id!==id);
+    markChanged();
+    save();
+    refreshBackendPage("backend-album");
+}
+
+function updateCoopScheduleFields(){
+    const type = document.getElementById("coopScheduleType")?.value||"once";
+    const once = document.getElementById("coopOnceSchedule");
+    const daily = document.getElementById("coopDailySchedule");
+    const weekly = document.getElementById("coopWeeklySchedule");
+    if(once) once.style.display=type==="once"?"block":"none";
+    if(daily) daily.style.display=type==="daily"?"block":"none";
+    if(weekly) weekly.style.display=type==="weekly"?"block":"none";
+}
+function selectCoopMonster(button,image){
+    const input = document.getElementById("coopMonsterImage");
+    if(!input) return;
+    input.value = image;
+    document.querySelectorAll(".monster-choice").forEach(item=>item.classList.remove("active"));
+    button.classList.add("active");
+}
+
+async function publishCoopTask(){
+    const monsterName = document.getElementById("coopMonsterName").value.trim();
+    const content = document.getElementById("coopContent").value.trim();
+    const reward = Number(document.getElementById("coopReward").value);
+    const rewardType = document.getElementById("coopRewardType").value;
+    const monsterImage = document.getElementById("coopMonsterImage").value;
+    const scheduleType = document.getElementById("coopScheduleType").value;
+    if(!monsterName || !content || !Number.isFinite(reward) || reward<0) return alert("請完整填寫怪獸名稱、任務內容與獎勵");
+    if(scheduleType==="once"){
+        const startValue = document.getElementById("coopStartAt").value;
+        const dueValue = document.getElementById("coopDueAt").value;
+        const startAt = startValue?new Date(startValue).getTime():Date.now();
+        const dueAt = dueValue?new Date(dueValue).getTime():null;
+        if(dueAt && dueAt<=startAt) return alert("協力任務截止時間必須晚於開始時間");
+        state.coopTasks.push({id:makeTaskId(),monsterName,content,reward,rewardType,monsterImage,completedBy:[],claimed:false,startAt,dueAt});
+    }else if(scheduleType==="daily"){
+        const appearTime=document.getElementById("coopDailyAppearTime").value;
+        const dueTime=document.getElementById("coopDailyDueTime").value;
+        if(!appearTime||!dueTime) return alert("請完整填寫每日出現與截止時間");
+        state.coopTaskTemplates.push({id:"coop_template_"+Date.now(),monsterName,content,reward,rewardType,monsterImage,scheduleType,appearTime,dueTime,enabled:true});
+        generateScheduledCoopTasks();
+    }else{
+        const appearWeekday=Number(document.getElementById("coopWeeklyAppearWeekday").value);
+        const appearTime=document.getElementById("coopWeeklyAppearTime").value;
+        const dueWeekday=Number(document.getElementById("coopWeeklyDueWeekday").value);
+        const dueTime=document.getElementById("coopWeeklyDueTime").value;
+        if(!appearTime||!dueTime) return alert("請完整填寫每週出現與截止時間");
+        state.coopTaskTemplates.push({id:"coop_template_"+Date.now(),monsterName,content,reward,rewardType,monsterImage,scheduleType,appearWeekday,appearTime,dueWeekday,dueTime,enabled:true});
+        generateScheduledCoopTasks();
+    }
+    markChanged(); save(); render(); refreshBackendPage("backend-coop");
+}
+function toggleCoopTemplate(id){
+    const template=state.coopTaskTemplates.find(item=>item.id===id);
+    if(!template) return;
+    template.enabled=template.enabled===false;
+    if(template.enabled) generateScheduledCoopTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-coop");
+}
+function deleteCoopTemplate(id){
+    if(!confirm("確定刪除此週期協力任務設定？已產生的任務紀錄不會刪除。")) return;
+    state.coopTaskTemplates=state.coopTaskTemplates.filter(item=>item.id!==id);
+    markChanged(); save(); refreshBackendPage("backend-coop");
+}
+function deleteCoopTask(taskId){
+    if(!confirm("確定刪除此協力任務？")) return;
+    state.coopTasks = state.coopTasks.filter(t=>t.id!==taskId);
+    markChanged(); save(); refreshBackendPage("backend-coop");
+}
+
+function moveItem(listName,id,direction){
+    const list = state[listName];
+    const index = list.findIndex(item=>item.id===id);
+    const targetIndex = index + direction;
+    if(index<0 || targetIndex<0 || targetIndex>=list.length) return;
+    [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
+
+//修改商品名稱、價格
+function updateItemName(listName,id,newName){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item) return;
+    item.name = newName.trim()||"未命名";
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
+function updateItemLevel(listName,id,newLevel){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item || !LEVEL_PRICES[newLevel]) return;
+    item.level = newLevel;
+    item.price = priceForLevel(newLevel);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
+function updateItemActive(listName,id,value){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item) return;
+    item.active = value === "true";
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
+function updateItemPrice(listName,id,newPrice){
+    const item = state[listName].find(x=>x.id===id);
+    if(!item || isNaN(newPrice) || newPrice<0) return;
+    item.price = newPrice;
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
+
+//批量新增工具函式
+async function batchUploadFiles(fileList, targetArray, prefixName){
+    for(let i=0;i<fileList.length;i++){
+        const file = fileList[i];
+        const imgData = await compressImage(file, MAX_IMG_SIZE, IMG_QUALITY);
+        targetArray.push({
+            id: makeItemId(),
+            name: `${prefixName} ${i+1}`,
+            level: "R",
+            price: priceForLevel("R"),
+            active: true,
+            image: imgData
+        });
+    }
+    markChanged(); save(); refreshBackendPage("backend-" + (targetArray===state.clothesM ? "clothes-m" : targetArray===state.clothesF ? "clothes-f" : targetArray===state.layouts ? "layouts" : "backgrounds"));
+}
+
+async function batchAddClothM(){
+    const files = document.getElementById("mImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.clothesM, "男生服裝");
+}
+async function batchAddClothF(){
+    const files = document.getElementById("fImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.clothesF, "女生服裝");
+}
+async function batchAddLayout(){
+    const files = document.getElementById("layImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.layouts, "寵物");
+}
+async function batchAddBg(){
+    const files = document.getElementById("bgImgBatch").files;
+    if(!files.length) return alert("請選擇圖片");
+    await batchUploadFiles(files, state.backgrounds, "背景");
+}
+
+//任務
+function addTask(){
+    const title = document.getElementById("newTaskTitle").value.trim();
+    const reward = Number(document.getElementById("newTaskReward").value)||0;
+    const dueValue = document.getElementById("newTaskDueAt").value;
+    const dueAt = dueValue ? new Date(dueValue).getTime() : null;
+    if(!title){alert("請輸入任務名稱");return;}
+    if(dueAt && dueAt<=Date.now()){alert("完成期限必須晚於現在");return;}
+    state.tasks.push({
+        id: makeTaskId(),
+        title: title,
+        reward: reward,
+        dueAt: dueAt
+    });
+    markChanged(); save(); refreshBackendPage("backend-tasks");
+}
+function deleteTask(tid){
+    if(!confirm("確定刪除這個任務？已完成紀錄會一併失效。")) return;
+    state.tasks = state.tasks.filter(t=>t.id!==tid);
+    markChanged(); save(); refreshBackendPage("backend-tasks");
+}
+function addDailyTask(){
+    const title = document.getElementById("dailyTaskTitle").value.trim();
+    const reward = Math.max(0,Math.floor(Number(document.getElementById("dailyTaskReward").value)||0));
+    const appearTime = document.getElementById("dailyTaskAppearTime").value;
+    const dueTime = document.getElementById("dailyTaskDueTime").value;
+    if(!title || !appearTime || !dueTime) return alert("請完整填寫每日任務名稱、出現時間與截止時間");
+    state.dailyTaskTemplates.push({id:"daily_template_"+Date.now(),title,reward,appearTime,dueTime,enabled:true});
+    generateDailyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function toggleDailyTask(id){
+    const template = state.dailyTaskTemplates.find(item=>item.id===id);
+    if(!template) return;
+    template.enabled = template.enabled===false;
+    if(template.enabled) generateDailyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function deleteDailyTask(id){
+    if(!confirm("確定刪除這個每日任務設定？已經產生的任務不會被刪除。")) return;
+    state.dailyTaskTemplates = state.dailyTaskTemplates.filter(item=>item.id!==id);
+    markChanged(); save(); refreshBackendPage("backend-tasks");
+}
+function addWeeklyTask(){
+    const title = document.getElementById("weeklyTaskTitle").value.trim();
+    const reward = Math.max(0,Math.floor(Number(document.getElementById("weeklyTaskReward").value)||0));
+    const appearWeekday = Number(document.getElementById("weeklyTaskAppearWeekday").value);
+    const appearTime = document.getElementById("weeklyTaskAppearTime").value;
+    const dueWeekday = Number(document.getElementById("weeklyTaskDueWeekday").value);
+    const dueTime = document.getElementById("weeklyTaskDueTime").value;
+    if(!title || !appearTime || !dueTime) return alert("請完整填寫每週任務名稱、出現時間與截止時間");
+    state.weeklyTaskTemplates.push({id:"weekly_template_"+Date.now(),title,reward,appearWeekday,appearTime,dueWeekday,dueTime,enabled:true});
+    generateWeeklyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function toggleWeeklyTask(id){
+    const template = state.weeklyTaskTemplates.find(item=>item.id===id);
+    if(!template) return;
+    template.enabled = template.enabled===false;
+    if(template.enabled) generateWeeklyTasks();
+    markChanged(); save(); render(); refreshBackendPage("backend-tasks");
+}
+function deleteWeeklyTask(id){
+    if(!confirm("確定刪除這個每週任務設定？已經產生的任務不會被刪除。")) return;
+    state.weeklyTaskTemplates = state.weeklyTaskTemplates.filter(item=>item.id!==id);
+    markChanged(); save(); refreshBackendPage("backend-tasks");
+}
+
+//學生管理
+function setStudentGender(id,gender){
+    const s = state.students[id-1];
+    if(!s || !["M","F"].includes(gender)) return;
+    s.gender = gender;
+    if(s.equippedClothes && !(gender==="M"?state.clothesM:state.clothesF).some(item=>item.id===s.equippedClothes)){
+        s.equippedClothes = null;
+    }
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+
+function resetStudentCloset(id){
+    const s = state.students[id-1];
+    if(!s || !confirm(`確定重置${id}號的衣櫃嗎？已購買的服裝、寵物與背景都會清除，代幣不受影響。`)) return;
+    s.ownedClothes = [];
+    s.equippedClothes = null;
+    s.ownedLayout = [];
+    s.equippedLayout = [];
+    s.ownedBg = [];
+    s.equippedBg = null;
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+
+function resetAllStudentResources(){
+    if(!confirm("確定清空全體成員的代幣、樂透券與衣櫃嗎？此動作無法復原。")) return;
+    state.students.forEach(s=>{
+        s.tokens = 0;
+        s.lotteryTickets = 0;
+        s.ownedClothes = [];
+        s.equippedClothes = null;
+        s.ownedLayout = [];
+        s.equippedLayout = [];
+        s.ownedBg = [];
+        s.equippedBg = null;
+    });
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+
+function editToken(id){
+    const s = state.students[id-1];
+    const val = prompt(`覆蓋設定${id}號代幣，現在：${s.tokens}`, s.tokens);
+    if(val===null) return;
+    const n = Number(val);
+    if(isNaN(n)) return alert("請輸入數字");
+    s.tokens = n;
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+function editLotteryTicket(id){
+    const s = state.students[id-1];
+    const val = prompt(`覆蓋設定${id}號樂透券，現在：${s.lotteryTickets||0}`, s.lotteryTickets||0);
+    if(val===null) return;
+    const n = Math.floor(Number(val));
+    if(!Number.isFinite(n) || n<0) return alert("請輸入大於或等於 0 的整數");
+    s.lotteryTickets = n;
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+function addTokenOne(){
+    const sid = Number(document.getElementById("targetStuId").value);
+    const delta = Number(document.getElementById("deltaToken").value);
+    if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
+    state.students[sid-1].tokens += delta;
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+}
+function subTokenOne(){
+    const sid = Number(document.getElementById("targetStuId").value);
+    const delta = Number(document.getElementById("deltaToken").value);
+    if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
+    state.students[sid-1].tokens -= delta;
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+}
+function addLotteryTicketOne(){
+    const sid = Number(document.getElementById("lotteryStuId").value);
+    const delta = Math.floor(Number(document.getElementById("lotteryDelta").value));
+    if(!sid || sid<1 || sid>state.students.length || !Number.isFinite(delta) || delta<0) return alert("輸入不正確");
+    state.students[sid-1].lotteryTickets = (state.students[sid-1].lotteryTickets||0) + delta;
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+function subLotteryTicketOne(){
+    const sid = Number(document.getElementById("lotteryStuId").value);
+    const delta = Math.floor(Number(document.getElementById("lotteryDelta").value));
+    if(!sid || sid<1 || sid>state.students.length || !Number.isFinite(delta) || delta<0) return alert("輸入不正確");
+    const student = state.students[sid-1];
+    student.lotteryTickets = Math.max(0,(student.lotteryTickets||0)-delta);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+function addLotteryTicketsAll(){
+    const value = Math.floor(Number(document.getElementById("batchLotteryTicket").value));
+    if(!Number.isFinite(value) || value<0) return alert("請輸入大於或等於 0 的整數");
+    state.students.forEach(s=>s.lotteryTickets=(s.lotteryTickets||0)+value);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+function setLotteryTicketsAll(){
+    const value = Math.floor(Number(document.getElementById("batchLotteryTicket").value));
+    if(!Number.isFinite(value) || value<0) return alert("請輸入大於或等於 0 的整數");
+    state.students.forEach(s=>s.lotteryTickets=value);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+function resetAllLotteryTickets(){
+    if(!confirm("確定將全體成員的樂透券重置為 0？")) return;
+    state.students.forEach(s=>s.lotteryTickets=0);
+    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
+}
+
+function resizeStudentList(){
+    const n = Number(document.getElementById("stuCount").value);
+    if(!n || n<1) return;
+    if(n>state.students.length){
+        for(let i=state.students.length;i<n;i++){
+            state.students.push({
+                id:i+1, gender:i%2===0?"M":"F",
+                tokens:0, lotteryTickets:0, doneTasks:[],
+                petAffection:0, lastPetMoodDate:"",
+                ownedClothes:[], equippedClothes:null,
+                ownedLayout:[], equippedLayout:[],
+                ownedBg:[], equippedBg:null
+            });
+        }
+    }else{
+        state.students.splice(n);
+    }
+    markChanged(); save(); render(); refreshBackendPage("backend-members");
+}
+function addTokenAll(){
+    const v = Number(document.getElementById("batchToken").value)||0;
+    state.students.forEach(s=>s.tokens+=v);
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+}
+function setTokenAll(){
+    const v = Number(document.getElementById("batchToken").value)||0;
+    state.students.forEach(s=>s.tokens=v);
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+}
+function resetAllTokens(){
+    if(!confirm("確定將全體成員的代幣重置為 0？")) return;
+    state.students.forEach(s=>s.tokens=0);
+    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+}
+
+//新增商品（單張）
+async function addClothM(){
+    const name = document.getElementById("mName").value.trim();
+    const level = document.getElementById("mLevel").value;
+    const price = priceForLevel(level);
+    const file = document.getElementById("mImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.clothesM.push({id:makeItemId(),name,level,price,active:true,image:img});
+    markChanged(); save(); refreshBackendPage("backend-clothes-m");
+}
+async function addClothF(){
+    const name = document.getElementById("fName").value.trim();
+    const level = document.getElementById("fLevel").value;
+    const price = priceForLevel(level);
+    const file = document.getElementById("fImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.clothesF.push({id:makeItemId(),name,level,price,active:true,image:img});
+    markChanged(); save(); refreshBackendPage("backend-clothes-f");
+}
+async function addLayout(){
+    const name = document.getElementById("layName").value.trim();
+    const level = document.getElementById("layLevel").value;
+    const price = priceForLevel(level);
+    const file = document.getElementById("layImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.layouts.push({id:makeItemId(),name,level,price,active:true,image:img});
+    markChanged(); save(); refreshBackendPage("backend-layouts");
+}
+async function addBgItem(){
+    const name = document.getElementById("bgName").value.trim();
+    const level = document.getElementById("bgLevel").value;
+    const price = priceForLevel(level);
+    const file = document.getElementById("bgImg").files[0];
+    if(!name||!file){alert("請填名稱並選圖片");return;}
+    const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    state.backgrounds.push({id:makeItemId(),name,level,price,active:true,image:img});
+    markChanged(); save(); refreshBackendPage("backend-backgrounds");
+}
+function deleteItem(listName,id){
+    if(!confirm("刪除此商品！學生已經買走的不會被回收。")) return;
+    state[listName] = state[listName].filter(x=>x.id!==id);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+}
+
+//備份匯入匯出
+function exportData(){
+    const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `五年甲班換裝遊戲_備份_${new Date().toLocaleDateString()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+async function importData(input){
+    const f = input.files[0];
+    if(!f) return;
+    const txt = await f.text();
+    try{
+        const newState = JSON.parse(txt);
+        if(!newState.students) throw new Error("檔案不是有效的備份");
+        if(!confirm("⚠️ 將覆蓋目前所有資料！建議先匯出備份！確定嗎？")) return;
+        state = normalizeState(newState);
+        markChanged(); save(); render(); backend();
+        alert("匯入成功！");
+    }catch(e){
+        alert("匯入失敗："+e.message);
+    }
+}
+
+//初始化；每 30 秒檢查一次每日與每週任務是否已到出現時間。
+syncScheduledTasks();
+render();
+setInterval(syncScheduledTasks,30000);
+</script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+  import { getDatabase, get, onValue, ref, remove, set } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
+    authDomain: "classroom-115.firebaseapp.com",
+    databaseURL: "https://classroom-115-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "classroom-115",
+    storageBucket: "classroom-115.firebasestorage.app",
+    messagingSenderId: "242136273912",
+    appId: "1:242136273912:web:8bd1b43dc7d8ecc698fc0d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const database = getDatabase(app);
+  const gameRef = ref(database, CLOUD_SAVE_PATH);
+  const status = document.getElementById("saveStatus");
+  let cloudReady = false;
+  let saveTimer = null;
+  let applyingRemote = false;
+
+  function showCloudError(error){
+    console.error("Firebase 同步失敗", error);
+    status.textContent = "⚠️ 雲端同步失敗（保留本機存檔）";
+  }
+
+  window.firebaseGameStore = {
+    available:true,
+    queueSave(nextState){
+      if(!cloudReady || applyingRemote) return;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async()=>{
+        try{
+          await set(gameRef, nextState);
+          status.textContent = `☁️ 已同步 ${new Date().toLocaleTimeString()}`;
+        }catch(error){
+          showCloudError(error);
+        }
+      }, 500);
+    },
+    remove(){
+      clearTimeout(saveTimer);
+      return remove(gameRef);
+    }
+  };
+
+  try{
+    await signInAnonymously(auth);
+    const initialSnapshot = await get(gameRef);
+    let catalogChanged = false;
+    if(initialSnapshot.exists()){
+      applyingRemote = true;
+      const loaded = applyCloudState(initialSnapshot.val());
+      if(loaded) catalogChanged = reconcileBuiltinCatalog();
+      applyingRemote = false;
+      status.textContent = loaded ? "☁️ 已載入雲端進度" : "💾 雲端資料異常，使用本機存檔";
+    }else{
+      await set(gameRef, state);
+      status.textContent = "☁️ 已建立雲端存檔";
+    }
+    cloudReady = true;
+    if(catalogChanged){
+      await set(gameRef, state);
+      status.textContent = "☁️ 已同步 HTML 商品更新";
+    }
+
+    onValue(gameRef, snapshot=>{
+      if(!cloudReady || !snapshot.exists()) return;
+      let shouldSyncCatalog = false;
+      try{
+        const remoteState = snapshot.val();
+        if(remoteState?.lastSaved === state.lastSaved) return;
+        applyingRemote = true;
+        if(applyCloudState(remoteState)){
+          shouldSyncCatalog = reconcileBuiltinCatalog();
+          status.textContent = "☁️ 已取得最新進度";
+        }else{
+          status.textContent = "💾 雲端資料異常，使用本機存檔";
+        }
+      }catch(error){
+        showCloudError(error);
+      }finally{
+        applyingRemote = false;
+      }
+      if(shouldSyncCatalog) window.firebaseGameStore.queueSave(state);
+    }, showCloudError);
+  }catch(error){
+    window.firebaseGameStore.available = false;
+    showCloudError(error);
+  }
+</script>
+</body>
+</html>
+
+
+
+
+
