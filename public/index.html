@@ -8,6 +8,8 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans TC",system-ui,sans-serif;background:#f8f4ff;color:#403b4d}
 .bg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;background-repeat:no-repeat}
+html.cloud-sync-loading body{pointer-events:none;cursor:wait}
+html.cloud-sync-loading body::after{content:"正在取得最新雲端進度…";position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(23,32,51,.88);color:#fff;font-size:22px;font-weight:900;pointer-events:all}
 header{position:sticky;top:0;z-index:10;background:#333;border-bottom:1px solid #222;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 header h1{color:#f3d98b}
 h1,h2,h3{margin-top:0}
@@ -313,8 +315,10 @@ input[type="number"]{width:85px}
 </div>
 
 <script>
+document.documentElement.classList.add("cloud-sync-loading");
 const STORAGE_KEY = "growth26_v18_full";
 const CLOUD_SAVE_PATH = "games/classroom-115/progress";
+const CLOUD_SYNC_VERSION = 2;
 const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
@@ -2669,7 +2673,7 @@ setInterval(syncScheduledTasks,30000);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { getDatabase, get, onValue, ref, remove, set } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { getDatabase, get, onValue, ref, remove, runTransaction } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
@@ -2710,9 +2714,24 @@ setInterval(syncScheduledTasks,30000);
   async function flushCloudSave(){
     if(!cloudReady || applyingRemote || saveInFlight || !pendingState) return saveInFlight || false;
     const snapshotToSave = pendingState;
+    snapshotToSave.syncVersion = CLOUD_SYNC_VERSION;
     pendingState = null;
-    saveInFlight = set(gameRef, snapshotToSave)
-      .then(()=>{
+    saveInFlight = runTransaction(gameRef, current=>{
+      // 每次寫入前都在伺服器端比較版本；舊頁面或較慢裝置不得覆蓋較新的雲端紀錄。
+      if(current && savedAt(current) > savedAt(snapshotToSave)) return;
+      return snapshotToSave;
+    }, {applyLocally:false})
+      .then(async result=>{
+        if(!result.committed){
+          const newestCloudState = result.snapshot.val();
+          if(newestCloudState && savedAt(newestCloudState) > savedAt(state)){
+            applyingRemote = true;
+            applyCloudState(newestCloudState);
+            applyingRemote = false;
+          }
+          status.textContent = "☁️ 已保留較新的雲端進度";
+          return false;
+        }
         status.textContent = `☁️ 已同步 ${new Date().toLocaleTimeString()}`;
         return true;
       })
@@ -2749,24 +2768,23 @@ setInterval(syncScheduledTasks,30000);
     const initialSnapshot = await get(gameRef);
     let catalogChanged = false;
     if(initialSnapshot.exists()){
-      const remoteState = initialSnapshot.val();
-      // 本機可能是在 Firebase 尚未初始化時先完成的操作；較新的本機資料不可被舊雲端覆蓋。
-      if(savedAt(state) > savedAt(remoteState)){
-        pendingState = cloneState(state);
-        status.textContent = "☁️ 正在補傳較新的本機進度...";
-      }else{
-        applyingRemote = true;
-        const loaded = applyCloudState(remoteState);
-        if(loaded) catalogChanged = reconcileBuiltinCatalog();
-        applyingRemote = false;
-        status.textContent = loaded ? "☁️ 已載入雲端進度" : "💾 雲端資料異常，使用本機存檔";
-      }
+      // 啟動時一律先採用雲端紀錄，絕不以舊頁面的 localStorage 判斷並回寫。
+      applyingRemote = true;
+      const loaded = applyCloudState(initialSnapshot.val());
+      if(loaded) catalogChanged = reconcileBuiltinCatalog();
+      applyingRemote = false;
+      status.textContent = loaded ? "☁️ 已載入最新雲端進度" : "💾 雲端資料異常，使用本機存檔";
     }else{
       pendingState = cloneState(state);
       status.textContent = "☁️ 正在建立雲端存檔...";
     }
     cloudReady = true;
-    if(catalogChanged) pendingState = cloneState(state);
+    document.documentElement.classList.remove("cloud-sync-loading");
+    if(catalogChanged){
+      state.lastSaved = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      pendingState = cloneState(state);
+    }
     await flushCloudSave();
 
     onValue(gameRef, snapshot=>{
@@ -2794,6 +2812,7 @@ setInterval(syncScheduledTasks,30000);
     }, showCloudError);
   }catch(error){
     window.firebaseGameStore.available = false;
+    document.documentElement.classList.remove("cloud-sync-loading");
     showCloudError(error);
   }
 </script>
