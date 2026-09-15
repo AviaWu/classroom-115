@@ -114,6 +114,8 @@ test('real artwork REST upload commits save metadata without embedding its Data 
     assert.deepEqual(raw.progress.drawings,[{id:drawing.id,savedAt:drawing.savedAt}]);
     assert.equal(JSON.stringify(raw).includes(drawing.data),false);
     assert.deepEqual(await client.readArtwork(drawing.id),drawing);
+    await assert.rejects(client.deleteArtwork(drawing.id),/401/);
+    await seed(initial);
     await client.deleteArtwork(drawing.id);
     assert.equal(await client.readArtwork(drawing.id),null);
 });
