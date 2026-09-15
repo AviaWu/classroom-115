@@ -22,13 +22,35 @@ function page(t){
     const sync=createCloudSync({readRemote:async()=>clone(cloud),execute:async job=>{const out=operations.applyOperation(cloud,job.command,Date.now());cloud=out.progress;if(out.changed)writes++;return {...out,result:{ok:true,...out.result}};},applyState:w.applyCloudState,lock:w.setSyncLocked,status:w.setSyncStatus,newId:()=>`test-${++id}`,setInterval:()=>1,clearInterval(){},error(){}});
     w.firebaseGameStore=sync;
     t.after(()=>{sync.dispose();w.close();});
-    return {w,sync,alerts,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();},async login(){w.openBackend();w.document.getElementById("backendPw").value="1127";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
+    const signIn=(account,password)=>{w.document.getElementById('loginAccount').value=account;w.document.getElementById('loginPassword').value=password;w.login(new w.Event('submit'));};
+    return {w,sync,alerts,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="1127";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
 }
 test('inline scripts and modules parse',()=>{
     for(const [,attributes,source] of scripts){
         if(attributes.includes('module')){const r=spawnSync(process.execPath,['--input-type=module','--check'],{input:source,encoding:'utf8'});assert.equal(r.status,0,r.stderr);}
         else new vm.Script(source);
     }
+});
+test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{
+    const h=page(t);h.sync.setConnected(true);await h.sync.refresh();
+    assert.equal(h.w.document.getElementById('loginAccount').options.length,31);
+    h.signIn('student-1','0000');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);assert.match(h.w.document.getElementById('loginMessage').textContent,/錯誤/);
+    h.signIn('student-1','3847');assert.equal(h.w.document.getElementById('loginScreen').hidden,true);assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 1 號');
+    h.w.logout();h.signIn('teacher','1127');assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');assert.equal(h.w.document.getElementById('backendButton').hidden,false);
+});
+test('student can use own features and drawing but is blocked from every other student',async t=>{
+    const h=page(t);await h.start();h.w.logout();h.signIn('student-1','3847');
+    for(const action of ['tasks(1)','shop(1)','closet(1)','openPetMood(1)','openDrawingBoard()','openCoopTasks()']) await h.run(action);
+    assert.ok(h.w.document.getElementById('modal').classList.contains('open'));
+    for(const action of ['tasks(2)','shop(2)','closet(2)','openPetMood(2)',"completeCoopMember('coop',2)"]) await h.run(action);
+    assert.equal(h.alerts.filter(message=>message==='點錯啦!這不是你的人物喔!').length,5);assert.equal(h.writes,0);
+    h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
+});
+test('teacher has all student access but must enter the password again for backend',async t=>{
+    const h=page(t);await h.start();await h.run('tasks(2)');assert.deepEqual(h.alerts,[]);
+    h.w.openBackend();assert.ok(h.w.document.getElementById('backendPw'));assert.match(h.w.document.getElementById('body').textContent,/登入後台/);
+    h.w.document.getElementById('backendPw').value='0000';await h.w.checkBackendPw();assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);assert.ok(h.alerts.includes('密碼錯誤！'));
+    h.w.openBackend();h.w.document.getElementById('backendPw').value='1127';await h.w.checkBackendPw();assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
 });
 test('startup and opening all student views never writes; task button commits live reward',async t=>{
     const h=page(t);await h.start();

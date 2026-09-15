@@ -94,7 +94,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .owned{font-size:13px}
 .row{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid #eee;border-radius:14px;margin:8px 0;flex-wrap:wrap}
 .row .grow{flex:1;min-width:180px}
-input{border:1px solid #ddd;border-radius:9px;padding:9px}
+input,select{border:1px solid #ddd;border-radius:9px;padding:9px}
 input[type="file"]{padding:4px}
 label{font-weight:700}
 input[type="number"]{width:85px}
@@ -199,6 +199,16 @@ input[type="number"]{width:85px}
 .product-admin img{width:72px;height:72px;object-fit:contain;background:#fff4d6;border:2px solid #a88d5f;flex:none}
 .drag-handle{cursor:grab;font-size:20px;user-select:none}
 .drag-handle:active{cursor:grabbing}
+.login-screen{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#34405c 0 50%,#d8c69e 50%)}
+.login-screen[hidden]{display:none}
+.login-card{width:min(460px,100%);padding:30px;background:#fff5dc;border:5px solid #20263a;box-shadow:10px 10px 0 #172033;text-align:center}
+.login-card h1{margin-bottom:8px;color:#34405c;text-shadow:none}
+.login-form{display:grid;gap:16px;margin-top:24px;text-align:left}
+.login-form label{display:grid;gap:7px}
+.login-form select,.login-form input{width:100%;min-height:48px;font:inherit;border:3px solid #20263a;border-radius:0;background:#fffdf3}
+.login-form button{min-height:48px;font-size:16px}
+.login-message{min-height:22px;margin:0;color:#a12d2d;font-weight:900;text-align:center}
+.session-badge{display:inline-flex;align-items:center;padding:8px 10px;border:2px solid #f3d98b;color:#fff5dc;font-size:13px;font-weight:900}
 </style>
 
     <style>
@@ -276,7 +286,7 @@ input[type="number"]{width:85px}
       .pic{border:2px solid #a88d5f;border-radius:0;background:#eadbbd}
       .price{color:#9b6824}
       .row{border:3px solid var(--pixel-ink);border-radius:0;background:#fff8e8;box-shadow:3px 3px 0 rgba(23,32,51,.45)}
-      input{border:3px solid var(--pixel-ink);border-radius:0;background:#fffdf3;color:var(--pixel-ink);font-family:inherit}
+      input,select{border:3px solid var(--pixel-ink);border-radius:0;background:#fffdf3;color:var(--pixel-ink);font-family:inherit}
       .tabs{border-bottom:3px dashed var(--pixel-navy);padding-bottom:10px}
       .tab{border:3px solid var(--pixel-ink);border-radius:0;box-shadow:3px 3px 0 var(--pixel-shadow)}
       .tab.active{background:var(--pixel-blue)}
@@ -292,12 +302,31 @@ input[type="number"]{width:85px}
 <body>
 <div class="bg" id="userBg"></div>
 
+<section id="loginScreen" class="login-screen" aria-label="登入頁面">
+    <div class="login-card">
+        <h1>班級冒險登入</h1>
+        <p>選擇你的身分，輸入 4 位數密碼</p>
+        <form class="login-form" onsubmit="login(event)">
+            <label for="loginAccount">登入者
+                <select id="loginAccount" required></select>
+            </label>
+            <label for="loginPassword">4 位數密碼
+                <input id="loginPassword" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" required>
+            </label>
+            <p id="loginMessage" class="login-message" role="alert"></p>
+            <button class="primary" type="submit">進入班級</button>
+        </form>
+    </div>
+</section>
+
 <header>
 <h1>Great teamwork makes the dream work</h1>
 <div>
+<span id="sessionBadge" class="session-badge"></span>
 <button onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
 <button onclick="openDrawingBoard()">畫板</button>
-<button onclick="openBackend()">老師後台</button>
+<button id="backendButton" onclick="openBackend()">老師後台</button>
+<button onclick="logout()">登出</button>
 <span class="small" id="saveStatus" role="status"></span>
 </div>
 </header>
@@ -321,6 +350,12 @@ const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
+const TEACHER_PASSWORD = "1127";
+const STUDENT_PASSWORDS = Object.freeze({
+    1:"3847",2:"1926",3:"5063",4:"7412",5:"2895",6:"6031",7:"4758",8:"9203",9:"1567",10:"8340",
+    11:"2691",12:"5127",13:"9482",14:"3056",15:"7719",16:"4283",17:"6905",18:"1348",19:"8672",20:"2510",
+    21:"9137",22:"4826",23:"3095",24:"7264",25:"1483",26:"6759",27:"2048",28:"9316",29:"5487",30:"3621"
+});
 const DEFAULT_PET_IMAGE = "/images/Dec2/1000095494-removebg-preview.png";
 const DEFAULT_PET_NAME = "小嗶";
 const LEVEL_PRICES = {R:50, SR:100, SSR:200, UR:300};
@@ -420,6 +455,7 @@ let lastShopTab = "clothes";
 let lastSavedView;
 let currentView = null;
 let refreshingView = false;
+let currentUser = null;
 let backendAuthenticated = false;
 let syncUiEpoch = 0;
 let syncLocked = true;
@@ -429,6 +465,55 @@ window.firebaseGameStore = {
     refresh:()=>Promise.resolve(false), hasPendingSave:()=>false,
     flush:()=>Promise.resolve(false), pendingActions:()=>[]
 };
+function initializeLogin(){
+    const account=document.getElementById("loginAccount");
+    account.innerHTML='<option value="teacher">老師</option>'+Array.from({length:30},(_,index)=>`<option value="student-${index+1}">學生 ${index+1} 號</option>`).join("");
+    document.getElementById("loginScreen").hidden=false;
+    document.getElementById("loginPassword").focus();
+    updateSessionUi();
+}
+function login(event){
+    event?.preventDefault();
+    const account=document.getElementById("loginAccount").value;
+    const password=document.getElementById("loginPassword").value;
+    const studentMatch=account.match(/^student-(\d+)$/);
+    const valid=account==="teacher" ? password===TEACHER_PASSWORD : studentMatch && STUDENT_PASSWORDS[Number(studentMatch[1])]===password;
+    if(!valid){
+        document.getElementById("loginMessage").textContent="帳號或密碼錯誤，請再試一次。";
+        document.getElementById("loginPassword").select();
+        return false;
+    }
+    currentUser=account==="teacher" ? {role:"teacher",studentId:null} : {role:"student",studentId:Number(studentMatch[1])};
+    backendAuthenticated=false;
+    document.getElementById("loginPassword").value="";
+    document.getElementById("loginMessage").textContent="";
+    document.getElementById("loginScreen").hidden=true;
+    updateSessionUi();
+    return false;
+}
+function logout(){
+    currentUser=null;
+    backendAuthenticated=false;
+    closeModal();
+    initializeLogin();
+}
+function updateSessionUi(){
+    const badge=document.getElementById("sessionBadge");
+    const backendButton=document.getElementById("backendButton");
+    if(badge) badge.textContent=!currentUser?"尚未登入":currentUser.role==="teacher"?"老師":"學生 "+currentUser.studentId+" 號";
+    if(backendButton) backendButton.hidden=currentUser?.role!=="teacher";
+}
+function requireLogin(){
+    if(currentUser) return true;
+    initializeLogin();
+    return false;
+}
+function canAccessStudent(studentId){
+    if(!requireLogin()) return false;
+    if(currentUser.role==="teacher" || currentUser.studentId===Number(studentId)) return true;
+    alert("點錯啦!這不是你的人物喔!");
+    return false;
+}
 function setSyncLocked(locked){
     if(locked && !syncLocked) syncUiEpoch++;
     syncLocked = locked;
@@ -977,6 +1062,7 @@ function drawingHistoryHtml(){
 }
 
 function openDrawingBoard(){
+    if(!requireLogin()) return;
     currentView={type:"drawing"};
     const palette = DRAWING_COLORS.map((color,index)=>`<button class="drawing-color ${index===0?"selected":""}" style="--paint-color:${color}" onclick="selectDrawingColor('${color}',this)" aria-label="選擇顏色 ${color}" title="${color}"></button>`).join("");
     openModal(`<h2>班級畫板</h2>
@@ -1178,6 +1264,7 @@ function petLevelHtml(student){
     </div>`;
 }
 function openPetMood(id){
+    if(!canAccessStudent(id)) return;
     currentView={type:"pet",id};
     const student = state.students.find(s=>s.id===id);
     if(!student) return;
@@ -1208,6 +1295,7 @@ function openPetMood(id){
 }
 
 async function showPetMoodReply(studentId,mood,button){
+    if(!canAccessStudent(studentId)) return;
     const responses=PET_MOOD_RESPONSES[mood];
     if(!responses?.length) return;
     document.querySelectorAll(".pet-mood-button").forEach(item=>{
@@ -1348,6 +1436,7 @@ function syncDailyTasks(){
 
 //學生端任務
 function tasks(id){
+    if(!canAccessStudent(id)) return;
     currentView={type:"tasks",id};
     const s = state.students[id-1];
     const now = Date.now();
@@ -1362,6 +1451,7 @@ function tasks(id){
     `);
 }
 async function finishTask(id,tid){
+    if(!canAccessStudent(id)) return;
     await runCommand({type:"completeTask",studentId:id,taskId:tid},`task:${id}:${tid}`);
 }
 
@@ -1370,6 +1460,7 @@ function activeCoopTasks(now=Date.now()){
     return state.coopTasks.filter(task=>!task.claimed && (!task.startAt || now>=task.startAt) && (!task.dueAt || now<=task.dueAt));
 }
 function openCoopTasks(selectedId){
+    if(!requireLogin()) return;
     currentView={type:"coop",id:selectedId};
     const active = activeCoopTasks();
     if(!active.length){
@@ -1417,6 +1508,7 @@ function openCoopTask(taskId, taskButtons=""){
         </div>`);
 }
 async function completeCoopMember(taskId,studentId){
+    if(!canAccessStudent(studentId)) return;
     const result=await runCommand({type:"coopComplete",taskId,studentId},`coop:${taskId}:${studentId}`);
     if(result?.claimed) alert(`恭喜同心協力打敗「${result.monsterName}」！每位成員獲得 ${result.reward} ${result.rewardType==="ticket"?"張樂透券":"代幣"}！`);
     else if(result) document.getElementById("coopMonsterVisual")?.classList.add("coop-hit");
@@ -1487,6 +1579,7 @@ function bgCard(id,p){
 }
 
 function shop(id){
+    if(!canAccessStudent(id)) return;
     currentView={type:"shop",id,tab:"clothes"};
     lastShopTab = "clothes";
     openModal(`<h2>${id}號｜商店</h2>
@@ -1500,6 +1593,7 @@ function shop(id){
     switchShopTab(id, lastShopTab);
 }
 function switchShopTab(id,tab){
+    if(!canAccessStudent(id)) return;
     if(currentView?.type==="shop") currentView.tab=tab;
     lastShopTab = tab;
     const s = state.students[id-1];
@@ -1531,6 +1625,7 @@ function switchShopTab(id,tab){
 }
 
 async function drawLottery(id){
+    if(!canAccessStudent(id)) return;
     const result=await runCommand({type:"lottery",studentId:id,roll:Math.random(),indexRoll:Math.random()},`lottery:${id}`);
     if(!result?.item) return;
     const message=result.duplicate ? `抽中 ${result.item.level||"R"}｜${result.item.name}，已擁有此商品，返還 20 代幣！` : `恭喜抽中 ${result.item.level||"R"}｜${result.item.name}！`;
@@ -1553,17 +1648,21 @@ function closeLotteryResultPopup(){
 }
 
 async function buyCloth(id,pid){
+    if(!canAccessStudent(id)) return;
     await runCommand({type:"purchase",studentId:id,kind:"clothes",itemId:pid},`purchase:${id}:${pid}`);
 }
 async function buyLayout(id,pid){
+    if(!canAccessStudent(id)) return;
     await runCommand({type:"purchase",studentId:id,kind:"layout",itemId:pid},`purchase:${id}:${pid}`);
 }
 async function buyBg(id,pid){
+    if(!canAccessStudent(id)) return;
     await runCommand({type:"purchase",studentId:id,kind:"background",itemId:pid},`purchase:${id}:${pid}`);
 }
 
 //衣櫃
 function closet(id,initialTab="clothes"){
+    if(!canAccessStudent(id)) return;
     currentView={type:"closet",id,tab:initialTab};
     openModal(`<h2>${id}號｜衣櫃</h2>
     <div class="closet-layout">
@@ -1611,6 +1710,7 @@ function groupedClosetCards(list,card,emptyText){
     }).join("");
 }
 function switchClosetTab(id,tab){
+    if(!canAccessStudent(id)) return;
     if(currentView?.type==="closet") currentView.tab=tab;
     const s = state.students[id-1];
     const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
@@ -1656,19 +1756,23 @@ function switchClosetTab(id,tab){
     });
 }
 async function equipClothes(id,pid){
+    if(!canAccessStudent(id)) return;
     const student=state.students.find(s=>s.id===id);
     if(!student) return;
     await runCommand({type:"equip",studentId:id,kind:"clothes",itemId:student.equippedClothes===pid?null:pid},`equip:${id}:clothes`);
 }
 async function toggleEquipLayout(id,pid){
+    if(!canAccessStudent(id)) return;
     const student=state.students.find(s=>s.id===id);
     if(!student) return;
     await runCommand({type:"equip",studentId:id,kind:"layout",itemId:student.equippedLayout.includes(pid)?null:pid},`equip:${id}:layout`);
 }
 async function equipDefaultPet(id){
+    if(!canAccessStudent(id)) return;
     await runCommand({type:"equip",studentId:id,kind:"layout",itemId:null},`equip:${id}:layout`);
 }
 async function equipBg(id,pid){
+    if(!canAccessStudent(id)) return;
     const student=state.students.find(s=>s.id===id);
     if(!student) return;
     await runCommand({type:"equip",studentId:id,kind:"background",itemId:student.equippedBg===pid?null:pid},`equip:${id}:background`);
@@ -1676,6 +1780,8 @@ async function equipBg(id,pid){
 
 //後台
 openBackend = function(){
+    if(!requireLogin() || currentUser.role!=="teacher") return;
+    backendAuthenticated=false;
     currentView={type:"login"};
     openModal(`
     <h2>登入後台</h2>
@@ -1691,7 +1797,7 @@ openBackend = function(){
 }
 async function checkBackendPw(){
     const pw = document.getElementById("backendPw").value;
-    if(pw === "1127"){
+    if(currentUser?.role==="teacher" && pw === TEACHER_PASSWORD){
         backendAuthenticated=true;
         closeModal();
         await backend();
@@ -1702,6 +1808,7 @@ async function checkBackendPw(){
 }
 
 async function backend(){
+    if(currentUser?.role!=="teacher" || !backendAuthenticated) return;
     currentView={type:"backend"};
     const used = getStorageUsage();
     const usedMb = (used/1024/1024).toFixed(2);
@@ -2603,6 +2710,7 @@ function updateCloudControls(){
 }
 // 啟動只呈現快取；排程檢查另以明確操作在最新雲端資料上執行。
 render();
+initializeLogin();
 setInterval(syncScheduledTasks,30000);
 </script>
 <script type="module">
