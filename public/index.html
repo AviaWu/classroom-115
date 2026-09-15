@@ -5,13 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>We are 5 甲 </title>
 <style>
+html.cloud-starting .wrap{visibility:hidden}
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans TC",system-ui,sans-serif;background:#f8f4ff;color:#403b4d}
 .bg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;background-repeat:no-repeat}
-#cloudSyncPanel{display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(23,32,51,.88);color:#fff;padding:24px;text-align:center}
-html.cloud-sync-loading #cloudSyncPanel{display:flex}
-#cloudSyncPanel>div{max-width:650px;line-height:1.8}
-#cloudSyncPanel button{margin:8px}
 header{position:sticky;top:0;z-index:10;background:#333;border-bottom:1px solid #222;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 header h1{color:#f3d98b}
 h1,h2,h3{margin-top:0}
@@ -301,8 +298,7 @@ input[type="number"]{width:85px}
 <button onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
 <button onclick="openDrawingBoard()">畫板</button>
 <button onclick="openBackend()">老師後台</button>
-<button onclick="exportSyncBackups()">同步備份</button>
-<span class="small" id="saveStatus" role="status">☁️ 正在連線 Firebase...</span>
+<span class="small" id="saveStatus" role="status"></span>
 </div>
 </header>
 
@@ -317,17 +313,8 @@ input[type="number"]{width:85px}
 </div>
 </div>
 
-<div id="cloudSyncPanel" role="dialog" aria-modal="true" aria-label="雲端同步">
-<div>
-<p id="cloudSyncMessage" role="status">正在取得最新雲端進度…</p>
-<p>確認雲端版本之前暫停遊戲操作，避免舊進度覆蓋其他裝置。</p>
-<button onclick="window.firebaseGameStore.refresh()">重試連線</button>
-<button onclick="exportSyncBackups()">下載同步備份</button>
-<button onclick="location.reload()">重新載入網頁</button>
-</div>
-</div>
 <script>
-document.documentElement.classList.add("cloud-sync-loading");
+document.documentElement.classList.add("cloud-starting");
 const STORAGE_KEY = "growth26_v18_full";
 const CLOUD_SAVE_PATH = "games/classroom-115/progress";
 const MAX_IMG_SIZE = 800;
@@ -424,72 +411,50 @@ const BUILTIN_MONSTERS = [
     {name:"怪獸 4", image:"/images/mon/m%20(4).jpg"}
 ];
 
-let raw = localStorage.getItem(STORAGE_KEY);
-const sharedState = readSharedState();
-if(sharedState){
-    raw = JSON.stringify(sharedState);
-    localStorage.setItem(STORAGE_KEY, raw);
-}
-let state = raw ? JSON.parse(raw) : null;
+let raw = null;
+try { raw = localStorage.getItem(STORAGE_KEY); } catch {}
+let state = null;
+try { state = raw ? JSON.parse(raw) : null; } catch {}
 let unsavedChange = false;
-let autoSaveTimer = null;
-let lastShopTab = "clothes"; //記錄商店頁籤
-
-// Fail closed: cached state is not editable before a server-confirmed read.
-window.firebaseGameStore = {
-    available:false,
-    canEdit(){ return false; },
-    editToken(){ return 0; },
-    queueSave(){ return false; },
-    flush(){ return Promise.resolve(false); },
-    refresh(){ location.reload(); },
-    hasPendingSave(){ return false; }
-};
+let lastShopTab = "clothes";
+let lastSavedView;
+let currentView = null;
+let refreshingView = false;
+let backendAuthenticated = false;
 let syncUiEpoch = 0;
+let syncLocked = true;
+window.firebaseGameStore = {
+    available:false, canEdit:()=>false, canManage:()=>false,
+    perform:()=>Promise.reject(new Error("離線中")),
+    refresh:()=>Promise.resolve(false), hasPendingSave:()=>false,
+    flush:()=>Promise.resolve(false), pendingActions:()=>[]
+};
 function setSyncLocked(locked){
-    if(locked){
-        syncUiEpoch++;
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = null;
-    }
-    document.documentElement.classList.toggle("cloud-sync-loading", locked);
-    document.querySelectorAll("header, .wrap, #modal").forEach(el=>{ el.inert = locked; });
+    if(locked && !syncLocked) syncUiEpoch++;
+    syncLocked = locked;
+    document.documentElement.classList.toggle("cloud-offline",locked);
+    updateCloudControls();
 }
 function setSyncStatus(message){
+    document.documentElement.classList.remove("cloud-starting");
     document.getElementById("saveStatus").textContent = message;
-    document.getElementById("cloudSyncMessage").textContent = message;
 }
 function canContinueEdit(token){
-    return window.firebaseGameStore.canEdit() && token === syncUiEpoch;
+    return window.firebaseGameStore.canEdit() && token===syncUiEpoch;
 }
-async function exportSyncBackups(){
-    try{
-        const {readConflictBackups} = await import("./cloud-sync.mjs");
-        const backups = await readConflictBackups();
-        const blob = new Blob([JSON.stringify({backups, currentLocalState:state},null,2)],{type:"application/json"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `classroom-sync-backups-${Date.now()}.json`;
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(url),1000);
-    }catch(error){
-        alert("讀取同步備份失敗："+error.message);
+async function runCommand(command,key){
+    try { return await window.firebaseGameStore.perform(command,key); }
+    catch(error){
+        if(error.message==="離線中") setSyncStatus("離線中");
+        else alert(error.message || "操作未完成，請確認最新資料後重試。");
+        return null;
     }
 }
-setSyncLocked(true);
-// Also block keyboard and already-focused controls, not just pointer input.
-["click","keydown","input","change","submit","pointerdown","drop"].forEach(type=>{
-    document.addEventListener(type,event=>{
-        if(!window.firebaseGameStore.canEdit() && !event.target.closest?.("#cloudSyncPanel")){
-            event.preventDefault();
-            event.stopImmediatePropagation();
-        }
-    },true);
-});
-
-if(!state){
-    state = {
+function cacheConfirmedState(){
+    try { localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+    catch(error){ console.warn("無法保留離線快取",error); }
+}
+function initialProgress(){ return normalizeState({
         students: Array.from({length:26}, (_,i)=>({
             id:i+1, gender: i<12 ? "M" : "F",
             tokens:0, lotteryTickets:0, doneTasks:[],
@@ -517,9 +482,9 @@ if(!state){
         weeklyTaskTemplates:[],
         globalBgImage:"",
         lastSaved:null
-    };
-}
-normalizeState(state);
+    }); }
+state = normalizeState(state || {students:[]});
+lastSavedView = structuredClone(state);
 
 function normalizeState(target){
     if(!target || typeof target!=="object") return null;
@@ -585,7 +550,7 @@ function normalizeState(target){
     [...target.clothesM,...target.clothesF,...target.layouts,...target.backgrounds].forEach(item=>{
         if(!item.level) item.level = "R";
         if(typeof item.active!=="boolean") item.active = true;
-        item.price = priceForLevel(item.level);
+        if(!Number.isFinite(item.price)) item.price = priceForLevel(item.level);
     });
     target.students.forEach((s,index)=>{
         if(!Number.isFinite(Number(s.id))) s.id=index+1;
@@ -702,7 +667,6 @@ function seedBuiltinBoyClothes(persist=true){
     return changed;
 }
 
-seedBuiltinBoyClothes();
 
 // 內建女生服裝：以 public/images/girl/ 的商品圖片完整取代舊商品；g0 僅作預設服裝
 function seedBuiltinGirlClothes(persist=true){
@@ -735,7 +699,6 @@ function seedBuiltinGirlClothes(persist=true){
     return changed;
 }
 
-seedBuiltinGirlClothes();
 
 // 內建寵物商品：指定圖片作為免費預設寵物，其餘 Dec2 圖片加入商店
 function seedBuiltinLayouts(persist=true){
@@ -787,7 +750,6 @@ function seedBuiltinLayouts(persist=true){
     return changed;
 }
 
-seedBuiltinLayouts();
 
 // 內建背景商品：直接使用 public/images/bgm/ 的全部 JPG 圖片，避免重複建立商品
 function seedBuiltinBackgrounds(persist=true){
@@ -820,48 +782,13 @@ function seedBuiltinBackgrounds(persist=true){
     return changed;
 }
 
-seedBuiltinBackgrounds();
 
-// 雲端進度載入後，以目前 HTML 內建商品清單補齊商品，再回寫 Firebase。
-// 僅調整商品目錄；學生代幣、任務、衣櫃與裝備進度均會保留。
-function reconcileBuiltinCatalog(){
-    const changed = [
-        seedBuiltinBoyClothes(false),
-        seedBuiltinGirlClothes(false),
-        seedBuiltinLayouts(false),
-        seedBuiltinBackgrounds(false)
-    ].some(Boolean);
-    if(changed){
-        state.lastSaved = new Date().toISOString();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        render();
-    }
-    return changed;
-}
-
-function markChanged(){
-    if(!window.firebaseGameStore.canEdit()) return;
-    unsavedChange = true;
-    document.getElementById("saveStatus").textContent = "⚠️有未儲存變更";
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(()=>{ save(); },5000);
-}
-
-window.addEventListener("beforeunload", e=>{
-    if(unsavedChange || window.firebaseGameStore.hasPendingSave()){
-        persistPendingLocally();
-        e.preventDefault();
-        e.returnValue = "資料仍在同步至雲端，請稍候再關閉。";
+function markChanged(){ unsavedChange = true; }
+window.addEventListener("beforeunload",event=>{
+    if(window.firebaseGameStore.hasPendingSave()){
+        event.preventDefault();event.returnValue="";
     }
 });
-// Lifecycle changes never mint a new timestamp or force-upload stale state.
-function persistPendingLocally(){
-    if(!unsavedChange && !window.firebaseGameStore.hasPendingSave()) return;
-    try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
-    catch(error){ console.error("保留本機進度失敗",error); }
-}
-window.addEventListener("pagehide", persistPendingLocally);
-
 function makeItemId(){
     return "item_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
 }
@@ -912,61 +839,29 @@ function getStorageUsage(){
 }
 
 function save(){
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = null;
     if(!window.firebaseGameStore.canEdit()) return false;
     if(!unsavedChange) return true;
-    try{
-        state.lastSaved = new Date().toISOString();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        unsavedChange = false;
-        if(!window.firebaseGameStore.queueSave(state)){
-            unsavedChange = true;
-            return false;
-        }
-        return true;
-    }catch(e){
-        if(e.name === "QuotaExceededError"){
-            alert("⚠️ 儲存空間已滿！無法儲存新項目。\n請刪除一些舊商品或匯出備份後重置。");
-        }else{
-            alert("儲存失敗："+e.message);
-        }
-        return false;
-    }
+    const changes=window.GameOperations.createEditChanges(lastSavedView,state);
+    unsavedChange=false;
+    lastSavedView=structuredClone(state);
+    if(changes.length) void runCommand({type:"edit",changes});
+    return true;
 }
 async function flushSavedState(){
     if(!save()) return false;
-    try{
-        if(typeof window.firebaseGameStore.flush==="function"){
-            return await window.firebaseGameStore.flush();
-        }
-    }catch(error){
-        console.error("等待雲端同步失敗，本機刪除紀錄已保留",error);
-    }
-    return true;
+    return window.firebaseGameStore.flush();
 }
 
 function applyCloudState(cloudState){
-    if(!cloudState || !Array.isArray(cloudState.students) || !cloudState.students.length) return false;
-    const previousState = state;
-    try{
-        const candidate = normalizeState(structuredClone(cloudState));
-        if(!candidate || !candidate.students.length) return false;
-        state = candidate;
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = null;
-        closeModal();
-        document.querySelectorAll(".lottery-result-popup").forEach(el=>el.remove());
-        render();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        unsavedChange = false;
-        return true;
-    }catch(error){
-        state = previousState;
-        console.error("雲端資料格式錯誤，繼續使用本機存檔",error);
-        try{ render(); }catch(renderError){ console.error("恢復本機畫面失敗",renderError); }
-        return false;
-    }
+    document.documentElement.classList.remove("cloud-starting");
+    const next=normalizeState(structuredClone(cloudState || {students:[]}));
+    const changed=JSON.stringify(state)!==JSON.stringify(next);
+    state=next;
+    lastSavedView=structuredClone(state);
+    unsavedChange=false;
+    cacheConfirmedState();
+    if(changed){ render(); refreshVisibleView(); }
+    return true;
 }
 
 function esc(x){
@@ -1012,20 +907,51 @@ function render(){
             </div>
         </div>`;
     }).join("");
-    document.getElementById("students").innerHTML = html;
+    document.getElementById("students").innerHTML = html || `<div class="empty">雲端尚無進度，請由老師後台初始化或還原備份。</div>`;
     const coopIng = document.getElementById("coopIng");
     if(coopIng){
         coopIng.hidden = activeCoopTasks().length===0;
     }
     applyGlobalBg();
+    updateCloudControls();
 }
 
 function openModal(content){
-    document.getElementById("body").innerHTML = content||"";
+    const body=document.getElementById("body");
+    const preserved=new Map();
+    const active=document.activeElement;
+    if(refreshingView){
+        body.querySelectorAll("input,select,textarea").forEach(el=>{
+            const key=el.id || el.dataset.field;
+            if(key && (el.id || el===active || draftFields.get(key)?.dirty)) preserved.set(key,el);
+        });
+    }
+    body.innerHTML=content||"";
+    for(const [key,old] of preserved){
+        const fresh=[...body.querySelectorAll("input,select,textarea")].find(el=>(el.id||el.dataset.field)===key);
+        if(fresh) fresh.replaceWith(old);
+        else if(draftFields.get(key)?.dirty){
+            const row=old.closest(".product-admin");
+            const target=document.getElementById(backendPageId(key.split(":")[0]));
+            if(row && target && !row.isConnected){
+                if(!row.dataset.cloudDeleted){
+                    row.dataset.cloudDeleted="true";
+                    const note=document.createElement("p");
+                    note.textContent="這個項目已在另一台裝置刪除；保留未儲存的輸入供你複製。";
+                    row.appendChild(note);
+                }
+                target.appendChild(row);
+            }
+        }
+    }
     document.getElementById("modal").classList.add("open");
+    if(refreshingView && active?.isConnected && body.contains(active)) active.focus({preventScroll:true});
+    updateCloudControls();
 }
 
 function closeModal(){
+    currentView=null;
+    draftFields.clear();
     document.getElementById("body").innerHTML = "";
     document.getElementById("modal").classList.remove("open");
 }
@@ -1051,6 +977,7 @@ function drawingHistoryHtml(){
 }
 
 function openDrawingBoard(){
+    currentView={type:"drawing"};
     const palette = DRAWING_COLORS.map((color,index)=>`<button class="drawing-color ${index===0?"selected":""}" style="--paint-color:${color}" onclick="selectDrawingColor('${color}',this)" aria-label="選擇顏色 ${color}" title="${color}"></button>`).join("");
     openModal(`<h2>班級畫板</h2>
         <div class="drawing-board-layout">
@@ -1216,18 +1143,11 @@ function clearDrawingBoard(){
     drawingContext.fillRect(0,0,canvas.width,canvas.height);
     document.getElementById("drawingStatus").textContent = "畫板已清空";
 }
-function saveDrawingBoard(){
-    const canvas = document.getElementById("drawingCanvas");
+async function saveDrawingBoard(){
+    const canvas=document.getElementById("drawingCanvas");
     if(!canvas) return;
-    const item = {id:"drawing_"+Date.now(),savedAt:new Date().toISOString(),data:canvas.toDataURL("image/jpeg",.78)};
-    state.drawings.unshift(item);
-    if(state.drawings.length>3){
-        state.drawingAlbum.unshift(...state.drawings.splice(3));
-    }
-    markChanged();
-    if(!save()) return;
-    document.getElementById("drawingHistory").innerHTML = drawingHistoryHtml();
-    document.getElementById("drawingStatus").textContent = "已儲存；最近保留 3 張，舊作已移至後台畫冊";
+    const result=await runCommand({type:"saveDrawing",drawing:{id:"drawing_"+crypto.randomUUID(),savedAt:new Date().toISOString(),data:canvas.toDataURL("image/jpeg",.78)}},"save-drawing");
+    if(result && document.getElementById("drawingStatus")) document.getElementById("drawingStatus").textContent="已儲存；最近保留 3 張，舊作已移至後台畫冊";
 }
 function loadDrawing(id){
     const item = state.drawings.find(drawing=>drawing.id===id);
@@ -1258,6 +1178,7 @@ function petLevelHtml(student){
     </div>`;
 }
 function openPetMood(id){
+    currentView={type:"pet",id};
     const student = state.students.find(s=>s.id===id);
     if(!student) return;
     const equippedLayout = Array.isArray(student.equippedLayout) ? student.equippedLayout : [];
@@ -1286,37 +1207,19 @@ function openPetMood(id){
         </div>`);
 }
 
-function showPetMoodReply(studentId,mood,button){
-    const responses = PET_MOOD_RESPONSES[mood];
-    const replyElement = document.getElementById("petMoodReply");
-    const student = state.students.find(s=>s.id===studentId);
-    if(!responses?.length || !replyElement || !student) return;
+async function showPetMoodReply(studentId,mood,button){
+    const responses=PET_MOOD_RESPONSES[mood];
+    if(!responses?.length) return;
     document.querySelectorAll(".pet-mood-button").forEach(item=>{
-        const selected = item===button;
-        item.classList.toggle("selected",selected);
-        item.setAttribute("aria-pressed",String(selected));
+        item.classList.toggle("selected",item===button);
+        item.setAttribute("aria-pressed",String(item===button));
     });
-    replyElement.style.setProperty("--reply-color",button?.style.getPropertyValue("--mood-color")||"#fffdf3");
-    let reply = responses[Math.floor(Math.random()*responses.length)];
-    const today = localDateKey();
-    if(student.lastPetMoodDate!==today){
-        const oldLevel = petProgress(student).level;
-        student.petAffection = petProgress(student).affection+1;
-        student.lastPetMoodDate = today;
-        const newLevel = petProgress(student).level;
-        if(newLevel>oldLevel){
-            student.tokens += (newLevel-oldLevel)*10;
-            reply += `\n好感度 +1！寵物升到 Lv.${newLevel}，獲得 ${(newLevel-oldLevel)*10} 代幣！`;
-        }else{
-            reply += "\n今日好感度 +1！";
-        }
-        markChanged(); save(); render();
-        const levelCard = document.querySelector(".pet-level-card");
-        if(levelCard) levelCard.outerHTML=petLevelHtml(student);
-    }else{
-        reply += "\n今天已經獲得過好感度，明天再來互動吧！";
-    }
-    replyElement.textContent = reply;
+    let reply=responses[Math.floor(Math.random()*responses.length)];
+    const result=await runCommand({type:"petMood",studentId},`pet:${studentId}`);
+    if(!result) return;
+    reply+=result.awarded ? (result.bonus?`\n好感度 +1！寵物升到 Lv.${result.level}，獲得 ${result.bonus} 代幣！`:"\n今日好感度 +1！") : "\n今天已經獲得過好感度，明天再來互動吧！";
+    const element=document.getElementById("petMoodReply");
+    if(element && currentView?.id===studentId) element.textContent=reply;
 }
 
 //排程任務：每日依日期、每週依週一日期去重；截止不晚於出現時間時延至下一週期。
@@ -1436,13 +1339,8 @@ function generateScheduledCoopTasks(now=new Date()){
     return changed;
 }
 function syncScheduledTasks(){
-    if(!window.firebaseGameStore.canEdit()) return false;
-    const changed = generateDailyTasks() | generateWeeklyTasks() | generateScheduledCoopTasks();
-    if(!changed) return false;
-    markChanged();
-    save();
-    render();
-    return true;
+    if(!window.firebaseGameStore.canEdit()) return Promise.resolve(false);
+    return runCommand({type:"schedule"},"schedule");
 }
 function syncDailyTasks(){
     return syncScheduledTasks();
@@ -1450,7 +1348,7 @@ function syncDailyTasks(){
 
 //學生端任務
 function tasks(id){
-    syncScheduledTasks();
+    currentView={type:"tasks",id};
     const s = state.students[id-1];
     const now = Date.now();
     const todo = state.tasks.filter(t=>!s.doneTasks.includes(t.id) && (!t.dueAt || now <= t.dueAt));
@@ -1463,13 +1361,8 @@ function tasks(id){
         </div>`).join("") : `<div class="empty">🎉 全部任務已完成！</div>`}
     `);
 }
-function finishTask(id,tid){
-    const s = state.students[id-1];
-    const t = state.tasks.find(x=>x.id===tid);
-    if(!t || s.doneTasks.includes(tid)) return;
-    s.doneTasks.push(tid);
-    s.tokens += t.reward;
-    markChanged(); save();render();tasks(id);
+async function finishTask(id,tid){
+    await runCommand({type:"completeTask",studentId:id,taskId:tid},`task:${id}:${tid}`);
 }
 
 //協力任務：只顯示已開始且未截止的任務；全員完成後發放全班獎勵。
@@ -1477,7 +1370,7 @@ function activeCoopTasks(now=Date.now()){
     return state.coopTasks.filter(task=>!task.claimed && (!task.startAt || now>=task.startAt) && (!task.dueAt || now<=task.dueAt));
 }
 function openCoopTasks(selectedId){
-    syncScheduledTasks();
+    currentView={type:"coop",id:selectedId};
     const active = activeCoopTasks();
     if(!active.length){
         openModal(`<h2>協力任務</h2><div class="empty">目前沒有進行中的協力任務。</div>`);
@@ -1523,31 +1416,10 @@ function openCoopTask(taskId, taskButtons=""){
             </div>
         </div>`);
 }
-function completeCoopMember(taskId,studentId){
-    const task = state.coopTasks.find(t=>t.id===taskId);
-    const now = Date.now();
-    if(!task || task.claimed || (task.startAt && now<task.startAt) || (task.dueAt && now>task.dueAt)) return;
-    if(!Array.isArray(task.completedBy)) task.completedBy=[];
-    if(task.completedBy.includes(studentId)) return;
-    task.completedBy.push(studentId);
-    if(task.completedBy.length >= state.students.length){
-        const reward = Number(task.reward)||0;
-        const rewardType = task.rewardType==="ticket" ? "ticket" : "token";
-        state.students.forEach(s=>{
-            if(rewardType==="ticket") s.lotteryTickets = (s.lotteryTickets||0) + reward;
-            else s.tokens += reward;
-        });
-        task.claimed = true;
-        markChanged(); save(); render();
-        alert(`恭喜同心協力打敗「${task.monsterName}」！每位成員獲得 ${reward} ${rewardType==="ticket"?"張樂透券":"代幣"}！`);
-        openCoopTasks();
-        return;
-    }
-    markChanged(); save();
-    const active = activeCoopTasks();
-    const taskButtons = active.map(t=>`<button class="${t.id===taskId?"active":""}" onclick="openCoopTasks('${esc(t.id)}')">${esc(t.monsterName)}</button>`).join("");
-    openCoopTask(taskId, taskButtons);
-    setTimeout(()=>document.getElementById("coopMonsterVisual")?.classList.add("coop-hit"),20);
+async function completeCoopMember(taskId,studentId){
+    const result=await runCommand({type:"coopComplete",taskId,studentId},`coop:${taskId}:${studentId}`);
+    if(result?.claimed) alert(`恭喜同心協力打敗「${result.monsterName}」！每位成員獲得 ${result.reward} ${result.rewardType==="ticket"?"張樂透券":"代幣"}！`);
+    else if(result) document.getElementById("coopMonsterVisual")?.classList.add("coop-hit");
 }
 
 //商店
@@ -1615,6 +1487,7 @@ function bgCard(id,p){
 }
 
 function shop(id){
+    currentView={type:"shop",id,tab:"clothes"};
     lastShopTab = "clothes";
     openModal(`<h2>${id}號｜商店</h2>
     <div class="tabs">
@@ -1627,6 +1500,7 @@ function shop(id){
     switchShopTab(id, lastShopTab);
 }
 function switchShopTab(id,tab){
+    if(currentView?.type==="shop") currentView.tab=tab;
     lastShopTab = tab;
     const s = state.students[id-1];
     const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
@@ -1656,39 +1530,11 @@ function switchShopTab(id,tab){
     });
 }
 
-function drawLottery(id){
-    const s = state.students[id-1];
-    if(!s || (s.lotteryTickets||0)<1) return alert("樂透券不足！");
-    const clothPool = (s.gender==="M" ? state.clothesM : state.clothesF).filter(item=>item.active!==false);
-    const prizes = [
-        ...clothPool.map(item=>({item,type:"clothes"})),
-        ...state.layouts.filter(item=>item.active!==false).map(item=>({item,type:"layout"})),
-        ...state.backgrounds.filter(item=>item.active!==false).map(item=>({item,type:"background"}))
-    ];
-    if(!prizes.length) return alert("商店目前沒有可抽取的商品！");
-    const roll = Math.random()*100;
-    const wantedLevel = roll<80 ? "R" : roll<95 ? "SR" : roll<99 ? "SSR" : "UR";
-    const levelPrizes = prizes.filter(prize=>(prize.item.level||"R")===wantedLevel);
-    const pool = levelPrizes.length ? levelPrizes : prizes;
-    const prize = pool[Math.floor(Math.random()*pool.length)];
-    s.lotteryTickets -= 1;
-    const addedToWardrobe = addItemToWardrobe(s,prize.type,prize.item.id);
-    const duplicate = !addedToWardrobe;
-    if(duplicate) s.tokens += 20;
-    markChanged(); save(); render();
-    const machine = document.getElementById("gachaMachine");
-    machine?.classList.add("drawing");
-    const resultMessage = duplicate
-        ? `抽中 ${prize.item.level||"R"}｜${prize.item.name}，已擁有此商品，返還 20 代幣！`
-        : `恭喜抽中 ${prize.item.level||"R"}｜${prize.item.name}！`;
-    setTimeout(()=>{
-        machine?.classList.remove("drawing");
-        showLotteryResult(prize.item,resultMessage);
-    },850);
-    const ticketTitle = document.querySelector(".lottery-page h3");
-    if(ticketTitle) ticketTitle.textContent = `持有樂透券：🎟️ ${s.lotteryTickets}`;
-    const drawButton = document.querySelector(".lottery-page > button");
-    if(drawButton) drawButton.disabled = s.lotteryTickets<1;
+async function drawLottery(id){
+    const result=await runCommand({type:"lottery",studentId:id,roll:Math.random(),indexRoll:Math.random()},`lottery:${id}`);
+    if(!result?.item) return;
+    const message=result.duplicate ? `抽中 ${result.item.level||"R"}｜${result.item.name}，已擁有此商品，返還 20 代幣！` : `恭喜抽中 ${result.item.level||"R"}｜${result.item.name}！`;
+    showLotteryResult(result.item,message);
 }
 function showLotteryResult(item,message){
     document.getElementById("lotteryResultPopup")?.remove();
@@ -1706,34 +1552,19 @@ function closeLotteryResultPopup(){
     document.getElementById("lotteryResultPopup")?.remove();
 }
 
-function buyCloth(id,pid){
-    const s = state.students[id-1];
-    const pool = s.gender==="M"?state.clothesM:state.clothesF;
-    const item = pool.find(x=>x.id===pid);
-    if(!item || s.ownedClothes.includes(pid)) return;
-    if(s.tokens < item.price){ alert("代幣不足！"); return; }
-    s.tokens -= item.price; s.ownedClothes.push(pid);
-    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+async function buyCloth(id,pid){
+    await runCommand({type:"purchase",studentId:id,kind:"clothes",itemId:pid},`purchase:${id}:${pid}`);
 }
-function buyLayout(id,pid){
-    const s = state.students[id-1];
-    const item = state.layouts.find(x=>x.id===pid);
-    if(!item || s.ownedLayout.includes(pid)) return;
-    if(s.tokens < item.price){ alert("代幣不足！"); return; }
-    s.tokens -= item.price; s.ownedLayout.push(pid);
-    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+async function buyLayout(id,pid){
+    await runCommand({type:"purchase",studentId:id,kind:"layout",itemId:pid},`purchase:${id}:${pid}`);
 }
-function buyBg(id,pid){
-    const s = state.students[id-1];
-    const item = state.backgrounds.find(x=>x.id===pid);
-    if(!item || s.ownedBg.includes(pid)) return;
-    if(s.tokens < item.price){ alert("代幣不足！"); return; }
-    s.tokens -= item.price; s.ownedBg.push(pid);
-    markChanged(); save(); render(); switchShopTab(id, lastShopTab);
+async function buyBg(id,pid){
+    await runCommand({type:"purchase",studentId:id,kind:"background",itemId:pid},`purchase:${id}:${pid}`);
 }
 
 //衣櫃
 function closet(id,initialTab="clothes"){
+    currentView={type:"closet",id,tab:initialTab};
     openModal(`<h2>${id}號｜衣櫃</h2>
     <div class="closet-layout">
         <div>
@@ -1780,6 +1611,7 @@ function groupedClosetCards(list,card,emptyText){
     }).join("");
 }
 function switchClosetTab(id,tab){
+    if(currentView?.type==="closet") currentView.tab=tab;
     const s = state.students[id-1];
     const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
     let html="";
@@ -1823,30 +1655,28 @@ function switchClosetTab(id,tab){
         el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
     });
 }
-function equipClothes(id,pid){
-    const s = state.students[id-1];
-    s.equippedClothes = (s.equippedClothes===pid) ? null : pid;
-    markChanged(); save(); render(); switchClosetTab(id,"clothes");
+async function equipClothes(id,pid){
+    const student=state.students.find(s=>s.id===id);
+    if(!student) return;
+    await runCommand({type:"equip",studentId:id,kind:"clothes",itemId:student.equippedClothes===pid?null:pid},`equip:${id}:clothes`);
 }
-function toggleEquipLayout(id,pid){
-    const s = state.students[id-1];
-    s.equippedLayout = s.equippedLayout.includes(pid) ? [] : [pid];
-    markChanged(); save(); render(); switchClosetTab(id,"layouts");
+async function toggleEquipLayout(id,pid){
+    const student=state.students.find(s=>s.id===id);
+    if(!student) return;
+    await runCommand({type:"equip",studentId:id,kind:"layout",itemId:student.equippedLayout.includes(pid)?null:pid},`equip:${id}:layout`);
 }
-function equipDefaultPet(id){
-    const s = state.students[id-1];
-    if(!s || s.equippedLayout.length===0) return;
-    s.equippedLayout = [];
-    markChanged(); save(); render(); switchClosetTab(id,"layouts");
+async function equipDefaultPet(id){
+    await runCommand({type:"equip",studentId:id,kind:"layout",itemId:null},`equip:${id}:layout`);
 }
-function equipBg(id,pid){
-    const s = state.students[id-1];
-    s.equippedBg = (s.equippedBg===pid) ? null : pid;
-    markChanged(); save(); render(); switchClosetTab(id,"bgs");
+async function equipBg(id,pid){
+    const student=state.students.find(s=>s.id===id);
+    if(!student) return;
+    await runCommand({type:"equip",studentId:id,kind:"background",itemId:student.equippedBg===pid?null:pid},`equip:${id}:background`);
 }
 
 //後台
 openBackend = function(){
+    currentView={type:"login"};
     openModal(`
     <h2>登入後台</h2>
     <div class="row">
@@ -1862,6 +1692,7 @@ openBackend = function(){
 async function checkBackendPw(){
     const pw = document.getElementById("backendPw").value;
     if(pw === "1127"){
+        backendAuthenticated=true;
         closeModal();
         await backend();
     }else{
@@ -1871,9 +1702,12 @@ async function checkBackendPw(){
 }
 
 async function backend(){
+    currentView={type:"backend"};
     const used = getStorageUsage();
     const usedMb = (used/1024/1024).toFixed(2);
     const full = used > STORAGE_LIMIT * 0.9;
+    const pendingLabels={restore:"備份還原",initialize:"初始化",saveDrawing:"畫板儲存",lottery:"樂透抽獎",purchase:"購買",edit:"後台設定",resources:"資源調整",equip:"裝備設定",completeTask:"完成任務",coopComplete:"協力任務",petMood:"寵物互動"};
+    const pendingHtml=window.firebaseGameStore.pendingActions().map(job=>`<div class="row"><span class="grow">未確認：${esc(pendingLabels[job.command.type]||"操作")}（${esc(new Date(job.createdAt).toLocaleString())}）</span><button onclick="retryPendingAction('${esc(job.id)}')">確認上次操作</button></div>`).join("");
 
     //任務統計
     let taskListHtml = state.tasks.map(t=>{
@@ -1922,9 +1756,9 @@ async function backend(){
                 ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:''}
                 <div class="grow">
                     <div class="edit-item-row">
-                        <input value="${esc(p.name)}" onchange="updateItemName('${listName}','${esc(p.id)}',this.value)" placeholder="名稱">
-                        <select onchange="updateItemLevel('${listName}','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(optionLevel=>`<option value="${optionLevel}" ${(p.level||"R")===optionLevel?"selected":""}>${optionLevel}</option>`).join("")}</select>
-                        <select onchange="updateItemActive('${listName}','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
+                        <input data-field="${listName}:${esc(p.id)}:name" value="${esc(p.name)}" onchange="updateItemName('${listName}','${esc(p.id)}',this.value)" placeholder="名稱">
+                        <select data-field="${listName}:${esc(p.id)}:level" onchange="updateItemLevel('${listName}','${esc(p.id)}',this.value)">${LEVEL_ORDER.map(optionLevel=>`<option value="${optionLevel}" ${(p.level||"R")===optionLevel?"selected":""}>${optionLevel}</option>`).join("")}</select>
+                        <select data-field="${listName}:${esc(p.id)}:active" onchange="updateItemActive('${listName}','${esc(p.id)}',this.value)"><option value="true" ${p.active!==false?"selected":""}>上架</option><option value="false" ${p.active===false?"selected":""}>下架</option></select>
                     </div>
                 </div>
                 <button class="danger" onclick="deleteItem('${listName}','${esc(p.id)}')">刪除</button>
@@ -1959,7 +1793,7 @@ async function backend(){
     openModal(`
     <h2>老師後台</h2>
     <nav class="backend-nav" aria-label="後台功能選單">
-        <button onclick="jumpBackend('backend-overview')">存檔</button>
+        <button onclick="jumpBackend('backend-overview')">備份</button>
         <button onclick="jumpBackend('backend-tasks')">任務</button>
         <button onclick="jumpBackend('backend-tokens')">代幣</button>
         <button onclick="jumpBackend('backend-lottery')">樂透</button>
@@ -1972,13 +1806,15 @@ async function backend(){
         <button onclick="jumpBackend('backend-album')">畫冊</button>
     </nav>
     <div id="backend-overview" class="backend-page active">
+      ${pendingHtml}
       <div class="row">
         <div class="grow">
             <div class="info">儲存空間：已用 ${usedMb} MB / 5 MB</div>
             ${full ? `<div class="warn">⚠️ 空間即將滿！建議刪除不用的商品</div>`:""}
         </div>
-        <button onclick="exportData()">匯出備份</button>
-        <button class="warning" onclick="document.getElementById('importFile').click()">匯入備份</button>
+        <button onclick="exportData()">下載備份</button>
+        <button onclick="initializeCloud()">初始化空白雲端</button>
+        <button class="warning" onclick="document.getElementById('importFile').click()">從備份還原</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
       </div>
     </div>
@@ -2125,7 +1961,7 @@ async function backend(){
         <div class="row">
             <b style="min-width:45px">${s.id}</b>
             <label>性別：
-                <select onchange="setStudentGender(${s.id},this.value)">
+                <select data-field="students:${s.id}:gender" onchange="setStudentGender(${s.id},this.value)">
                     <option value="M" ${s.gender==="M"?"selected":""}>男生</option>
                     <option value="F" ${s.gender==="F"?"selected":""}>女生</option>
                 </select>
@@ -2383,24 +2219,32 @@ function moveItem(listName,id,direction){
 }
 
 //修改商品名稱、價格
-function updateItemName(listName,id,newName){
-    const item = state[listName].find(x=>x.id===id);
-    if(!item) return;
-    item.name = newName.trim()||"未命名";
-    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+async function updateItemName(listName,id,newName){
+    const item=state[listName].find(x=>x.id===id);
+    if(!item) return alert("這項商品已被刪除，未儲存的輸入已保留。");
+    const key=`${listName}:${id}:name`,draft=draftFields.get(key);
+    const changes=[{collection:listName,id,action:"set",field:"name",before:draft?draft.before:item.name,value:newName.trim()||"未命名"}];
+
+    const result=await runCommand({type:"edit",changes},key);
+    if(result) draftFields.delete(key);
 }
-function updateItemLevel(listName,id,newLevel){
-    const item = state[listName].find(x=>x.id===id);
-    if(!item || !LEVEL_PRICES[newLevel]) return;
-    item.level = newLevel;
-    item.price = priceForLevel(newLevel);
-    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+async function updateItemLevel(listName,id,newLevel){
+    const item=state[listName].find(x=>x.id===id);
+    if(!item) return alert("這項商品已被刪除，未儲存的輸入已保留。");
+    const key=`${listName}:${id}:level`,draft=draftFields.get(key);
+    const changes=[{collection:listName,id,action:"set",field:"level",before:draft?draft.before:item.level,value:newLevel}];
+    changes.push({collection:listName,id,action:"set",field:"price",before:item.price,value:priceForLevel(newLevel)});
+    const result=await runCommand({type:"edit",changes},key);
+    if(result) draftFields.delete(key);
 }
-function updateItemActive(listName,id,value){
-    const item = state[listName].find(x=>x.id===id);
-    if(!item) return;
-    item.active = value === "true";
-    markChanged(); save(); refreshBackendPage(backendPageId(listName));
+async function updateItemActive(listName,id,value){
+    const item=state[listName].find(x=>x.id===id);
+    if(!item) return alert("這項商品已被刪除，未儲存的輸入已保留。");
+    const key=`${listName}:${id}:active`,draft=draftFields.get(key);
+    const changes=[{collection:listName,id,action:"set",field:"active",before:draft?draft.before === "true":item.active,value:value === "true"}];
+
+    const result=await runCommand({type:"edit",changes},key);
+    if(result) draftFields.delete(key);
 }
 function updateItemPrice(listName,id,newPrice){
     const item = state[listName].find(x=>x.id===id);
@@ -2411,6 +2255,7 @@ function updateItemPrice(listName,id,newPrice){
 
 //批量新增工具函式
 async function batchUploadFiles(fileList, targetArray, prefixName){
+    const listName=["clothesM","clothesF","layouts","backgrounds"].find(key=>state[key]===targetArray);
     const editToken = syncUiEpoch;
     const additions = [];
     for(let i=0;i<fileList.length;i++){
@@ -2427,8 +2272,8 @@ async function batchUploadFiles(fileList, targetArray, prefixName){
         });
     }
     if(!canContinueEdit(editToken)) return;
-    targetArray.push(...additions);
-    markChanged(); save(); refreshBackendPage("backend-" + (targetArray===state.clothesM ? "clothes-m" : targetArray===state.clothesF ? "clothes-f" : targetArray===state.layouts ? "layouts" : "backgrounds"));
+    state[listName].push(...additions);
+    markChanged(); save(); refreshBackendPage(backendPageId(listName));
 }
 
 async function batchAddClothM(){
@@ -2527,185 +2372,117 @@ function deleteWeeklyTask(id){
 }
 
 //學生管理
-function setStudentGender(id,gender){
-    const s = state.students[id-1];
-    if(!s || !["M","F"].includes(gender)) return;
-    s.gender = gender;
-    if(s.equippedClothes && !(gender==="M"?state.clothesM:state.clothesF).some(item=>item.id===s.equippedClothes)){
-        s.equippedClothes = null;
-    }
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
+async function setStudentGender(id,gender){ await runCommand({type:"gender",studentId:id,gender}); }
+
+async function resetStudentCloset(id){
+    if(!confirm(`確定重置${id}號的衣櫃？已購買服裝、寵物與背景將清除。`)) return;
+    await runCommand({type:"resetCloset",studentId:id});
 }
 
-function resetStudentCloset(id){
-    const s = state.students[id-1];
-    if(!s || !confirm(`確定重置${id}號的衣櫃嗎？已購買的服裝、寵物與背景都會清除，代幣不受影響。`)) return;
-    s.ownedClothes = [];
-    s.equippedClothes = null;
-    s.ownedLayout = [];
-    s.equippedLayout = [];
-    s.ownedBg = [];
-    s.equippedBg = null;
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
+async function resetAllStudentResources(){
+    if(!confirm("確定清空全體成員的代幣、樂透券與衣櫃？")) return;
+    await runCommand({type:"resetResources"});
 }
 
-function resetAllStudentResources(){
-    if(!confirm("確定清空全體成員的代幣、樂透券與衣櫃嗎？此動作無法復原。")) return;
-    state.students.forEach(s=>{
-        s.tokens = 0;
-        s.lotteryTickets = 0;
-        s.ownedClothes = [];
-        s.equippedClothes = null;
-        s.ownedLayout = [];
-        s.equippedLayout = [];
-        s.ownedBg = [];
-        s.equippedBg = null;
-    });
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
+async function editToken(id){
+    const student=state.students.find(s=>s.id===id);
+    if(!student) return;
+    const value=prompt(`設定${id}號代幣`,student.tokens);
+    if(value===null) return;
+    await runCommand({type:"resources",studentId:id,field:"tokens",mode:"set",amount:Number(value)});
+}
+async function editLotteryTicket(id){
+    const student=state.students.find(s=>s.id===id);
+    if(!student) return;
+    const value=prompt(`設定${id}號樂透券`,student.lotteryTickets);
+    if(value===null) return;
+    await runCommand({type:"resources",studentId:id,field:"lotteryTickets",mode:"set",amount:Number(value)});
+}
+async function addTokenOne(){
+    await runCommand({type:"resources",studentId:Number(document.getElementById("targetStuId").value),field:"tokens",mode:"add",amount:Number(document.getElementById("deltaToken").value)});
+}
+async function subTokenOne(){
+    await runCommand({type:"resources",studentId:Number(document.getElementById("targetStuId").value),field:"tokens",mode:"add",amount:-Number(document.getElementById("deltaToken").value)});
+}
+async function addLotteryTicketOne(){
+    await runCommand({type:"resources",studentId:Number(document.getElementById("lotteryStuId").value),field:"lotteryTickets",mode:"add",amount:Number(document.getElementById("lotteryDelta").value)});
+}
+async function subLotteryTicketOne(){
+    await runCommand({type:"resources",studentId:Number(document.getElementById("lotteryStuId").value),field:"lotteryTickets",mode:"add",amount:-Number(document.getElementById("lotteryDelta").value)});
+}
+async function addLotteryTicketsAll(){
+    await runCommand({type:"resources",all:true,field:"lotteryTickets",mode:"add",amount:Number(document.getElementById("batchLotteryTicket").value)});
+}
+async function setLotteryTicketsAll(){
+    await runCommand({type:"resources",all:true,field:"lotteryTickets",mode:"set",amount:Number(document.getElementById("batchLotteryTicket").value)});
+}
+async function resetAllLotteryTickets(){
+    if(!confirm("確定重置全體資源為 0？")) return;
+    await runCommand({type:"resources",all:true,field:"lotteryTickets",mode:"set",amount:0});
 }
 
-function editToken(id){
-    const s = state.students[id-1];
-    const val = prompt(`覆蓋設定${id}號代幣，現在：${s.tokens}`, s.tokens);
-    if(val===null) return;
-    const n = Number(val);
-    if(isNaN(n)) return alert("請輸入數字");
-    s.tokens = n;
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
+async function resizeStudentList(){
+    const count=Number(document.getElementById("stuCount").value);
+    if(count<state.students.length && !confirm(`將移除 ${count+1} 號起的成員與進度，確定？`)) return;
+    await runCommand({type:"resizeStudents",count});
 }
-function editLotteryTicket(id){
-    const s = state.students[id-1];
-    const val = prompt(`覆蓋設定${id}號樂透券，現在：${s.lotteryTickets||0}`, s.lotteryTickets||0);
-    if(val===null) return;
-    const n = Math.floor(Number(val));
-    if(!Number.isFinite(n) || n<0) return alert("請輸入大於或等於 0 的整數");
-    s.lotteryTickets = n;
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
+async function addTokenAll(){
+    await runCommand({type:"resources",all:true,field:"tokens",mode:"add",amount:Number(document.getElementById("batchToken").value)});
 }
-function addTokenOne(){
-    const sid = Number(document.getElementById("targetStuId").value);
-    const delta = Number(document.getElementById("deltaToken").value);
-    if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
-    state.students[sid-1].tokens += delta;
-    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+async function setTokenAll(){
+    await runCommand({type:"resources",all:true,field:"tokens",mode:"set",amount:Number(document.getElementById("batchToken").value)});
 }
-function subTokenOne(){
-    const sid = Number(document.getElementById("targetStuId").value);
-    const delta = Number(document.getElementById("deltaToken").value);
-    if(!sid || sid<1 || sid>state.students.length || isNaN(delta)) return alert("輸入不正確");
-    state.students[sid-1].tokens -= delta;
-    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
-}
-function addLotteryTicketOne(){
-    const sid = Number(document.getElementById("lotteryStuId").value);
-    const delta = Math.floor(Number(document.getElementById("lotteryDelta").value));
-    if(!sid || sid<1 || sid>state.students.length || !Number.isFinite(delta) || delta<0) return alert("輸入不正確");
-    state.students[sid-1].lotteryTickets = (state.students[sid-1].lotteryTickets||0) + delta;
-    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
-}
-function subLotteryTicketOne(){
-    const sid = Number(document.getElementById("lotteryStuId").value);
-    const delta = Math.floor(Number(document.getElementById("lotteryDelta").value));
-    if(!sid || sid<1 || sid>state.students.length || !Number.isFinite(delta) || delta<0) return alert("輸入不正確");
-    const student = state.students[sid-1];
-    student.lotteryTickets = Math.max(0,(student.lotteryTickets||0)-delta);
-    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
-}
-function addLotteryTicketsAll(){
-    const value = Math.floor(Number(document.getElementById("batchLotteryTicket").value));
-    if(!Number.isFinite(value) || value<0) return alert("請輸入大於或等於 0 的整數");
-    state.students.forEach(s=>s.lotteryTickets=(s.lotteryTickets||0)+value);
-    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
-}
-function setLotteryTicketsAll(){
-    const value = Math.floor(Number(document.getElementById("batchLotteryTicket").value));
-    if(!Number.isFinite(value) || value<0) return alert("請輸入大於或等於 0 的整數");
-    state.students.forEach(s=>s.lotteryTickets=value);
-    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
-}
-function resetAllLotteryTickets(){
-    if(!confirm("確定將全體成員的樂透券重置為 0？")) return;
-    state.students.forEach(s=>s.lotteryTickets=0);
-    markChanged(); save(); render(); refreshBackendPage("backend-lottery");
-}
-
-function resizeStudentList(){
-    const n = Number(document.getElementById("stuCount").value);
-    if(!n || n<1) return;
-    if(n>state.students.length){
-        for(let i=state.students.length;i<n;i++){
-            state.students.push({
-                id:i+1, gender:i%2===0?"M":"F",
-                tokens:0, lotteryTickets:0, doneTasks:[],
-                petAffection:0, lastPetMoodDate:"",
-                ownedClothes:[], equippedClothes:null,
-                ownedLayout:[], equippedLayout:[],
-                ownedBg:[], equippedBg:null
-            });
-        }
-    }else{
-        state.students.splice(n);
-    }
-    markChanged(); save(); render(); refreshBackendPage("backend-members");
-}
-function addTokenAll(){
-    const v = Number(document.getElementById("batchToken").value)||0;
-    state.students.forEach(s=>s.tokens+=v);
-    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
-}
-function setTokenAll(){
-    const v = Number(document.getElementById("batchToken").value)||0;
-    state.students.forEach(s=>s.tokens=v);
-    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
-}
-function resetAllTokens(){
-    if(!confirm("確定將全體成員的代幣重置為 0？")) return;
-    state.students.forEach(s=>s.tokens=0);
-    markChanged(); save(); render(); refreshBackendPage("backend-tokens");
+async function resetAllTokens(){
+    if(!confirm("確定重置全體資源為 0？")) return;
+    await runCommand({type:"resources",all:true,field:"tokens",mode:"set",amount:0});
 }
 
 //新增商品（單張）
 async function addClothM(){
+    const editToken=syncUiEpoch;
     const name = document.getElementById("mName").value.trim();
     const level = document.getElementById("mLevel").value;
     const price = priceForLevel(level);
     const file = document.getElementById("mImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    if(!img) return;
+    if(!img || !canContinueEdit(editToken)) return;
     state.clothesM.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-m");
 }
 async function addClothF(){
+    const editToken=syncUiEpoch;
     const name = document.getElementById("fName").value.trim();
     const level = document.getElementById("fLevel").value;
     const price = priceForLevel(level);
     const file = document.getElementById("fImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    if(!img) return;
+    if(!img || !canContinueEdit(editToken)) return;
     state.clothesF.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-f");
 }
 async function addLayout(){
+    const editToken=syncUiEpoch;
     const name = document.getElementById("layName").value.trim();
     const level = document.getElementById("layLevel").value;
     const price = priceForLevel(level);
     const file = document.getElementById("layImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    if(!img) return;
+    if(!img || !canContinueEdit(editToken)) return;
     state.layouts.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-layouts");
 }
 async function addBgItem(){
+    const editToken=syncUiEpoch;
     const name = document.getElementById("bgName").value.trim();
     const level = document.getElementById("bgLevel").value;
     const price = priceForLevel(level);
     const file = document.getElementById("bgImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
-    if(!img) return;
+    if(!img || !canContinueEdit(editToken)) return;
     state.backgrounds.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-backgrounds");
 }
@@ -2716,48 +2493,125 @@ function deleteItem(listName,id){
 }
 
 //備份匯入匯出
-function exportData(){
-    const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `五年甲班換裝遊戲_備份_${new Date().toLocaleDateString()}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+async function exportData(){
+    if(!backendAuthenticated) return;
+    try{
+        const latest=await window.readLatestProgress();
+        if(!latest) return alert("雲端目前沒有可備份的資料。");
+        const blob=new Blob([JSON.stringify(latest,null,2)],{type:"application/json"});
+        const url=URL.createObjectURL(blob),link=document.createElement("a");
+        link.href=url;link.download=`班級遊戲_備份_${new Date().toISOString().slice(0,10)}.json`;link.click();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(error){alert("備份下載失敗："+error.message);}
 }
 async function importData(input){
-    const f = input.files[0];
-    if(!f) return;
-    const editToken = syncUiEpoch;
-    const txt = await f.text();
-    if(!canContinueEdit(editToken)) return alert("同步狀態已改變，請重新匯入。");
+    if(!backendAuthenticated || !input.files[0]) return;
     try{
-        const newState = JSON.parse(txt);
-        if(!newState.students) throw new Error("檔案不是有效的備份");
-        if(!confirm("⚠️ 將覆蓋目前所有資料！建議先匯出備份！確定嗎？")) return;
-        // Imported metadata must never choose the write's base revision.
-        const {revision,commitId,baseCommitId,syncVersion,updatedAt} = state;
-        state = normalizeState({...newState,revision,commitId,baseCommitId,syncVersion,updatedAt});
-        markChanged();
-        const synced = await flushSavedState();
-        render();
-        if(window.firebaseGameStore.canEdit()) backend();
-        alert(synced ? "匯入同步流程已完成，請確認目前進度與同步狀態。" : "匯入尚未同步，請查看同步狀態；本機資料已保留。");
-    }catch(e){
-        alert("匯入失敗："+e.message);
-    }
+        const candidate=window.GameOperations.normalizeProgress(JSON.parse(await input.files[0].text()));
+        if(!candidate?.students.length) throw new Error("檔案不是有效的遊戲備份。");
+        const detail=`${candidate.students.length} 位成員、${candidate.tasks.length} 個任務、${candidate.coopTasks.length} 個協力任務、${candidate.drawings.length+candidate.drawingAlbum.length} 張畫作`;
+        if(!confirm(`將以備份還原全班共用資料（${detail}）。所有裝置都會更新，現有進度將被取代。確定還原？`)) return;
+        await runCommand({type:"restore",value:candidate},"restore");
+    }catch(error){alert("還原失敗："+error.message);}
+    input.value="";
 }
 
-//初始化；每 30 秒檢查一次每日與每週任務是否已到出現時間。
-syncScheduledTasks();
+async function retryPendingAction(id){
+    if(!backendAuthenticated) return;
+    const job=window.firebaseGameStore.pendingActions().find(item=>item.id===id);
+    if(!job) return;
+    if(["restore","initialize"].includes(job.command.type) && !confirm("將查證並完成上次已確認的還原／初始化操作，使用上次選擇的資料。確定？")) return;
+    await runCommand(job.command,job.key);
+    refreshVisibleView();
+}
+async function initializeCloud(){
+    if(!backendAuthenticated || !window.firebaseGameStore.canManage()) return;
+    if(!confirm("僅限雲端完全沒有資料時，建立 26 位成員與內建商品。確定初始化？")) return;
+    const previous=state;
+    state=initialProgress();
+    seedBuiltinBoyClothes(false);seedBuiltinGirlClothes(false);seedBuiltinLayouts(false);seedBuiltinBackgrounds(false);
+    const value=structuredClone(state);state=previous;
+    await runCommand({type:"initialize",value},"initialize");
+}
+function refreshVisibleView(){
+    const view=currentView;
+    if(!view) return;
+    if(view.type==="drawing"){
+        const history=document.getElementById("drawingHistory");
+        if(history) history.innerHTML=drawingHistoryHtml();
+        return;
+    }
+    if(view.type==="login") return;
+    if(view.id && ["tasks","shop","closet","pet"].includes(view.type) && !state.students.some(s=>s.id===view.id)){
+        closeModal();return;
+    }
+    const panel=document.querySelector("#modal .panel"),scroll=panel?.scrollTop||0;
+    const page=document.querySelector(".backend-page.active")?.id;
+    const reply=document.getElementById("petMoodReply")?.textContent;
+    refreshingView=true;
+    try{
+        if(view.type==="tasks") tasks(view.id);
+        if(view.type==="shop"){shop(view.id);switchShopTab(view.id,view.tab);}
+        if(view.type==="closet") closet(view.id,view.tab);
+        if(view.type==="pet"){
+            openPetMood(view.id);
+            if(reply) document.getElementById("petMoodReply").textContent=reply;
+        }
+        if(view.type==="coop") openCoopTasks(view.id);
+        if(view.type==="backend"){void backend();if(page) activateBackendPage(page);updateCoopScheduleFields();}
+    }finally{refreshingView=false;if(panel) panel.scrollTop=scroll;}
+}
+const draftFields=new Map();
+document.addEventListener("focusin",event=>{
+    const el=event.target,key=el.dataset?.field;
+    if(key && !draftFields.has(key)) draftFields.set(key,{before:el.value,dirty:false});
+});
+document.addEventListener("focusout",event=>{
+    const key=event.target.dataset?.field;
+    if(key && !draftFields.get(key)?.dirty) draftFields.delete(key);
+});
+document.addEventListener("beforeinput",event=>{
+    const el=event.target,key=el.dataset?.field;
+    if(key && !draftFields.has(key)) draftFields.set(key,{before:el.value,dirty:false});
+});
+document.addEventListener("input",event=>{
+    const key=event.target.dataset?.field;
+    if(key && draftFields.has(key)) draftFields.get(key).dirty=true;
+});
+// Teacher legacy handlers produce per-record/per-field commands. No delayed save.
+const teacherMutations=["dropItem","deleteAlbumDrawing","publishCoopTask","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
+for(const name of teacherMutations){
+    const original=window[name];
+    window[name]=function(...args){
+        if(!backendAuthenticated || !window.firebaseGameStore.canEdit()) return;
+        return original(...args);
+    };
+}
+const sharedMutations=new Set([...teacherMutations,"finishTask","completeCoopMember","buyCloth","buyLayout","buyBg","drawLottery","equipClothes","toggleEquipLayout","equipDefaultPet","equipBg","showPetMoodReply","saveDrawingBoard","editToken","editLotteryTicket","addTokenOne","subTokenOne","addTokenAll","setTokenAll","resetAllTokens","addLotteryTicketOne","subLotteryTicketOne","addLotteryTicketsAll","setLotteryTicketsAll","resetAllLotteryTickets"]);
+function updateCloudControls(){
+    document.querySelectorAll("button[onclick],input[onchange],select[onchange]").forEach(el=>{
+        const name=(el.getAttribute("onclick")||el.getAttribute("onchange")||"").match(/^([A-Za-z_$][\w$]*)\(/)?.[1];
+        if(!sharedMutations.has(name)) return;
+        if(!window.firebaseGameStore.canEdit()){
+            if(el.dataset.cloudDisabled===undefined) el.dataset.cloudDisabled=String(el.disabled);
+            el.disabled=true;
+        }else if(el.dataset.cloudDisabled!==undefined){
+            el.disabled=el.dataset.cloudDisabled==="true";
+            delete el.dataset.cloudDisabled;
+        }
+    });
+}
+// 啟動只呈現快取；排程檢查另以明確操作在最新雲端資料上執行。
 render();
 setInterval(syncScheduledTasks,30000);
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { getDatabase, onValue, ref, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
-  import { createCloudSync, saveConflictBackup, canonical } from "./cloud-sync.mjs";
-
+  import { getDatabase, onValue, ref } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { createCloudSync } from "./cloud-sync.mjs";
+  import { createFirebaseStore, createTokenProvider } from "./firebase-store.mjs";
+  import * as GameOperations from "./game-operations.mjs";
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
     authDomain: "classroom-115.firebaseapp.com",
@@ -2768,91 +2622,37 @@ setInterval(syncScheduledTasks,30000);
     appId: "1:242136273912:web:8bd1b43dc7d8ecc698fc0d"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const database = getDatabase(app);
-  const gameRef = ref(database, CLOUD_SAVE_PATH);
-  // The REST read has no offline-cache fallback. RTDB's get() can return cached
-  // data when disconnected, which must not unlock an old page after resume.
-  async function readServerState(){
-    if(!auth.currentUser) throw new Error("尚未完成登入，請重新連線。");
-    const controller = new AbortController();
-    const timer = setTimeout(()=>controller.abort(),15000);
-    try{
-      const token = await auth.currentUser.getIdToken();
-      const url = `${firebaseConfig.databaseURL}/${CLOUD_SAVE_PATH}.json?auth=${encodeURIComponent(token)}`;
-      const response = await fetch(url,{cache:"no-store",signal:controller.signal});
-      if(!response.ok) throw new Error(`雲端讀取失敗 (${response.status})`);
-      return await response.json();
-    }finally{
-      clearTimeout(timer);
-    }
-  }
-  function showCloudError(error){
-    console.error("Firebase 同步失敗",error);
-    setSyncStatus("⚠️ 同步未完成，已暫停操作並保留本機資料。請確認網路、更新網頁或按重試。" + (error.message || ""));
-  }
-  const sync = createCloudSync({
-    getState:()=>state,
-    isDirty:()=>unsavedChange,
-    lock:setSyncLocked,
-    status:setSyncStatus,
-    error:showCloudError,
-    readRemote:readServerState,
-    newId:()=>crypto.randomUUID(),
-    serverTimestamp,
-    async transact(update){
-      const result = await runTransaction(gameRef,update,{applyLocally:false});
-      return {committed:result.committed,value:result.snapshot.val()};
-    },
-    async backup(record){
-      await saveConflictBackup(record);
-    },
-    shouldBackupInitial:remote=>Boolean(raw && canonical(JSON.parse(raw)) !== canonical(remote)),
-    applyState(remote){
-      if(!applyCloudState(remote)) throw new Error("雲端進度無法套用，已停止同步。");
-    },
-    acknowledge(remote){
-      if(remote){
-        for(const key of ["revision","commitId","baseCommitId","syncVersion","updatedAt","lastSaved"]){
-          if(remote[key] !== undefined) state[key] = remote[key];
-        }
+
+  window.GameOperations=GameOperations;
+  const app=initializeApp(firebaseConfig),auth=getAuth(app),database=getDatabase(app);
+  let serverOffset=0;
+  const pendingKey="classroom-pending-operations";
+  const store=createFirebaseStore({
+      databaseURL:firebaseConfig.databaseURL,
+      getToken:createTokenProvider(auth,signInAnonymously),getUid:()=>auth.currentUser.uid,
+      now:()=>Date.now()+serverOffset
+  });
+  window.readLatestProgress=store.readRemote;
+  const sync=createCloudSync({
+      ...store,applyState:applyCloudState,lock:setSyncLocked,status:setSyncStatus,
+      error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},
+      newId:()=>crypto.randomUUID(),now:()=>Date.now()+serverOffset,
+      loadPending:()=>{try{return JSON.parse(sessionStorage.getItem(pendingKey)||"[]");}catch{return [];}},
+      persistPending:jobs=>sessionStorage.setItem(pendingKey,JSON.stringify(jobs)),
+      recovered:(command,result)=>{
+          if(command.type==="lottery" && result?.item) showLotteryResult(result.item,`上次抽獎結果：${result.item.name}${result.duplicate?"，重複商品已返還 20 代幣":""}`);
       }
-      unsavedChange = false;
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
-    },
-    reconcile:reconcileBuiltinCatalog
   });
-  window.firebaseGameStore = sync;
-  sync.setActive(!document.hidden);
-  document.addEventListener("visibilitychange",()=>{
-    persistPendingLocally();
-    sync.setActive(!document.hidden);
-  });
+  window.firebaseGameStore=sync;
+  document.addEventListener("visibilitychange",()=>sync.setActive(!document.hidden));
   window.addEventListener("pagehide",()=>sync.setActive(false));
   window.addEventListener("pageshow",()=>sync.setActive(!document.hidden));
   window.addEventListener("focus",()=>sync.setActive(!document.hidden));
   window.addEventListener("offline",()=>sync.setConnected(false));
-  window.addEventListener("online",()=>{ void sync.refresh(); });
-  try{
-    await signInAnonymously(auth);
-    onValue(ref(database,".info/connected"),snapshot=>sync.setConnected(snapshot.val() === true),error=>{
-      sync.setConnected(false);
-      showCloudError(error);
-    });
-    onValue(gameRef,snapshot=>sync.remoteChanged(snapshot.val()),error=>{
-      sync.setConnected(false);
-      showCloudError(error);
-    });
-  }catch(error){
-    sync.setConnected(false);
-    showCloudError(error);
-  }
+  window.addEventListener("online",()=>sync.setConnected(true));
+  onValue(ref(database,".info/serverTimeOffset"),snapshot=>{serverOffset=snapshot.val()||0;});
+  if(navigator.onLine) sync.setConnected(true);
+  else setSyncStatus("離線中");
 </script>
 </body>
 </html>
-
-
-
-
-

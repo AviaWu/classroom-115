@@ -18,14 +18,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/*.test.mjs
+      - run: npm ci --ignore-scripts
+      - run: npm test
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
       - run: npm install --global firebase-tools@15.30.0
       - name: Validate database rules against emulator
-        run: firebase emulators:exec --config firebase.emulator.json --project demo-classroom-sync --only database "node --test tests/database-rules.emulator.mjs"
+        run: firebase emulators:exec --config firebase.emulator.json --project demo-classroom-sync --only database "npm run test:emulator"
       - name: Deploy rules before allowing new clients
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLASSROOM_115 }}

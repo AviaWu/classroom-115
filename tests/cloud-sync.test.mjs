@@ -1,114 +1,119 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCloudSync, makeWrite, sameBase, validVersion} from '../public/cloud-sync.mjs';
-
-const clone = value => structuredClone(value);
-const progress = (revision = 10, tokens = 20) => ({students:[{id:1,tokens}],lastSaved:'2026-09-15T01:00:00Z',revision,commitId:`commit-${revision}-abcdefghijkl`,syncVersion:3});
-function harness(initial = progress(), options = {}) {
-    let remote = clone(initial), local = clone(initial), dirty = false, writes = 0, counter = 0;
-    const backups = [], errors = [], locks = [], messages = [];
-    let readHook, transactionHook;
-    const sync = createCloudSync({
-        getState:()=>local, isDirty:()=>dirty, lock:value=>locks.push(value), status:value=>messages.push(value), error:value=>errors.push(value),
-        readRemote:async()=>readHook ? readHook() : clone(remote),
-        newId:()=>`new-commit-abcdefghijkl-${++counter}`, serverTimestamp:()=>123,
-        transact:async update=>{
-            if(options.emptyCacheOnce){options.emptyCacheOnce=false;return {committed:false,value:null};}
-            if(options.alwaysAbort) return {committed:false,value:null};
-            if(transactionHook) await transactionHook();
-            const next = update(clone(remote));
-            if(next !== undefined){ remote = clone(next); writes++; }
-            return {committed:next !== undefined,value:clone(remote)};
+import {createCloudSync} from '../public/cloud-sync.mjs';
+const clone = x => structuredClone(x);
+const progress = tokens => ({students:[{id:1,tokens}],tasks:[]});
+function harness(options={}) {
+    let remote=progress(20),local=progress(999),writes=0,reads=0,nextId=0,readHook,executeHook;
+    const messages=[],locks=[],errors=[],receipts=new Map(),stored=[];
+    let tick,interval;
+    const sync=createCloudSync({
+        readRemote:async()=>{reads++;return readHook ? readHook() : clone(remote);},
+        execute:async job=>{
+            if(executeHook) await executeHook(job);
+            if(receipts.has(job.id)) return clone(receipts.get(job.id));
+            remote.students[0].tokens+=job.command.amount;
+            writes++;
+            const outcome={progress:clone(remote),result:{tokens:remote.students[0].tokens}};
+            receipts.set(job.id,outcome);return outcome;
         },
-        backup:async record=>{ if(options.backupFails) throw new Error('quota'); backups.push(clone(record)); },
-        shouldBackupInitial:()=>false,
-        applyState:value=>{local=clone(value);dirty=false;},
-        acknowledge:value=>{ if(value) for(const k of ['revision','commitId','syncVersion','lastSaved','updatedAt']) local[k]=value[k]; dirty=false; },
-        reconcile:()=>false
+        readReceipt:async id=>receipts.has(id)?{result:receipts.get(id).result}:null,
+        applyState:value=>{local=clone(value);},lock:x=>locks.push(x),status:x=>messages.push(x),error:e=>errors.push(e),
+        newId:()=>`operation-${++nextId}`,now:()=>1000,
+        persistPending:jobs=>{stored.splice(0,stored.length,...clone(jobs));},loadPending:()=>options.pending||[],
+        setInterval:(fn,ms)=>{tick=fn;interval=ms;return 1;},clearInterval:()=>{},
     });
-    return {sync,backups,errors,locks,messages,
-        get remote(){return remote;}, set remote(v){remote=clone(v);},
-        get local(){return local;}, get writes(){return writes;},
-        edit(tokens){local.students[0].tokens=tokens;dirty=true;},
-        queue(tokens){local.students[0].tokens=tokens;dirty=false;return sync.queueSave(local);},
-        setRead(fn){readHook=fn;},setTransaction(fn){transactionHook=fn;},
+    return {sync,messages,locks,errors,stored,receipts,
+        get remote(){return remote;},set remote(v){remote=clone(v);},get local(){return local;},get writes(){return writes;},get reads(){return reads;},get interval(){return interval;},
+        setRead:fn=>readHook=fn,setExecute:fn=>executeHook=fn,tick:()=>tick(),
         async start(){sync.setConnected(true);await sync.refresh();}
     };
 }
-
-test('save advances version, not timestamp ordering; no-op refresh does not write',async()=>{
-    const h=harness();await h.start();assert.equal(h.sync.canEdit(),true);
-    assert.equal(h.queue(100),true);assert.equal(h.sync.canEdit(),false);await h.sync.flush();
-    assert.equal(h.remote.revision,11);assert.equal(h.remote.students[0].tokens,100);
-    assert.equal(h.remote.baseCommitId,'commit-10-abcdefghijkl');
-    await h.sync.refresh();assert.equal(h.writes,1);
+test('opening and refreshing reads cloud without uploading local state or migrating metadata',async()=>{
+    const h=harness();h.remote={...progress(42),revision:7,syncVersion:3};await h.start();
+    assert.equal(h.local.students[0].tokens,42);assert.equal(h.writes,0);
+    await h.sync.refresh();assert.equal(h.writes,0);
 });
-test('A resumes after B updated: read latest before allowing edits',async()=>{
-    const h=harness();await h.start();h.sync.setActive(false);
-    h.remote=progress(11,100);assert.equal(h.queue(25),false);
-    h.sync.setActive(true);await h.sync.refresh();
-    assert.equal(h.local.students[0].tokens,100);assert.equal(h.writes,0);assert.equal(h.sync.canEdit(),true);
+test('polling reads changed cloud data at five seconds and emits no processing message',async()=>{
+    const h=harness();await h.start();assert.equal(h.interval,5000);
+    h.remote=progress(50);await h.tick();assert.equal(h.local.students[0].tokens,50);
+    assert.ok(h.messages.every(x=>x==='' || x==='離線中'));
 });
-test('dirty A offline versus B update: backup and discard stale write',async()=>{
-    const h=harness();await h.start();h.edit(25);h.sync.setConnected(false);
-    h.local.lastSaved='2099-01-01T00:00:00Z';h.remote=progress(11,100);
-    h.sync.setConnected(true);await h.sync.refresh();
-    assert.equal(h.writes,0);assert.equal(h.local.students[0].tokens,100);
-    assert.equal(h.backups[0].local.students[0].tokens,25);assert.equal(h.backups[0].base.revision,10);
+test('actions write immediately while other controls remain available',async()=>{
+    const h=harness();await h.start();let release;
+    h.setExecute(()=>new Promise(r=>release=r));
+    const pending=h.sync.perform({type:'resources',amount:5},'one');await Promise.resolve();
+    assert.equal(h.sync.canEdit(),true);release();await pending;
+    assert.equal(h.remote.students[0].tokens,25);assert.equal(h.writes,1);
 });
-test('B wins between A read and transaction; transaction rejects A original base',async()=>{
-    const h=harness();await h.start();let first=true;
-    h.setTransaction(()=>{if(first){first=false;h.remote=progress(11,100);}});
-    h.queue(25);await h.sync.flush();
-    assert.equal(h.writes,0);assert.equal(h.local.students[0].tokens,100);assert.equal(h.backups.length,1);
+test('double clicks reuse one in-flight action',async()=>{
+    const h=harness();await h.start();
+    const a=h.sync.perform({type:'resources',amount:5},'same');
+    const b=h.sync.perform({type:'resources',amount:5},'same');await Promise.all([a,b]);
+    assert.equal(h.writes,1);
 });
-test('remote event during write is not lost',async()=>{
-    const h=harness();await h.start();let first=true;
-    h.setTransaction(()=>{if(first){first=false;h.remote=progress(11,200);h.sync.remoteChanged(h.remote);}});
-    h.queue(25);await h.sync.flush();assert.equal(h.local.students[0].tokens,200);assert.equal(h.writes,0);
+test('concurrent queued actions preserve both deltas',async()=>{
+    const h=harness();await h.start();
+    await Promise.all([h.sync.perform({type:'resources',amount:5},'a'),h.sync.perform({type:'resources',amount:7},'b')]);
+    assert.equal(h.remote.students[0].tokens,32);assert.equal(h.local.students[0].tokens,32);
 });
-test('network failure holds pending original base; explicit retry detects conflict',async()=>{
-    const h=harness();await h.start();h.setRead(()=>{throw new Error('offline');});
-    h.queue(25);await h.sync.flush();assert.equal(h.sync.canEdit(),false);assert.equal(h.errors.length,1);
-    h.remote=progress(11,100);h.setRead(null);await h.sync.refresh();
-    assert.equal(h.backups.length,1);assert.equal(h.writes,0);assert.equal(h.sync.canEdit(),true);
+test('old polling response cannot overwrite an acknowledged action',async()=>{
+    const h=harness();await h.start();let release;
+    h.setRead(()=>new Promise(r=>release=r));const reading=h.sync.refresh();await Promise.resolve();
+    h.setRead(null);await h.sync.perform({type:'resources',amount:5},'a');
+    release(progress(20));await reading;assert.equal(h.local.students[0].tokens,25);
 });
-test('backup failure must not replace local data or unlock',async()=>{
-    const h=harness(progress(),{backupFails:true});await h.start();h.edit(25);h.sync.setActive(false);
-    h.remote=progress(11,100);h.sync.setActive(true);await h.sync.refresh();
-    assert.equal(h.local.students[0].tokens,25);assert.equal(h.writes,0);assert.equal(h.sync.canEdit(),false);
+test('offline blocks mutations; reconnect reads before unlocking',async()=>{
+    const h=harness();await h.start();h.sync.setConnected(false);
+    assert.equal(h.sync.canEdit(),false);
+    await assert.rejects(h.sync.perform({type:'resources',amount:5},'a'));
+    h.remote=progress(70);h.sync.setConnected(true);assert.equal(h.sync.canEdit(),false);
+    await h.sync.refresh();assert.equal(h.local.students[0].tokens,70);assert.equal(h.writes,0);
+    assert.ok(h.messages.includes('離線中'));
 });
-test('reconnect while same read is in flight cannot unlock using pre-disconnect response',async()=>{
-    const h=harness();await h.start();let resolve;let first=true;
-    h.setRead(()=>{if(first){first=false;return new Promise(r=>resolve=r);}return clone(h.remote);});
-    const run=h.sync.refresh();await Promise.resolve();h.sync.setConnected(false);h.remote=progress(11,100);h.sync.setConnected(true);
-    resolve(progress());await run;assert.equal(h.local.students[0].tokens,100);assert.equal(h.sync.canEdit(),true);
+test('uncertain network outcome retries same operation id after server read',async()=>{
+    const h=harness();await h.start();let first=true,seen=[];
+    h.setExecute(job=>{seen.push(job.id);if(first){first=false;throw Object.assign(new Error('network'),{retryable:true});}});
+    const pending=h.sync.perform({type:'resources',amount:5},'a');
+    await new Promise(r=>setImmediate(r));assert.equal(h.sync.canEdit(),false);assert.equal(h.stored.length,1);
+    await h.sync.refresh();await pending;
+    assert.equal(seen[0],seen[1]);assert.equal(h.writes,1);assert.equal(h.stored.length,0);
 });
-test('legacy migration compares entire original snapshot',async()=>{
-    const legacy={students:[{id:1,tokens:100}],lastSaved:'2026-09-15T07:00:00Z',syncVersion:2};
-    const h=harness(legacy);await h.start();assert.equal(h.remote.revision,1);assert.equal(h.remote.syncVersion,3);assert.equal(h.remote.students[0].tokens,100);
-    assert.equal(sameBase({...legacy,students:[{id:1,tokens:20}]},legacy),false);
+test('returning to tab refreshes cloud without uploading cached changes',async()=>{
+    const h=harness();await h.start();h.sync.setActive(false);h.remote=progress(81);
+    h.sync.setActive(true);await h.sync.refresh();assert.equal(h.local.students[0].tokens,81);assert.equal(h.writes,0);
 });
-test('deleted cloud state cannot be resurrected by previously loaded page',async()=>{
-    const h=harness();await h.start();h.remote=null;await h.sync.refresh();assert.equal(h.writes,0);assert.equal(h.sync.canEdit(),false);
+test('empty cloud clears displayed old progress and does not recreate it',async()=>{
+    const h=harness();await h.start();h.remote=null;await h.sync.refresh();
+    assert.equal(h.local,null);assert.equal(h.sync.canEdit(),false);assert.equal(h.writes,0);assert.equal(h.sync.canManage(),true);
 });
-test('SDK empty cache abort does not discard valid pending work',async()=>{
-    const h=harness(progress(),{emptyCacheOnce:true});await h.start();h.queue(55);await h.sync.flush();
-    assert.equal(h.remote.students[0].tokens,55);assert.equal(h.writes,1);assert.equal(h.backups.length,0);
+test('reload only checks unresolved receipts and never resends them automatically',async()=>{
+    const h=harness({pending:[{id:'old-op',key:'a',createdAt:1000,command:{type:'resources',amount:5}}]});
+    await h.start();await h.tick();assert.equal(h.writes,0);assert.equal(h.sync.hasPendingSave(),true);
+    await h.sync.perform({type:'resources',amount:5},'a');assert.equal(h.writes,1);
 });
-test('repeated transaction aborts stop retrying and retain pending data',async()=>{
-    const h=harness(progress(),{alwaysAbort:true});await h.start();h.queue(55);await h.sync.flush();
-    assert.equal(h.sync.canEdit(),false);assert.equal(h.sync.hasPendingSave(),true);assert.equal(h.errors.length,1);assert.equal(h.writes,0);
+test('domain rejection leaves confirmed cloud progress intact and permits following actions',async()=>{
+    const h=harness();await h.start();h.setExecute(()=>{throw new Error('代幣不足');});
+    await assert.rejects(h.sync.perform({type:'resources',amount:5},'a'),/代幣不足/);
+    assert.equal(h.local.students[0].tokens,20);assert.equal(h.sync.canEdit(),true);assert.equal(h.stored.length,0);
 });
-test('conflict flush returns false rather than reporting save success',async()=>{
-    const h=harness();await h.start();h.remote=progress(11,100);h.queue(55);
-    assert.equal(await h.sync.flush(),false);assert.equal(h.sync.canEdit(),true);assert.equal(h.local.students[0].tokens,100);
+test('failure to clear local pending storage after cloud acknowledgement does not lose success',async()=>{
+    let saves=0;
+    const sync=createCloudSync({readRemote:async()=>progress(20),execute:async()=>({progress:progress(25),result:{ok:true}}),applyState(){},lock(){},status(){},error(){},newId:()=> 'persist-id',setInterval:()=>1,clearInterval(){},persistPending:()=>{if(++saves>1)throw new Error('storage unavailable');}});
+    sync.setConnected(true);await sync.refresh();
+    const result=await sync.perform({type:'resources',amount:5},'a');assert.equal(result.ok,true);assert.equal(sync.hasPendingSave(),false);
 });
-test('future/invalid protocol does not unlock or write',async()=>{
-    const h=harness({...progress(),syncVersion:4});await h.start();assert.equal(h.sync.canEdit(),false);assert.equal(h.writes,0);
+test('different actions with the same control key are both committed in order',async()=>{
+    const h=harness();await h.start();await Promise.all([h.sync.perform({type:'resources',amount:5},'same-control'),h.sync.perform({type:'resources',amount:7},'same-control')]);
+    assert.equal(h.remote.students[0].tokens,32);assert.equal(h.writes,2);
 });
-test('import metadata cannot change write base; clock skew has no effect',()=>{
-    const base=progress();const payload=makeWrite({...progress(999,50),lastSaved:'1900-01-01T00:00:00Z'},base,'unique-commit-abcdefghijkl',123);
-    assert.equal(payload.revision,11);assert.equal(payload.baseCommitId,base.commitId);assert.equal(validVersion(payload),true);
-    assert.equal(sameBase(progress(11),base),false);
+test('a newly confirmed restore never silently replays a different pending backup',async()=>{
+    const h=harness({pending:[{id:'pending-restore',key:'restore',createdAt:1000,command:{type:'restore',value:progress(1)}}]});await h.start();
+    await assert.rejects(h.sync.perform({type:'restore',value:progress(99)},'restore'),/未確認/);assert.equal(h.writes,0);
+});
+test('poll ticks during a slow server read coalesce without keeping refresh alive forever',async()=>{
+    const h=harness();await h.start();let release,first=true;
+    h.setRead(()=>{if(first){first=false;return new Promise(r=>release=r);}return progress(20);});
+    const count=h.reads,reading=h.sync.refresh();await Promise.resolve();void h.tick();release(progress(20));await reading;
+    assert.equal(h.reads-count,1);
 });
