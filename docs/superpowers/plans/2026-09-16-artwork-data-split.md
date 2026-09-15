@@ -235,7 +235,7 @@ assert.ok(backup.drawings.every(item=>item.data.startsWith('data:image/')));
 assert.equal('drawingAlbum' in backup,false);
 ```
 
-Add restore coverage proving a legacy backup with five drawings restores only the three greatest valid `savedAt` values. Add migration coverage proving page load performs no writes and explicit migration removes embedded `data` and `drawingAlbum` only after three artwork uploads succeed.
+Add restore coverage proving a backup with five complete current drawings restores only the three greatest valid `savedAt` values under fresh IDs. Add cleanup coverage proving page load performs no writes and explicit teacher confirmation clears legacy `drawings` and `drawingAlbum` without uploading them.
 
 - [ ] **Step 2: Run integration tests and confirm album/backup behavior fails**
 
@@ -259,7 +259,7 @@ async function buildCompleteBackup(progress) {
 }
 ```
 
-Restore and migration select the newest three valid records from legacy `drawings` plus `drawingAlbum`, upload their payloads, then submit sanitized `restore` or `migrateArtworks` commands. Keep migration behind a teacher confirmation that states historical drawings are permanently removed.
+Restore selects the newest three complete records from `drawings`, assigns fresh IDs, uploads their payloads, then submits a sanitized `restore` command. Ignore legacy `drawingAlbum`. Keep legacy cleanup behind a teacher confirmation that states all old drawings are permanently removed, then submit `migrateArtworks` with an empty list.
 
 - [ ] **Step 5: Run complete Node and emulator tests**
 
