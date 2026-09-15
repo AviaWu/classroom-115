@@ -14,7 +14,7 @@
 
 - Artwork payload path is exactly `/artworks/classroom-115/{drawingId}`.
 - `progress.drawings` contains at most three `{id, savedAt}` records and never contains image `data` after migration.
-- `progress.drawingAlbum` is removed and rejected by new writes.
+- New-format progress has no `drawingAlbum`; legacy embedded drawings may only remain byte-for-byte unchanged until explicit migration.
 - Normal five-second progress reads never request artwork payloads.
 - The open drawing modal refreshes from the latest three indexes every five seconds and does not redownload an unchanged ID.
 - Closed drawing UI performs no artwork reads.
@@ -60,16 +60,15 @@ Expected: FAIL because `drawingAlbum` is still populated and `confirmArtworkDele
 - [ ] **Step 3: Normalize indexes and implement both commands**
 
 ```js
-progress.drawings = array(progress.drawings)
+const indexedDrawings = array(progress.drawings)
   .filter(item=>object(item) && validDrawingId(item.id) && Number.isFinite(Date.parse(item.savedAt)))
   .map(({id,savedAt})=>({id,savedAt}))
   .sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt))
   .slice(0,3);
-delete progress.drawingAlbum;
 progress.pendingArtworkDeletes = unique(progress.pendingArtworkDeletes).filter(validDrawingId);
 ```
 
-Implement `saveDrawing` with metadata validation, deduplication, three-item slicing, and evicted-ID queuing. Implement `confirmArtworkDeletion` so it removes only `command.drawingId` from the queue. Implement `migrateArtworks` so an explicit operation replaces legacy embedded drawings with at most three metadata records and deletes `drawingAlbum`. Remove `drawings` and `drawingAlbum` from generic teacher-edit collections so teacher bulk edits cannot forge artwork state.
+Preserve legacy embedded `data` and `drawingAlbum` unchanged during normalization and every unrelated operation. Reject `saveDrawing` while either legacy form exists. Implement `saveDrawing` with metadata validation, deduplication, three-item slicing, and evicted-ID queuing for migrated data. Implement `confirmArtworkDeletion` so it removes only `command.drawingId` from the queue. Implement `migrateArtworks` so an explicit operation replaces legacy embedded drawings with at most three metadata records and deletes `drawingAlbum`. Remove `drawings` and `drawingAlbum` from generic teacher-edit collections so teacher bulk edits cannot forge artwork state.
 
 When `restore` replaces progress, compare the old and restored drawing IDs, add displaced IDs to the restored `pendingArtworkDeletes`, and preserve already-pending cleanup IDs. This prevents a restore from leaking artwork payloads that are no longer among its newest three.
 
@@ -133,7 +132,7 @@ Keep authentication, `cache:'no-store'`, timeout coverage, and retryable error c
 
 - [ ] **Step 4: Add restrictive artwork and progress rules**
 
-Add `/artworks/classroom-115/$drawingId` read/write validation for authenticated users, key/id equality, prefix and length, ISO timestamp length, allowed Data URL prefix, exact children, and 1,500,000-character limit. Add `drawings`, `drawingAlbum`, and `pendingArtworkDeletes` validations under progress; add `confirmArtworkDeletion` and `migrateArtworks` to receipt types.
+Add `/artworks/classroom-115/$drawingId` read/write validation for authenticated users, key/id equality, prefix and length, ISO timestamp length, allowed Data URL prefix, exact children, and 1,500,000-character limit. Add `drawings`, `drawingAlbum`, and `pendingArtworkDeletes` validations under progress; add `confirmArtworkDeletion` and `migrateArtworks` to receipt types. Rules allow pre-existing embedded drawing data and `drawingAlbum` only when they remain byte-for-byte unchanged during a non-migration write, preventing both accidental loss and new legacy payloads.
 
 - [ ] **Step 5: Run store unit tests and emulator suites**
 
@@ -246,7 +245,7 @@ Expected: FAIL because the backend still renders the album and backup exports em
 
 - [ ] **Step 3: Remove album UI and functions**
 
-Remove the backend navigation button, `backend-album` section, album CSS, `downloadAlbumDrawing`, `deleteAlbumDrawing`, and any `refreshBackendPage('backend-album')` calls. Remove `drawingAlbum` from default and browser normalization state.
+Remove the backend navigation button, `backend-album` section, album CSS, `downloadAlbumDrawing`, `deleteAlbumDrawing`, and any `refreshBackendPage('backend-album')` calls. Remove `drawingAlbum` from new default state while retaining hidden read compatibility for legacy data until explicit migration.
 
 - [ ] **Step 4: Assemble complete backups and sanitize restores**
 
