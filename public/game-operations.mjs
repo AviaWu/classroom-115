@@ -34,7 +34,8 @@ function drawingIds(value) {
     return new Set(array(value).filter(item=>object(item) && validDrawingId(item.id)).map(item=>item.id));
 }
 function addArtworkDeletes(progress, ids) {
-    progress.pendingArtworkDeletes = unique([...progress.pendingArtworkDeletes,...ids]).filter(validDrawingId);
+    const retained = drawingIds(progress.drawings);
+    progress.pendingArtworkDeletes = unique([...progress.pendingArtworkDeletes,...ids]).filter(id=>validDrawingId(id) && !retained.has(id));
 }
 
 function equal(left, right) {

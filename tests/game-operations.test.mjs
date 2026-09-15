@@ -237,7 +237,7 @@ test('restore queues displaced external artwork while preserving cleanup already
     delete restored.drawingAlbum;
     const result = run(current,'restore',{value:restored});
     assert.deepEqual(result.progress.drawings.map(item=>item.id),['drawing_5','drawing_4','drawing_3']);
-    assert.deepEqual(result.progress.pendingArtworkDeletes,['drawing_existing','drawing_pending','drawing_3','drawing_2','drawing_1']);
+    assert.deepEqual(result.progress.pendingArtworkDeletes,['drawing_existing','drawing_pending','drawing_2','drawing_1']);
 });
 
 test('teacher edit changes cannot replace drawing indexes or legacy albums', () => {
