@@ -7,7 +7,7 @@
         ".read": "auth != null",
         ".write": "auth != null && newData.hasChildren(['progress', 'operations', 'lastOperationId']) && newData.child('lastOperationId').isString() && !data.child('operations').child(newData.child('lastOperationId').val()).exists() && newData.child('operations').child(newData.child('lastOperationId').val()).child('uid').val() === auth.uid && newData.child('operations').child(newData.child('lastOperationId').val()).child('committedAt').val() === now && (!data.child('lastOperationId').exists() || newData.child('operations').child(data.child('lastOperationId').val()).exists()) && (data.child('progress').exists() || (newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore')) && (newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() !== 'initialize' || !data.child('progress').exists()) && (!data.child('restoredAt').exists() || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('createdAt').val() > data.child('restoredAt').val()) && (((newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore') && newData.child('restoredAt').val() === now) || (!(newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore') && newData.child('restoredAt').val() === data.child('restoredAt').val()))",
         "progress": {
-          ".validate": "newData.hasChildren(['students', 'lastSaved']) && !newData.hasChild('syncVersion') && !newData.hasChild('revision') && !newData.hasChild('baseCommitId') && !newData.hasChild('commitId') && !newData.hasChild('updatedAt') && ((!data.child('drawingAlbum').exists() || newData.parent().child('operations').child(newData.parent().child('lastOperationId').val()).child('type').val() === 'migrateArtworks' || newData.parent().child('operations').child(newData.parent().child('lastOperationId').val()).child('type').val() === 'restore' || newData.child('drawingAlbum').val() === data.child('drawingAlbum').val()) && ((!data.child('drawings').child('0').child('data').exists() && !data.child('drawings').child('1').child('data').exists() && !data.child('drawings').child('2').child('data').exists()) || newData.parent().child('operations').child(newData.parent().child('lastOperationId').val()).child('type').val() === 'migrateArtworks' || newData.parent().child('operations').child(newData.parent().child('lastOperationId').val()).child('type').val() === 'restore' || newData.child('drawings').val() === data.child('drawings').val()))",
+          ".validate": "newData.hasChildren(['students', 'lastSaved']) && !newData.hasChild('syncVersion') && !newData.hasChild('revision') && !newData.hasChild('baseCommitId') && !newData.hasChild('commitId') && !newData.hasChild('updatedAt') && (newData.parent().child('operations').child(newData.parent().child('lastOperationId').val()).child('type').val() === 'migrateArtworks' || newData.parent().child('operations').child(newData.parent().child('lastOperationId').val()).child('type').val() === 'restore' || ((!data.child('drawingAlbum').exists() || newData.child('drawingAlbum').exists()) && (!data.child('drawings').child('0').child('data').exists() || newData.child('drawings').child('0').child('data').exists()) && (!data.child('drawings').child('1').child('data').exists() || newData.child('drawings').child('1').child('data').exists()) && (!data.child('drawings').child('2').child('data').exists() || newData.child('drawings').child('2').child('data').exists())))",
           "students": {
             ".validate": "newData.hasChildren(['0'])"
           },
@@ -19,7 +19,7 @@
           },
           "drawings": {
             "$drawingIndex": {
-              ".validate": "($drawingIndex.matches(/^[0-2]$/) || (data.exists() && newData.val() === data.val())) && newData.hasChildren(['id', 'savedAt'])",
+              ".validate": "($drawingIndex.matches(/^[0-2]$/) || data.exists()) && newData.hasChildren(['id', 'savedAt'])",
               "id": {
                 ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 128 && newData.val().matches(/^drawing_[A-Za-z0-9_-]+$/)"
               },
@@ -35,7 +35,7 @@
             }
           },
           "drawingAlbum": {
-            ".validate": "data.exists() && newData.parent().parent().child('operations').child(newData.parent().parent().child('lastOperationId').val()).child('type').val() !== 'migrateArtworks' && newData.val() === data.val()"
+            ".validate": "data.exists()"
           },
           "pendingArtworkDeletes": {
             "$drawingIndex": {
