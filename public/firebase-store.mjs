@@ -104,6 +104,13 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(artwork.type==='migrateArtworks') return {...command,drawings:await Promise.all(artwork.drawings.map(writeArtwork))};
         return command;
     }
+    async function cleanupRejectedArtwork(artwork){
+        if(artwork?.type!=='saveDrawing') return;
+        try{await deleteArtwork(artwork.drawings[0].id);}
+        catch(error){
+            if(error.retryable || error.name==='AbortError' || error instanceof TypeError){error.retryable=true;throw error;}
+        }
+    }
     async function readRemote(){
         const {value}=await call('/progress');
         const normalized=normalizeProgress(value);
@@ -125,15 +132,13 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             const receipt=room.operations?.[job.id];
             if(receipt) return {progress:normalizeProgress(room.progress??null),result:JSON.parse(receipt.result.json)};
             const clock=now();
-            if(clock-job.createdAt>24*60*60*1000) throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
+            if(clock-job.createdAt>24*60*60*1000){
+                await cleanupRejectedArtwork(artwork);
+                throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
+            }
             const candidate=command ?? indexCommand(job.command,artwork);
             if(room.restoredAt && job.createdAt<=room.restoredAt && !['restore','initialize'].includes(candidate.type)){
-                if(artwork?.type==='saveDrawing'){
-                    try{await deleteArtwork(artwork.drawings[0].id);}
-                    catch(error){
-                        if(error.retryable || error.name==='AbortError' || error instanceof TypeError){error.retryable=true;throw error;}
-                    }
-                }
+                await cleanupRejectedArtwork(artwork);
                 throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
             }
             const outcome=applyOperation(room.progress??null,candidate,clock);

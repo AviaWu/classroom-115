@@ -109,6 +109,12 @@ test('a transient orphan cleanup failure stays retryable',async()=>{
     await assert.rejects(s.store.execute(job('restore-race-offline',{type:'saveDrawing',drawing})),error=>error instanceof TypeError && error.retryable===true);
     assert.deepEqual(s.artworks[drawing.id],drawing);
 });
+test('an expired drawing command removes a possibly uploaded orphan before cancellation',async()=>{
+    const s=server(),drawing={id:'drawing_expired1',savedAt:'2026-09-16T00:00:00Z',data:'data:image/jpeg;base64,AA=='};
+    await s.store.writeArtwork(drawing);
+    await assert.rejects(s.store.execute({id:'expired-drawing',createdAt:-100_000_000,command:{type:'saveDrawing',drawing}}),/超過一天/);
+    assert.equal(s.artworks[drawing.id],undefined);
+});
 test('server read does not upgrade or upload legacy progress',async()=>{
     const s=server(),value=await s.store.readRemote();assert.equal(value.students[0].tokens,100);assert.equal(s.writes,0);assert.equal(s.room.progress.revision,9);
 });
