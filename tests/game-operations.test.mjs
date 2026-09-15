@@ -217,6 +217,14 @@ test('an empty legacy album blocks saves until explicit migration removes it', (
     assert.deepEqual(run(migrated.progress,'saveDrawing',{drawing:meta}).progress.drawings,[meta]);
 });
 
+test('a stale legacy cleanup cannot erase drawings saved after another device migrated', () => {
+    const current = state({drawings:[{id:'drawing_newest',savedAt:'2026-09-16T00:00:00.000Z'}]});
+    delete current.drawingAlbum;
+    const result = run(current,'migrateArtworks',{drawings:[]});
+    assert.equal(result.changed,false);
+    assert.deepEqual(result.progress.drawings,current.drawings);
+});
+
 test('legacy artwork remains byte-for-byte intact until explicit migration', () => {
     const legacy = state({drawings:[{id:'drawing_3',savedAt:'2026-09-16T00:00:03.000Z',data:'data:image/png;base64,three'}],
         drawingAlbum:[{id:'drawing_2',savedAt:'2026-09-16T00:00:02.000Z',data:'data:image/png;base64,two'}]});

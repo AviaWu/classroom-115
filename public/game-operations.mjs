@@ -394,6 +394,7 @@ export function applyOperation(value,command,now = Date.now()) {
     }
     case 'migrateArtworks': {
         if (!Array.isArray(command.drawings)) throw new Error('畫作資料格式不正確');
+        if (!legacyArtwork(progress)) break;
         progress.drawings = indexedDrawings(command.drawings);
         delete progress.drawingAlbum;
         break;
