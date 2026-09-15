@@ -6,8 +6,23 @@
       "classroom-115": {
         "progress": {
           ".read": "auth != null",
-          ".write": "auth != null && (!data.exists() || !data.child('lastSaved').isString() || (newData.child('lastSaved').isString() && newData.child('lastSaved').val() >= data.child('lastSaved').val()))",
-          ".validate": "newData.hasChildren(['students', 'lastSaved'])",
+          ".write": "auth != null && newData.exists() && newData.child('syncVersion').val() === 3 && newData.child('revision').isNumber() && ((!data.exists() && newData.child('revision').val() === 1 && newData.child('baseCommitId').val() === 'initial') || (data.exists() && !data.child('revision').exists() && newData.child('revision').val() === 1 && newData.child('baseCommitId').val() === 'legacy') || (data.child('syncVersion').val() === 3 && data.child('revision').isNumber() && newData.child('revision').val() === data.child('revision').val() + 1 && newData.child('baseCommitId').val() === data.child('commitId').val()))",
+          ".validate": "newData.hasChildren(['students', 'lastSaved', 'syncVersion', 'revision', 'baseCommitId', 'commitId', 'updatedAt'])",
+          "syncVersion": {
+            ".validate": "newData.val() === 3"
+          },
+          "revision": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 9007199254740991 && newData.val() % 1 === 0"
+          },
+          "baseCommitId": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "commitId": {
+            ".validate": "newData.isString() && newData.val().length >= 16 && newData.val().length <= 128 && (!data.exists() || newData.val() !== data.val())"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() === now"
+          },
           "students": {
             ".validate": "newData.hasChildren(['0'])"
           },
