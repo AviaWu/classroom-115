@@ -587,7 +587,7 @@ function normalizeState(target){
     target.deletedCoopTaskIds = [...new Set(target.deletedCoopTaskIds.filter(id=>typeof id==="string"))];
     if(!Array.isArray(target.drawings)) target.drawings=[];
     if(!Array.isArray(target.drawingAlbum)) target.drawingAlbum=[];
-    target.drawings = target.drawings.filter(item=>item && typeof item.data==="string");
+    target.drawings = target.drawings.filter(item=>item && typeof item==="object");
     target.drawingAlbum = target.drawingAlbum.filter(item=>item && typeof item.data==="string");
     if(target.drawings.length>3){
         target.drawingAlbum.unshift(...target.drawings.slice(3));
@@ -946,6 +946,7 @@ function applyCloudState(cloudState){
     unsavedChange=false;
     cacheConfirmedState();
     if(changed){ render(); refreshVisibleView(); }
+    else if(currentView?.type==="drawing") void refreshDrawingImages();
     return true;
 }
 
@@ -1052,13 +1053,54 @@ let drawingActive = false;
 let drawingTool = "pen";
 let drawingColor = DRAWING_COLORS[0];
 let drawingUndoStack = [];
+const artworkCache = new Map();
+const artworkRequests = new Map();
+const artworkFailures = new Set();
+
+function drawingImage(item){
+    return typeof item.data==="string" ? item.data : artworkCache.get(item.id)?.data;
+}
 
 function drawingHistoryHtml(){
     if(!state.drawings.length) return `<div class="empty">尚無儲存作品</div>`;
-    return state.drawings.map((item,index)=>`<button class="drawing-thumb" onclick="loadDrawing('${esc(item.id)}')" title="載入這張畫板">
-        <img src="${esc(item.data)}" alt="畫板作品 ${index+1}">
+    return state.drawings.slice(0,3).map((item,index)=>{
+        const data=drawingImage(item);
+        return `<button class="drawing-thumb" onclick="loadDrawing('${esc(item.id)}')" title="載入這張畫板" ${data?'':'disabled'}>
+        ${data?`<img src="${esc(data)}" alt="畫板作品 ${index+1}">`:`<span>${artworkFailures.has(item.id)?"圖片載入失敗，稍後會重試":"圖片載入中"}</span>`}
         <span>${esc(new Date(item.savedAt).toLocaleString())}</span>
-    </button>`).join("");
+    </button>`;
+    }).join("");
+}
+
+async function refreshDrawingImages(){
+    if(currentView?.type!=="drawing") return;
+    const latest=state.drawings.slice(0,3),ids=new Set(latest.map(item=>item.id));
+    for(const id of artworkCache.keys()) if(!ids.has(id)) artworkCache.delete(id);
+    for(const id of artworkFailures) if(!ids.has(id)) artworkFailures.delete(id);
+    const renderHistory=()=>{
+        if(currentView?.type!=="drawing") return;
+        const history=document.getElementById("drawingHistory");
+        if(history) history.innerHTML=drawingHistoryHtml();
+    };
+    const requests=latest.map(item=>{
+        if(drawingImage(item)) return;
+        if(artworkRequests.has(item.id)) return artworkRequests.get(item.id);
+        if(typeof window.artworkStore?.readArtwork!=="function") return;
+        artworkFailures.delete(item.id);
+        const request=Promise.resolve().then(async()=>{
+            if(currentView?.type!=="drawing" || !state.drawings.some(current=>current.id===item.id)) return;
+            const artwork=await window.artworkStore.readArtwork(item.id);
+            if(!artwork || artwork.id!==item.id || typeof artwork.data!=="string" || !artwork.data) throw new Error("畫作圖片無法載入");
+            if(state.drawings.some(current=>current.id===item.id)) artworkCache.set(item.id,artwork);
+        }).catch(()=>{artworkFailures.add(item.id);}).finally(()=>{
+            artworkRequests.delete(item.id);
+            renderHistory();
+        });
+        artworkRequests.set(item.id,request);
+        return request;
+    });
+    renderHistory();
+    await Promise.all(requests);
 }
 
 function openDrawingBoard(){
@@ -1083,6 +1125,7 @@ function openDrawingBoard(){
             </aside>
         </div>`);
     initializeDrawingCanvas();
+    return refreshDrawingImages();
 }
 
 function initializeDrawingCanvas(){
@@ -1233,21 +1276,23 @@ async function saveDrawingBoard(){
     const canvas=document.getElementById("drawingCanvas");
     if(!canvas) return;
     const result=await runCommand({type:"saveDrawing",drawing:{id:"drawing_"+crypto.randomUUID(),savedAt:new Date().toISOString(),data:canvas.toDataURL("image/jpeg",.78)}},"save-drawing");
-    if(result && document.getElementById("drawingStatus")) document.getElementById("drawingStatus").textContent="已儲存；最近保留 3 張，舊作已移至後台畫冊";
+    if(result && document.getElementById("drawingStatus")) document.getElementById("drawingStatus").textContent="已儲存；最近保留 3 張作品";
 }
 function loadDrawing(id){
     const item = state.drawings.find(drawing=>drawing.id===id);
     const canvas = document.getElementById("drawingCanvas");
-    if(!item || !canvas || !drawingContext) return;
+    const data=item && drawingImage(item),context=drawingContext;
+    if(!data || !canvas || !context) return;
     const image = new Image();
     image.onload = ()=>{
+        if(currentView?.type!=="drawing" || document.getElementById("drawingCanvas")!==canvas) return;
         pushDrawingUndoState();
-        drawingContext.fillStyle = "#ffffff";
-        drawingContext.fillRect(0,0,canvas.width,canvas.height);
-        drawingContext.drawImage(image,0,0,canvas.width,canvas.height);
+        context.fillStyle = "#ffffff";
+        context.fillRect(0,0,canvas.width,canvas.height);
+        context.drawImage(image,0,0,canvas.width,canvas.height);
         document.getElementById("drawingStatus").textContent = "已載入作品，可繼續繪圖";
     };
-    image.src = item.data;
+    image.src = data;
 }
 
 function petProgress(student){
@@ -2644,8 +2689,7 @@ function refreshVisibleView(){
     const view=currentView;
     if(!view) return;
     if(view.type==="drawing"){
-        const history=document.getElementById("drawingHistory");
-        if(history) history.innerHTML=drawingHistoryHtml();
+        void refreshDrawingImages();
         return;
     }
     if(view.type==="login") return;
@@ -2741,6 +2785,7 @@ setInterval(syncScheduledTasks,30000);
       now:()=>Date.now()+serverOffset
   });
   window.readLatestProgress=store.readRemote;
+  window.artworkStore=store;
   const sync=createCloudSync({
       ...store,applyState:applyCloudState,lock:setSyncLocked,status:setSyncStatus,
       error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},

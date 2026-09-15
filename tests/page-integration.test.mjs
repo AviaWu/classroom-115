@@ -13,17 +13,26 @@ const fixture=()=>operations.normalizeProgress({students:[{id:1,gender:'M',token
 function page(t){
     const dom=new JSDOM(html,{runScripts:'outside-only',pretendToBeVisual:true,url:'https://classroom.test'}),w=dom.window;
     let cloud=fixture(),writes=0,id=0;
-    const alerts=[];
+    const alerts=[],artworkReads=[],artworkPayloads=new Map();
+    let artworkReadHook;
     w.structuredClone=clone;w.alert=m=>alerts.push(m);w.confirm=()=>true;
-    w.HTMLCanvasElement.prototype.getContext=function(){return {fillRect(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},closePath(){},getImageData(){return {data:new Uint8ClampedArray(16)};},putImageData(){}};};
+    w.HTMLCanvasElement.prototype.getContext=function(){return {fillRect(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},closePath(){},drawImage(){},getImageData(){return {data:new Uint8ClampedArray(16)};},putImageData(){}};};
     w.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/jpeg;base64,test';
     w.eval(scripts[0][2]);
     w.GameOperations=operations;
-    const sync=createCloudSync({readRemote:async()=>clone(cloud),execute:async job=>{const out=operations.applyOperation(cloud,job.command,Date.now());cloud=out.progress;if(out.changed)writes++;return {...out,result:{ok:true,...out.result}};},applyState:w.applyCloudState,lock:w.setSyncLocked,status:w.setSyncStatus,newId:()=>`test-${++id}`,setInterval:()=>1,clearInterval(){},error(){}});
+    w.artworkStore={readArtwork:async id=>{artworkReads.push(id);return artworkReadHook ? artworkReadHook(id) : clone(artworkPayloads.get(id)||null);}};
+    const sync=createCloudSync({readRemote:async()=>clone(cloud),execute:async job=>{
+        const command=clone(job.command);
+        if(command.type==='saveDrawing'){
+            artworkPayloads.set(command.drawing.id,clone(command.drawing));
+            const {id,savedAt}=command.drawing;command.drawing={id,savedAt};
+        }
+        const out=operations.applyOperation(cloud,command,Date.now());cloud=out.progress;if(out.changed)writes++;return {...out,result:{ok:true,...out.result}};
+    },applyState:w.applyCloudState,lock:w.setSyncLocked,status:w.setSyncStatus,newId:()=>`test-${++id}`,setInterval:()=>1,clearInterval(){},error(){}});
     w.firebaseGameStore=sync;
     t.after(()=>{sync.dispose();w.close();});
     const signIn=(account,password)=>{w.document.getElementById('loginAccount').value=account;w.document.getElementById('loginPassword').value=password;w.login(new w.Event('submit'));};
-    return {w,sync,alerts,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="1127";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
+    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="1127";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
 }
 test('inline scripts and modules parse',()=>{
     for(const [,attributes,source] of scripts){
@@ -141,4 +150,65 @@ test('single-image uploads finishing after disconnect do not mutate the catalogu
     const upload=h.w.addClothM();h.sync.setConnected(false);resolve('data:image/png;base64,test');await upload;
     assert.equal(h.cloud.clothesM.length,1);assert.doesNotMatch(h.w.document.getElementById('body').textContent,/未上傳圖片/);
     assert.equal(h.writes,0);
+});
+
+const drawingMeta = number=>({id:`drawing_${number}`,savedAt:`2026-09-16T00:00:0${number}.000Z`});
+const settleArtwork = () => new Promise(resolve=>setImmediate(resolve));
+function addArtworkFixture(h,numbers=[3,2,1]) {
+    for(const number of numbers){const metadata=drawingMeta(number);h.artworkPayloads.set(metadata.id,{...metadata,data:`data:image/png;base64,image${number}`});}
+    h.cloud={...h.cloud,drawings:numbers.map(drawingMeta)};
+}
+test('closed drawing UI never downloads artworks and opening reads only the latest three IDs once',async t=>{
+    const h=page(t);addArtworkFixture(h);await h.start();await h.sync.refresh();await settleArtwork();
+    assert.deepEqual(h.artworkReads,[]);
+    await h.run('openDrawingBoard()');await settleArtwork();
+    assert.deepEqual(h.artworkReads,['drawing_3','drawing_2','drawing_1']);
+    assert.equal(h.w.document.querySelectorAll('#drawingHistory img').length,3);
+    await h.sync.refresh();await settleArtwork();
+    h.w.closeModal();await h.run('openDrawingBoard()');await settleArtwork();
+    assert.deepEqual(h.artworkReads,['drawing_3','drawing_2','drawing_1']);
+    assert.equal(h.writes,0);
+});
+test('open drawing polling loads only new IDs and preserves the exact canvas and tools',async t=>{
+    const h=page(t);addArtworkFixture(h);await h.start();await h.run('openDrawingBoard()');await settleArtwork();
+    const canvas=h.w.document.getElementById('drawingCanvas'),eraser=h.w.document.getElementById('drawingEraser');h.w.toggleDrawingEraser();
+    addArtworkFixture(h,[4,3,2]);await h.sync.refresh();await settleArtwork();
+    assert.deepEqual(h.artworkReads,['drawing_3','drawing_2','drawing_1','drawing_4']);
+    assert.equal(h.w.document.getElementById('drawingCanvas'),canvas);assert.equal(h.w.document.getElementById('drawingEraser'),eraser);assert.equal(eraser.classList.contains('active'),true);
+    assert.deepEqual([...h.w.document.querySelectorAll('#drawingHistory img')].map(img=>img.getAttribute('src')),['data:image/png;base64,image4','data:image/png;base64,image3','data:image/png;base64,image2']);
+    h.w.closeModal();addArtworkFixture(h,[5,4,3]);await h.sync.refresh();await settleArtwork();
+    assert.equal(h.artworkReads.includes('drawing_5'),false);
+});
+test('in-flight drawing reads are shared and finishing after close does not recreate the modal',async t=>{
+    const h=page(t);addArtworkFixture(h,[1]);let finish;
+    h.setArtworkRead(()=>new Promise(resolve=>finish=resolve));await h.start();
+    const opening=h.w.openDrawingBoard();await settleArtwork();
+    assert.deepEqual(h.artworkReads,['drawing_1']);
+    assert.equal(h.w.document.querySelector('#drawingHistory img'),null);
+    assert.doesNotMatch(h.w.document.getElementById('drawingHistory').innerHTML,/src="undefined"/);
+    h.cloud={...h.cloud,globalBgImage:'different'};await h.sync.refresh();await settleArtwork();assert.equal(h.artworkReads.length,1);
+    h.w.closeModal();finish(h.artworkPayloads.get('drawing_1'));await opening;await settleArtwork();
+    assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);
+    assert.equal(h.w.document.getElementById('drawingHistory'),null);
+});
+test('a failed image does not block other thumbnails and retries on an unchanged progress snapshot',async t=>{
+    const h=page(t);addArtworkFixture(h,[2,1]);let fail=true;
+    h.setArtworkRead(id=>{if(id==='drawing_1'&&fail){fail=false;throw new TypeError('image unavailable');}return h.artworkPayloads.get(id);});
+    await h.start();await h.w.openDrawingBoard();await settleArtwork();
+    assert.equal(h.w.document.querySelectorAll('#drawingHistory img').length,1);
+    assert.match(h.w.document.getElementById('drawingHistory').textContent,/失敗|無法載入/);
+    assert.equal(h.sync.canEdit(),true);
+    await h.sync.refresh();await settleArtwork();
+    assert.deepEqual(h.artworkReads,['drawing_2','drawing_1','drawing_1']);
+    assert.equal(h.w.document.querySelectorAll('#drawingHistory img').length,2);
+});
+test('legacy drawings remain viewable without downloading or migrating artwork payloads',async t=>{
+    const h=page(t);const legacy={...drawingMeta(1),data:'data:image/jpeg;base64,legacy'};
+    h.cloud={...h.cloud,drawings:[legacy],drawingAlbum:[]};await h.start();await h.run('openDrawingBoard()');await settleArtwork();
+    assert.deepEqual(h.artworkReads,[]);assert.equal(h.w.document.querySelector('#drawingHistory img').getAttribute('src'),legacy.data);assert.equal(h.writes,0);
+});
+test('closing a board before its queued loader starts sends no artwork request',async t=>{
+    const h=page(t);addArtworkFixture(h,[1]);await h.start();
+    const opening=h.w.openDrawingBoard();h.w.closeModal();await opening;await settleArtwork();
+    assert.deepEqual(h.artworkReads,[]);
 });
