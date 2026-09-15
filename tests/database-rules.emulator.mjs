@@ -81,14 +81,39 @@ test('authenticated clients can only read and write validated external artwork',
     const response=await read(artworkPath);
     assert.equal(response.status,200,await response.clone().text());
     assert.deepEqual(await response.json(),drawing);
+    await allowed({...drawing,id:'drawing_no_millis',savedAt:'2026-09-16T00:00:00Z'},{path:'artworks/classroom-115/drawing_no_millis'});
     await denied(drawing,{path:artworkPath,uid:null});
     for(const invalid of [
         {...drawing,id:'drawing_another'},
         {...drawing,savedAt:'not-an-iso-time'},
+        {...drawing,savedAt:'2026-09-16 00:00:00Z'},
         {...drawing,data:'data:text/plain;base64,AA=='},
         {...drawing,data:`data:image/jpeg;base64,${'A'.repeat(1_500_000)}`},
         {...drawing,extra:true},
     ]) await denied(invalid,{path:artworkPath});
+});
+
+test('artwork deletion cannot remove an image still referenced by progress',async()=>{
+    const kept={id:'drawing_kept01',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='};
+    const evicted={id:'drawing_evicted01',savedAt:'2026-09-15T00:00:00.000Z',data:'data:image/jpeg;base64,AQ=='};
+    await seed({progress:{...cleanProgress,drawings:[{id:kept.id,savedAt:kept.savedAt}]}});
+    await allowed(kept,{path:`artworks/classroom-115/${kept.id}`});
+    await allowed(evicted,{path:`artworks/classroom-115/${evicted.id}`});
+    await denied(null,{path:`artworks/classroom-115/${kept.id}`,method:'DELETE'});
+    await allowed(null,{path:`artworks/classroom-115/${evicted.id}`,method:'DELETE'});
+});
+
+test('progress drawing indexes reject a fourth metadata record',async()=>{
+    const drawings=Array.from({length:4},(_,index)=>({id:`drawing_index${index}`,savedAt:`2026-09-16T00:00:0${index}.000Z`}));
+    await seed({progress:cleanProgress});
+    await denied(operation(await room(),{progress:{...cleanProgress,drawings}}));
+});
+
+test('ordinary operations preserve a legacy drawing list above the new limit',async()=>{
+    const drawings=Array.from({length:4},(_,index)=>({id:`drawing_legacy${index}`,savedAt:`2026-09-16T00:00:0${index}.000Z`,data:'data:image/png;base64,AA=='}));
+    const progress={...legacy,drawings};
+    await seed({progress});
+    await allowed(operation(await room(),{progress}));
 });
 
 test('legacy embedded artwork stays byte-for-byte unchanged until migration',async()=>{
@@ -100,9 +125,9 @@ test('legacy embedded artwork stays byte-for-byte unchanged until migration',asy
     const unchanged=await room();
     await denied(operation(unchanged,{progress:{...progress,drawings:[{...legacyDrawing,data:'data:image/png;base64,Ag=='}]}}));
     await denied(operation(unchanged,{progress:{...progress,drawingAlbum:[]}}));
-    const migrated={...progress,drawings:[{id:legacyDrawing.id,savedAt:legacyDrawing.savedAt}]};
-    delete migrated.drawingAlbum;
-    await allowed(operation(unchanged,{type:'migrateArtworks',progress:migrated}));
+    const restored={...progress,drawings:[{id:legacyDrawing.id,savedAt:legacyDrawing.savedAt}]};
+    delete restored.drawingAlbum;
+    await allowed(operation(unchanged,{type:'restore',progress:restored}));
 });
 
 test('a conditional root transaction migrates progress and appends an authenticated receipt',async()=>{

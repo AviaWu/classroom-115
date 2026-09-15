@@ -7,10 +7,15 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
     }
+    function validArtworkTimestamp(value) {
+        if(typeof value !== 'string' || value.length < 20 || value.length > 40 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,19})?Z$/.test(value)) return false;
+        const timestamp=Date.parse(value);
+        return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0,19)===value.slice(0,19);
+    }
     function validateArtwork(drawing) {
         if(!drawing || typeof drawing !== 'object' || Array.isArray(drawing) ||
             Object.keys(drawing).length !== 3 || !Object.hasOwn(drawing,'id') || !Object.hasOwn(drawing,'savedAt') || !Object.hasOwn(drawing,'data') ||
-            typeof drawing.savedAt !== 'string' || drawing.savedAt.length !== 24 || !Number.isFinite(Date.parse(drawing.savedAt)) ||
+            !validArtworkTimestamp(drawing.savedAt) ||
             typeof drawing.data !== 'string' || drawing.data.length > 1_500_000 || !/^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]*={0,2}$/.test(drawing.data)) throw new Error('畫作資料格式不正確');
         assertArtworkId(drawing.id);
         return drawing;
@@ -55,7 +60,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     async function deleteArtwork(id){
         await callPath(artworkPath(id),{method:'DELETE'});
     }
-    async function uploadNewestArtworks(drawings){
+    function newestArtworks(drawings){
         if(!Array.isArray(drawings)) throw new Error('畫作資料格式不正確');
         const seen=new Set(),indexed=[];
         for(const drawing of drawings){
@@ -63,19 +68,29 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             if(!seen.has(drawing.id)){seen.add(drawing.id);indexed.push(drawing);}
         }
         indexed.sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
-        return Promise.all(indexed.slice(0,3).map(writeArtwork));
+        return indexed.slice(0,3);
     }
-    async function prepareCommand(command){
+    function preflightArtwork(command){
         if(!command || typeof command !== 'object') return command;
-        if(command.type==='saveDrawing') return {...command,drawing:await writeArtwork(command.drawing)};
+        if(command.type==='saveDrawing') return {type:'saveDrawing',drawings:[validateArtwork(command.drawing)]};
         if(command.type==='restore'){
             const value=command.value;
             if(!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('畫作資料格式不正確');
-            const drawings=await uploadNewestArtworks([...(Array.isArray(value.drawings)?value.drawings:[]),...(Array.isArray(value.drawingAlbum)?value.drawingAlbum:[])]);
+            return {type:'restore',drawings:newestArtworks([...(Array.isArray(value.drawings)?value.drawings:[]),...(Array.isArray(value.drawingAlbum)?value.drawingAlbum:[])])};
+        }
+        if(command.type==='migrateArtworks') return {type:'migrateArtworks',drawings:newestArtworks(command.drawings)};
+        return null;
+    }
+    async function prepareCommand(command,artwork){
+        if(!artwork) return command;
+        if(artwork.type==='saveDrawing') return {...command,drawing:await writeArtwork(artwork.drawings[0])};
+        if(artwork.type==='restore'){
+            const drawings=await Promise.all(artwork.drawings.map(writeArtwork));
+            const value=command.value;
             const {drawingAlbum,...restored}=value;
             return {...command,value:{...restored,drawings}};
         }
-        if(command.type==='migrateArtworks') return {...command,drawings:await uploadNewestArtworks(command.drawings)};
+        if(artwork.type==='migrateArtworks') return {...command,drawings:await Promise.all(artwork.drawings.map(writeArtwork))};
         return command;
     }
     async function readRemote(){
@@ -90,7 +105,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         return receipt ? {...receipt,result:JSON.parse(receipt.result.json)} : null;
     }
     async function execute(job){
-        const command=await prepareCommand(job.command);
+        const artwork=preflightArtwork(job.command);
+        let command;
         // Same command, ID and lottery samples survive every retry.
         for(let attempt=0;attempt<20;attempt++){
             const response=await call('',{headers:{'X-Firebase-ETag':'true'}});
@@ -99,6 +115,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             if(receipt) return {progress:normalizeProgress(room.progress??null),result:JSON.parse(receipt.result.json)};
             const clock=now();
             if(clock-job.createdAt>24*60*60*1000) throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
+            command ??= await prepareCommand(job.command,artwork);
             if(room.restoredAt && job.createdAt<=room.restoredAt && !['restore','initialize'].includes(command.type)){
                 throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
             }
