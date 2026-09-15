@@ -8,8 +8,10 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans TC",system-ui,sans-serif;background:#f8f4ff;color:#403b4d}
 .bg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;background-repeat:no-repeat}
-html.cloud-sync-loading body{pointer-events:none;cursor:wait}
-html.cloud-sync-loading body::after{content:"正在取得最新雲端進度…";position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(23,32,51,.88);color:#fff;font-size:22px;font-weight:900;pointer-events:all}
+#cloudSyncPanel{display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(23,32,51,.88);color:#fff;padding:24px;text-align:center}
+html.cloud-sync-loading #cloudSyncPanel{display:flex}
+#cloudSyncPanel>div{max-width:650px;line-height:1.8}
+#cloudSyncPanel button{margin:8px}
 header{position:sticky;top:0;z-index:10;background:#333;border-bottom:1px solid #222;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 header h1{color:#f3d98b}
 h1,h2,h3{margin-top:0}
@@ -299,7 +301,8 @@ input[type="number"]{width:85px}
 <button onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
 <button onclick="openDrawingBoard()">畫板</button>
 <button onclick="openBackend()">老師後台</button>
-<span class="small" id="saveStatus">☁️ 正在連線 Firebase...</span>
+<button onclick="exportSyncBackups()">同步備份</button>
+<span class="small" id="saveStatus" role="status">☁️ 正在連線 Firebase...</span>
 </div>
 </header>
 
@@ -314,11 +317,19 @@ input[type="number"]{width:85px}
 </div>
 </div>
 
+<div id="cloudSyncPanel" role="dialog" aria-modal="true" aria-label="雲端同步">
+<div>
+<p id="cloudSyncMessage" role="status">正在取得最新雲端進度…</p>
+<p>確認雲端版本之前暫停遊戲操作，避免舊進度覆蓋其他裝置。</p>
+<button onclick="window.firebaseGameStore.refresh()">重試連線</button>
+<button onclick="exportSyncBackups()">下載同步備份</button>
+<button onclick="location.reload()">重新載入網頁</button>
+</div>
+</div>
 <script>
 document.documentElement.classList.add("cloud-sync-loading");
 const STORAGE_KEY = "growth26_v18_full";
 const CLOUD_SAVE_PATH = "games/classroom-115/progress";
-const CLOUD_SYNC_VERSION = 2;
 const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
@@ -424,15 +435,58 @@ let unsavedChange = false;
 let autoSaveTimer = null;
 let lastShopTab = "clothes"; //記錄商店頁籤
 
-// Firebase 模組即使下載或初始化失敗，遊戲與老師後台仍使用本機存檔正常運作。
-// 模組初始化完成前的儲存要求也會暫存，避免開啟頁面後立刻操作時遺失進度。
+// Fail closed: cached state is not editable before a server-confirmed read.
 window.firebaseGameStore = {
     available:false,
-    queueSave(){},
+    canEdit(){ return false; },
+    editToken(){ return 0; },
+    queueSave(){ return false; },
     flush(){ return Promise.resolve(false); },
-    hasPendingSave(){ return false; },
-    remove(){ return Promise.resolve(false); }
+    refresh(){ location.reload(); },
+    hasPendingSave(){ return false; }
 };
+let syncUiEpoch = 0;
+function setSyncLocked(locked){
+    if(locked){
+        syncUiEpoch++;
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+    }
+    document.documentElement.classList.toggle("cloud-sync-loading", locked);
+    document.querySelectorAll("header, .wrap, #modal").forEach(el=>{ el.inert = locked; });
+}
+function setSyncStatus(message){
+    document.getElementById("saveStatus").textContent = message;
+    document.getElementById("cloudSyncMessage").textContent = message;
+}
+function canContinueEdit(token){
+    return window.firebaseGameStore.canEdit() && token === syncUiEpoch;
+}
+async function exportSyncBackups(){
+    try{
+        const {readConflictBackups} = await import("./cloud-sync.mjs");
+        const backups = await readConflictBackups();
+        const blob = new Blob([JSON.stringify({backups, currentLocalState:state},null,2)],{type:"application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `classroom-sync-backups-${Date.now()}.json`;
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(error){
+        alert("讀取同步備份失敗："+error.message);
+    }
+}
+setSyncLocked(true);
+// Also block keyboard and already-focused controls, not just pointer input.
+["click","keydown","input","change","submit","pointerdown","drop"].forEach(type=>{
+    document.addEventListener(type,event=>{
+        if(!window.firebaseGameStore.canEdit() && !event.target.closest?.("#cloudSyncPanel")){
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    },true);
+});
 
 if(!state){
     state = {
@@ -786,6 +840,7 @@ function reconcileBuiltinCatalog(){
 }
 
 function markChanged(){
+    if(!window.firebaseGameStore.canEdit()) return;
     unsavedChange = true;
     document.getElementById("saveStatus").textContent = "⚠️有未儲存變更";
     clearTimeout(autoSaveTimer);
@@ -794,18 +849,18 @@ function markChanged(){
 
 window.addEventListener("beforeunload", e=>{
     if(unsavedChange || window.firebaseGameStore.hasPendingSave()){
-        window.firebaseGameStore.flush();
+        persistPendingLocally();
         e.preventDefault();
         e.returnValue = "資料仍在同步至雲端，請稍候再關閉。";
-        return e.returnValue;
     }
 });
-
-// 行動裝置或直接關閉分頁時 beforeunload 不一定觸發，pagehide 可再嘗試送出待同步資料。
-window.addEventListener("pagehide", ()=>{
-    if(unsavedChange) save();
-    window.firebaseGameStore.flush();
-});
+// Lifecycle changes never mint a new timestamp or force-upload stale state.
+function persistPendingLocally(){
+    if(!unsavedChange && !window.firebaseGameStore.hasPendingSave()) return;
+    try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+    catch(error){ console.error("保留本機進度失敗",error); }
+}
+window.addEventListener("pagehide", persistPendingLocally);
 
 function makeItemId(){
     return "item_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
@@ -815,11 +870,17 @@ function makeTaskId(){
 }
 
 async function compressImage(file, maxSize, quality){
+    const editToken = syncUiEpoch;
     return new Promise((resolve,reject)=>{
         const img = new Image();
         const url = URL.createObjectURL(file);
         img.onload = ()=>{
             URL.revokeObjectURL(url);
+            if(!canContinueEdit(editToken)){
+                alert("進度同步狀態已改變，請重新選擇圖片。");
+                resolve(null);
+                return;
+            }
             let w = img.width, h = img.height;
             if(w>maxSize || h>maxSize){
                 const scale = maxSize / Math.max(w,h);
@@ -851,17 +912,17 @@ function getStorageUsage(){
 }
 
 function save(){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+    if(!window.firebaseGameStore.canEdit()) return false;
+    if(!unsavedChange) return true;
     try{
         state.lastSaved = new Date().toISOString();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         unsavedChange = false;
-        const status = document.getElementById("saveStatus");
-        status.textContent = window.firebaseGameStore.available ? "☁️ 正在同步..." : "💾 已儲存於本機";
-        try{
-            window.firebaseGameStore.queueSave(state);
-        }catch(cloudError){
-            console.error("雲端排程失敗，本機存檔不受影響",cloudError);
-            status.textContent = "💾 已儲存於本機（雲端離線）";
+        if(!window.firebaseGameStore.queueSave(state)){
+            unsavedChange = true;
+            return false;
         }
         return true;
     }catch(e){
@@ -877,7 +938,7 @@ async function flushSavedState(){
     if(!save()) return false;
     try{
         if(typeof window.firebaseGameStore.flush==="function"){
-            await window.firebaseGameStore.flush();
+            return await window.firebaseGameStore.flush();
         }
     }catch(error){
         console.error("等待雲端同步失敗，本機刪除紀錄已保留",error);
@@ -892,6 +953,10 @@ function applyCloudState(cloudState){
         const candidate = normalizeState(structuredClone(cloudState));
         if(!candidate || !candidate.students.length) return false;
         state = candidate;
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+        closeModal();
+        document.querySelectorAll(".lottery-result-popup").forEach(el=>el.remove());
         render();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         unsavedChange = false;
@@ -1371,6 +1436,7 @@ function generateScheduledCoopTasks(now=new Date()){
     return changed;
 }
 function syncScheduledTasks(){
+    if(!window.firebaseGameStore.canEdit()) return false;
     const changed = generateDailyTasks() | generateWeeklyTasks() | generateScheduledCoopTasks();
     if(!changed) return false;
     markChanged();
@@ -2345,10 +2411,13 @@ function updateItemPrice(listName,id,newPrice){
 
 //批量新增工具函式
 async function batchUploadFiles(fileList, targetArray, prefixName){
+    const editToken = syncUiEpoch;
+    const additions = [];
     for(let i=0;i<fileList.length;i++){
         const file = fileList[i];
         const imgData = await compressImage(file, MAX_IMG_SIZE, IMG_QUALITY);
-        targetArray.push({
+        if(!imgData || !canContinueEdit(editToken)) return;
+        additions.push({
             id: makeItemId(),
             name: `${prefixName} ${i+1}`,
             level: "R",
@@ -2357,6 +2426,8 @@ async function batchUploadFiles(fileList, targetArray, prefixName){
             image: imgData
         });
     }
+    if(!canContinueEdit(editToken)) return;
+    targetArray.push(...additions);
     markChanged(); save(); refreshBackendPage("backend-" + (targetArray===state.clothesM ? "clothes-m" : targetArray===state.clothesF ? "clothes-f" : targetArray===state.layouts ? "layouts" : "backgrounds"));
 }
 
@@ -2601,6 +2672,7 @@ async function addClothM(){
     const file = document.getElementById("mImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    if(!img) return;
     state.clothesM.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-m");
 }
@@ -2611,6 +2683,7 @@ async function addClothF(){
     const file = document.getElementById("fImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    if(!img) return;
     state.clothesF.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-clothes-f");
 }
@@ -2621,6 +2694,7 @@ async function addLayout(){
     const file = document.getElementById("layImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    if(!img) return;
     state.layouts.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-layouts");
 }
@@ -2631,6 +2705,7 @@ async function addBgItem(){
     const file = document.getElementById("bgImg").files[0];
     if(!name||!file){alert("請填名稱並選圖片");return;}
     const img = await compressImage(file,MAX_IMG_SIZE,IMG_QUALITY);
+    if(!img) return;
     state.backgrounds.push({id:makeItemId(),name,level,price,active:true,image:img});
     markChanged(); save(); refreshBackendPage("backend-backgrounds");
 }
@@ -2652,14 +2727,21 @@ function exportData(){
 async function importData(input){
     const f = input.files[0];
     if(!f) return;
+    const editToken = syncUiEpoch;
     const txt = await f.text();
+    if(!canContinueEdit(editToken)) return alert("同步狀態已改變，請重新匯入。");
     try{
         const newState = JSON.parse(txt);
         if(!newState.students) throw new Error("檔案不是有效的備份");
         if(!confirm("⚠️ 將覆蓋目前所有資料！建議先匯出備份！確定嗎？")) return;
-        state = normalizeState(newState);
-        markChanged(); save(); render(); backend();
-        alert("匯入成功！");
+        // Imported metadata must never choose the write's base revision.
+        const {revision,commitId,baseCommitId,syncVersion,updatedAt} = state;
+        state = normalizeState({...newState,revision,commitId,baseCommitId,syncVersion,updatedAt});
+        markChanged();
+        const synced = await flushSavedState();
+        render();
+        if(window.firebaseGameStore.canEdit()) backend();
+        alert(synced ? "匯入同步流程已完成，請確認目前進度與同步狀態。" : "匯入尚未同步，請查看同步狀態；本機資料已保留。");
     }catch(e){
         alert("匯入失敗："+e.message);
     }
@@ -2673,7 +2755,8 @@ setInterval(syncScheduledTasks,30000);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { getDatabase, get, onValue, ref, remove, runTransaction } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { getDatabase, onValue, ref, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { createCloudSync, saveConflictBackup, canonical } from "./cloud-sync.mjs";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
@@ -2689,130 +2772,80 @@ setInterval(syncScheduledTasks,30000);
   const auth = getAuth(app);
   const database = getDatabase(app);
   const gameRef = ref(database, CLOUD_SAVE_PATH);
-  const status = document.getElementById("saveStatus");
-  let cloudReady = false;
-  let applyingRemote = false;
-  let pendingState = null;
-  let saveInFlight = null;
-
-  function savedAt(value){
-    const time = Date.parse(value?.lastSaved || "");
-    return Number.isFinite(time) ? time : 0;
-  }
-
-  function cloneState(value){
-    return typeof structuredClone === "function"
-      ? structuredClone(value)
-      : JSON.parse(JSON.stringify(value));
-  }
-
-  function showCloudError(error){
-    console.error("Firebase 同步失敗", error);
-    status.textContent = "⚠️ 雲端同步失敗（保留本機存檔）";
-  }
-
-  async function flushCloudSave(){
-    if(!cloudReady || applyingRemote || saveInFlight || !pendingState) return saveInFlight || false;
-    const snapshotToSave = pendingState;
-    snapshotToSave.syncVersion = CLOUD_SYNC_VERSION;
-    pendingState = null;
-    saveInFlight = runTransaction(gameRef, current=>{
-      // 每次寫入前都在伺服器端比較版本；舊頁面或較慢裝置不得覆蓋較新的雲端紀錄。
-      if(current && savedAt(current) > savedAt(snapshotToSave)) return;
-      return snapshotToSave;
-    }, {applyLocally:false})
-      .then(async result=>{
-        if(!result.committed){
-          const newestCloudState = result.snapshot.val();
-          if(newestCloudState && savedAt(newestCloudState) > savedAt(state)){
-            applyingRemote = true;
-            applyCloudState(newestCloudState);
-            applyingRemote = false;
-          }
-          status.textContent = "☁️ 已保留較新的雲端進度";
-          return false;
-        }
-        status.textContent = `☁️ 已同步 ${new Date().toLocaleTimeString()}`;
-        return true;
-      })
-      .catch(error=>{
-        // 保留最新版本供連線恢復或離開頁面前再次重試。
-        if(!pendingState || savedAt(snapshotToSave) > savedAt(pendingState)) pendingState = snapshotToSave;
-        showCloudError(error);
-        return false;
-      })
-      .finally(()=>{
-        saveInFlight = null;
-        if(pendingState) void flushCloudSave();
-      });
-    return saveInFlight;
-  }
-
-  window.firebaseGameStore = {
-    available:true,
-    queueSave(nextState){
-      if(applyingRemote) return;
-      pendingState = cloneState(nextState);
-      if(cloudReady) void flushCloudSave();
-    },
-    flush(){ return flushCloudSave(); },
-    hasPendingSave(){ return Boolean(pendingState || saveInFlight); },
-    remove(){
-      pendingState = null;
-      return remove(gameRef);
+  // The REST read has no offline-cache fallback. RTDB's get() can return cached
+  // data when disconnected, which must not unlock an old page after resume.
+  async function readServerState(){
+    if(!auth.currentUser) throw new Error("尚未完成登入，請重新連線。");
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(),15000);
+    try{
+      const token = await auth.currentUser.getIdToken();
+      const url = `${firebaseConfig.databaseURL}/${CLOUD_SAVE_PATH}.json?auth=${encodeURIComponent(token)}`;
+      const response = await fetch(url,{cache:"no-store",signal:controller.signal});
+      if(!response.ok) throw new Error(`雲端讀取失敗 (${response.status})`);
+      return await response.json();
+    }finally{
+      clearTimeout(timer);
     }
-  };
-
+  }
+  function showCloudError(error){
+    console.error("Firebase 同步失敗",error);
+    setSyncStatus("⚠️ 同步未完成，已暫停操作並保留本機資料。請確認網路、更新網頁或按重試。" + (error.message || ""));
+  }
+  const sync = createCloudSync({
+    getState:()=>state,
+    isDirty:()=>unsavedChange,
+    lock:setSyncLocked,
+    status:setSyncStatus,
+    error:showCloudError,
+    readRemote:readServerState,
+    newId:()=>crypto.randomUUID(),
+    serverTimestamp,
+    async transact(update){
+      const result = await runTransaction(gameRef,update,{applyLocally:false});
+      return {committed:result.committed,value:result.snapshot.val()};
+    },
+    async backup(record){
+      await saveConflictBackup(record);
+    },
+    shouldBackupInitial:remote=>Boolean(raw && canonical(JSON.parse(raw)) !== canonical(remote)),
+    applyState(remote){
+      if(!applyCloudState(remote)) throw new Error("雲端進度無法套用，已停止同步。");
+    },
+    acknowledge(remote){
+      if(remote){
+        for(const key of ["revision","commitId","baseCommitId","syncVersion","updatedAt","lastSaved"]){
+          if(remote[key] !== undefined) state[key] = remote[key];
+        }
+      }
+      unsavedChange = false;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    },
+    reconcile:reconcileBuiltinCatalog
+  });
+  window.firebaseGameStore = sync;
+  sync.setActive(!document.hidden);
+  document.addEventListener("visibilitychange",()=>{
+    persistPendingLocally();
+    sync.setActive(!document.hidden);
+  });
+  window.addEventListener("pagehide",()=>sync.setActive(false));
+  window.addEventListener("pageshow",()=>sync.setActive(!document.hidden));
+  window.addEventListener("focus",()=>sync.setActive(!document.hidden));
+  window.addEventListener("offline",()=>sync.setConnected(false));
+  window.addEventListener("online",()=>{ void sync.refresh(); });
   try{
     await signInAnonymously(auth);
-    const initialSnapshot = await get(gameRef);
-    let catalogChanged = false;
-    if(initialSnapshot.exists()){
-      // 啟動時一律先採用雲端紀錄，絕不以舊頁面的 localStorage 判斷並回寫。
-      applyingRemote = true;
-      const loaded = applyCloudState(initialSnapshot.val());
-      if(loaded) catalogChanged = reconcileBuiltinCatalog();
-      applyingRemote = false;
-      status.textContent = loaded ? "☁️ 已載入最新雲端進度" : "💾 雲端資料異常，使用本機存檔";
-    }else{
-      pendingState = cloneState(state);
-      status.textContent = "☁️ 正在建立雲端存檔...";
-    }
-    cloudReady = true;
-    document.documentElement.classList.remove("cloud-sync-loading");
-    if(catalogChanged){
-      state.lastSaved = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      pendingState = cloneState(state);
-    }
-    await flushCloudSave();
-
-    onValue(gameRef, snapshot=>{
-      if(!cloudReady || !snapshot.exists()) return;
-      let shouldSyncCatalog = false;
-      try{
-        const remoteState = snapshot.val();
-        // 忽略自己的寫入、舊版本，以及本機仍有待送資料時收到的遠端事件。
-        if(remoteState?.lastSaved === state.lastSaved ||
-           savedAt(remoteState) <= savedAt(state) ||
-           window.firebaseGameStore.hasPendingSave()) return;
-        applyingRemote = true;
-        if(applyCloudState(remoteState)){
-          shouldSyncCatalog = reconcileBuiltinCatalog();
-          status.textContent = "☁️ 已取得最新進度";
-        }else{
-          status.textContent = "💾 雲端資料異常，使用本機存檔";
-        }
-      }catch(error){
-        showCloudError(error);
-      }finally{
-        applyingRemote = false;
-      }
-      if(shouldSyncCatalog) window.firebaseGameStore.queueSave(state);
-    }, showCloudError);
+    onValue(ref(database,".info/connected"),snapshot=>sync.setConnected(snapshot.val() === true),error=>{
+      sync.setConnected(false);
+      showCloudError(error);
+    });
+    onValue(gameRef,snapshot=>sync.remoteChanged(snapshot.val()),error=>{
+      sync.setConnected(false);
+      showCloudError(error);
+    });
   }catch(error){
-    window.firebaseGameStore.available = false;
-    document.documentElement.classList.remove("cloud-sync-loading");
+    sync.setConnected(false);
     showCloudError(error);
   }
 </script>
