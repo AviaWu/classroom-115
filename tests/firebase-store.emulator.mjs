@@ -104,6 +104,20 @@ test('real initialization and reads round-trip Firebase omissions without writin
     assert.deepEqual(await rawRoom(),raw);
 });
 
+test('real artwork REST upload commits save metadata without embedding its Data URL',async()=>{
+    const initial=fixture();
+    delete initial.drawingAlbum;
+    await seed(initial);
+    const client=store(),drawing={id:`drawing_${randomUUID()}`,savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='};
+    await client.execute(job({type:'saveDrawing',drawing}));
+    const raw=await rawRoom();
+    assert.deepEqual(raw.progress.drawings,[{id:drawing.id,savedAt:drawing.savedAt}]);
+    assert.equal(JSON.stringify(raw).includes(drawing.data),false);
+    assert.deepEqual(await client.readArtwork(drawing.id),drawing);
+    await client.deleteArtwork(drawing.id);
+    assert.equal(await client.readArtwork(drawing.id),null);
+});
+
 test('real ETag conflicts reapply different task rewards against the latest progress',async()=>{
     const legacy = fixture();
     await seed(legacy);

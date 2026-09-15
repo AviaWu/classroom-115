@@ -3,10 +3,16 @@ import assert from 'node:assert/strict';
 import {createFirebaseStore} from '../public/firebase-store.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
 function server(){
-    let room=initial(),etag=1,writes=0,drop=false;
+    let room=initial(),artworks={},etag=1,writes=0,drop=false;const calls=[];
     const resolve=v=>{if(v && typeof v==='object'){if(v['.sv']==='timestamp')return 100000;return Array.isArray(v)?v.map(resolve):Object.fromEntries(Object.entries(v).map(([k,x])=>[k,resolve(x)]));}return v;};
     const fetch=async(url,options)=>{
-        await Promise.resolve();const path=new URL(url).pathname;
+        calls.push({url,options});await Promise.resolve();const path=new URL(url).pathname;
+        if(path.startsWith('/artworks/classroom-115/')){
+            const id=decodeURIComponent(path.split('/').pop().replace('.json',''));
+            if(options.method==='PUT'){artworks[id]=JSON.parse(options.body);return Response.json(artworks[id]);}
+            if(options.method==='DELETE'){delete artworks[id];return Response.json(null);}
+            return Response.json(artworks[id]||null);
+        }
         if(options.method==='PUT'){
             if(options.headers['if-match']!==String(etag))return new Response('{}',{status:412});
             room=resolve(JSON.parse(options.body));writes++;etag++;
@@ -17,9 +23,51 @@ function server(){
         return Response.json(value,{headers:{etag:String(etag)}});
     };
     const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'fake-token',getUid:()=> 'test-user',now:()=>100000,fetch});
-    return {store,get room(){return room;},set room(v){room=v;etag++;},get writes(){return writes;},dropNext:()=>drop=true};
+    return {store,get room(){return room;},set room(v){room=v;etag++;},get artworks(){return artworks;},get writes(){return writes;},get calls(){return calls;},dropNext:()=>drop=true};
 }
 const job=(id,command)=>({id,createdAt:90000,command});
+test('artwork REST methods keep drawing payloads outside the room transaction',async()=>{
+    const s=server(),drawing={id:'drawing_1abc',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='};
+    assert.deepEqual(await s.store.writeArtwork(drawing),{id:drawing.id,savedAt:drawing.savedAt});
+    assert.match(s.calls[0].url,/\/artworks\/classroom-115\/drawing_1abc\.json/);
+    assert.equal(s.calls[0].options.method,'PUT');
+    assert.deepEqual(await s.store.readArtwork(drawing.id),drawing);
+    await s.store.deleteArtwork(drawing.id);
+    assert.equal(s.calls.at(-1).options.method,'DELETE');
+});
+test('saveDrawing uploads validated payload before committing metadata only',async()=>{
+    const s=server(),drawing={id:'drawing_2abc',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='};
+    await s.store.execute(job('save-drawing',{type:'saveDrawing',drawing}));
+    assert.match(s.calls[0].url,/\/artworks\/classroom-115\/drawing_2abc\.json/);
+    assert.equal(s.calls[0].options.method,'PUT');
+    assert.deepEqual(s.room.progress.drawings,[{id:drawing.id,savedAt:drawing.savedAt}]);
+    assert.equal(JSON.stringify(s.room).includes(drawing.data),false);
+    const calls=s.calls.length;
+    await assert.rejects(s.store.execute(job('bad-id',{type:'saveDrawing',drawing:{...drawing,id:'bad'}})),/畫作/);
+    await assert.rejects(s.store.writeArtwork({...drawing,data:'not-a-data-url'}),/畫作/);
+    assert.equal(s.calls.length,calls);
+});
+test('restore and migration upload only the newest three artwork payloads',async()=>{
+    const drawings=Array.from({length:4},(_,index)=>({id:`drawing_restore${index}`,savedAt:`2026-09-16T00:00:00.00${index}Z`,data:'data:image/png;base64,AA=='}));
+    const s=server();
+    await s.store.execute(job('restore-artwork',{type:'restore',value:{students:[{id:1,tokens:0}],drawings,drawingAlbum:[]}}));
+    assert.deepEqual(Object.keys(s.artworks).sort(),drawings.slice(1).map(item=>item.id).sort());
+    assert.deepEqual(s.room.progress.drawings.map(item=>item.id),drawings.slice(1).reverse().map(item=>item.id));
+    assert.equal('drawingAlbum' in s.room.progress,false);
+    s.room={...s.room,progress:{...s.room.progress,drawings:[drawings[0]],drawingAlbum:[]}};
+    await s.store.execute({id:'migrate-artwork',createdAt:100001,command:{type:'migrateArtworks',drawings}});
+    assert.deepEqual(s.room.progress.drawings.map(item=>item.id),drawings.slice(1).reverse().map(item=>item.id));
+    assert.equal('drawingAlbum' in s.room.progress,false);
+});
+test('a retried drawing save reuses its operation receipt after a lost acknowledgement',async()=>{
+    const s=server(),drawing={id:'drawing_retry1',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='},request=job('save-retry',{type:'saveDrawing',drawing});
+    s.dropNext();
+    await assert.rejects(s.store.execute(request));
+    await s.store.execute(request);
+    assert.equal(s.writes,1);
+    assert.deepEqual(s.room.progress.drawings,[{id:drawing.id,savedAt:drawing.savedAt}]);
+    assert.ok(s.room.operations[request.id]);
+});
 test('server read does not upgrade or upload legacy progress',async()=>{
     const s=server(),value=await s.store.readRemote();assert.equal(value.students[0].tokens,100);assert.equal(s.writes,0);assert.equal(s.room.progress.revision,9);
 });

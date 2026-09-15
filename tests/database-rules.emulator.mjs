@@ -74,6 +74,37 @@ test('authenticated clients can read the room and unchanged legacy progress',asy
     assert.equal((await read('games/other-room')).status,401);
 });
 
+test('authenticated clients can only read and write validated external artwork',async()=>{
+    const drawing={id:'drawing_abc123',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='};
+    const artworkPath=`artworks/classroom-115/${drawing.id}`;
+    await allowed(drawing,{path:artworkPath});
+    const response=await read(artworkPath);
+    assert.equal(response.status,200,await response.clone().text());
+    assert.deepEqual(await response.json(),drawing);
+    await denied(drawing,{path:artworkPath,uid:null});
+    for(const invalid of [
+        {...drawing,id:'drawing_another'},
+        {...drawing,savedAt:'not-an-iso-time'},
+        {...drawing,data:'data:text/plain;base64,AA=='},
+        {...drawing,data:`data:image/jpeg;base64,${'A'.repeat(1_500_000)}`},
+        {...drawing,extra:true},
+    ]) await denied(invalid,{path:artworkPath});
+});
+
+test('legacy embedded artwork stays byte-for-byte unchanged until migration',async()=>{
+    const legacyDrawing={id:'drawing_legacy1',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/png;base64,AA=='};
+    const legacyAlbum={id:'drawing_album1',savedAt:'2026-09-15T00:00:00.000Z',data:'data:image/png;base64,AQ=='};
+    const progress={...legacy,drawings:[legacyDrawing],drawingAlbum:[legacyAlbum]};
+    await seed({progress});
+    await allowed(operation(await room(),{progress}));
+    const unchanged=await room();
+    await denied(operation(unchanged,{progress:{...progress,drawings:[{...legacyDrawing,data:'data:image/png;base64,Ag=='}]}}));
+    await denied(operation(unchanged,{progress:{...progress,drawingAlbum:[]}}));
+    const migrated={...progress,drawings:[{id:legacyDrawing.id,savedAt:legacyDrawing.savedAt}]};
+    delete migrated.drawingAlbum;
+    await allowed(operation(unchanged,{type:'migrateArtworks',progress:migrated}));
+});
+
 test('a conditional root transaction migrates progress and appends an authenticated receipt',async()=>{
     await seed({progress:legacy});
     const response = await read(roomPath,'test-user',{'X-Firebase-ETag':'true'});
