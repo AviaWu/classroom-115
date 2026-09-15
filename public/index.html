@@ -1053,6 +1053,8 @@ let drawingActive = false;
 let drawingTool = "pen";
 let drawingColor = DRAWING_COLORS[0];
 let drawingUndoStack = [];
+// Every selection or canvas edit invalidates earlier image decodes.
+let drawingEpoch = 0;
 const artworkCache = new Map();
 const artworkRequests = new Map();
 const artworkFailures = new Set();
@@ -1131,6 +1133,7 @@ function openDrawingBoard(){
 function initializeDrawingCanvas(){
     const canvas = document.getElementById("drawingCanvas");
     if(!canvas) return;
+    drawingEpoch++;
     drawingContext = canvas.getContext("2d",{alpha:false});
     drawingContext.fillStyle = "#ffffff";
     drawingContext.fillRect(0,0,canvas.width,canvas.height);
@@ -1149,6 +1152,7 @@ function initializeDrawingCanvas(){
     };
     canvas.addEventListener("pointerdown",event=>{
         event.preventDefault();
+        drawingEpoch++;
         const p = point(event);
         if(drawingTool==="bucket"){
             floodFillDrawing(Math.floor(p.x),Math.floor(p.y));
@@ -1166,6 +1170,7 @@ function initializeDrawingCanvas(){
     canvas.addEventListener("pointermove",event=>{
         if(!drawingActive) return;
         event.preventDefault();
+        drawingEpoch++;
         const p = point(event);
         drawingContext.lineTo(p.x,p.y);
         applyDrawingStroke();
@@ -1191,6 +1196,7 @@ function pushDrawingUndoState(){
 }
 function undoDrawing(){
     if(!drawingContext || !drawingUndoStack.length) return;
+    drawingEpoch++;
     drawingContext.putImageData(drawingUndoStack.pop(),0,0);
     updateDrawingUndoButton();
     const status = document.getElementById("drawingStatus");
@@ -1233,6 +1239,7 @@ function floodFillDrawing(startX,startY){
     const target = [data[startIndex],data[startIndex+1],data[startIndex+2],data[startIndex+3]];
     const fill = drawingHexToRgba(drawingColor);
     if(target.every((value,index)=>value===fill[index])) return false;
+    drawingEpoch++;
     pushDrawingUndoState();
     const queue = new Int32Array(canvas.width*canvas.height);
     let head = 0;
@@ -1267,6 +1274,7 @@ function floodFillDrawing(startX,startY){
 function clearDrawingBoard(){
     const canvas = document.getElementById("drawingCanvas");
     if(!canvas || !drawingContext || !confirm("確定清空目前畫板？")) return;
+    drawingEpoch++;
     pushDrawingUndoState();
     drawingContext.fillStyle = "#ffffff";
     drawingContext.fillRect(0,0,canvas.width,canvas.height);
@@ -1283,9 +1291,10 @@ function loadDrawing(id){
     const canvas = document.getElementById("drawingCanvas");
     const data=item && drawingImage(item),context=drawingContext;
     if(!data || !canvas || !context) return;
+    const epoch=++drawingEpoch;
     const image = new Image();
     image.onload = ()=>{
-        if(currentView?.type!=="drawing" || document.getElementById("drawingCanvas")!==canvas) return;
+        if(epoch!==drawingEpoch || currentView?.type!=="drawing" || document.getElementById("drawingCanvas")!==canvas) return;
         pushDrawingUndoState();
         context.fillStyle = "#ffffff";
         context.fillRect(0,0,canvas.width,canvas.height);

@@ -212,3 +212,54 @@ test('closing a board before its queued loader starts sends no artwork request',
     const opening=h.w.openDrawingBoard();h.w.closeModal();await opening;await settleArtwork();
     assert.deepEqual(h.artworkReads,[]);
 });
+
+function deferDrawingDecodes(h){
+    const images=[],painted=[];
+    h.w.Image=class {constructor(){images.push(this);}};
+    const getContext=h.w.HTMLCanvasElement.prototype.getContext;
+    h.w.HTMLCanvasElement.prototype.getContext=function(...args){
+        const context=getContext.apply(this,args);
+        context.drawImage=image=>painted.push(image.src);
+        return context;
+    };
+    return {images,painted};
+}
+function drawingPointer(h,type){
+    const canvas=h.w.document.getElementById('drawingCanvas');
+    canvas.setPointerCapture=()=>{};
+    canvas.getBoundingClientRect=()=>({left:0,top:0,width:800,height:600});
+    canvas.dispatchEvent(new h.w.MouseEvent(type,{clientX:1,clientY:1,bubbles:true,cancelable:true}));
+}
+for(const order of [[0,1],[1,0]]) test(`only the latest selected drawing paints when decodes complete in order ${order.join(',')}`,async t=>{
+    const h=page(t),decoder=deferDrawingDecodes(h);addArtworkFixture(h,[2,1]);await h.start();await h.w.openDrawingBoard();
+    h.w.loadDrawing('drawing_1');h.w.loadDrawing('drawing_2');
+    decoder.images[order[0]].onload();
+    assert.deepEqual(decoder.painted,order[0]===0 ? [] : ['data:image/png;base64,image2']);
+    decoder.images[order[1]].onload();
+    assert.deepEqual(decoder.painted,['data:image/png;base64,image2']);
+    assert.match(h.w.document.getElementById('drawingUndo').textContent,/1\/5/);
+});
+for(const action of [
+    {name:'pointerdown',edit:h=>drawingPointer(h,'pointerdown')},
+    {name:'continuing a stroke',prepare:h=>drawingPointer(h,'pointerdown'),edit:h=>drawingPointer(h,'pointermove')},
+    {name:'clearing the board',edit:h=>h.w.clearDrawingBoard()},
+    {name:'undoing a change',prepare:h=>h.w.clearDrawingBoard(),edit:h=>h.w.undoDrawing()},
+    {name:'filling an area',edit:h=>h.w.floodFillDrawing(0,0)}
+]) test(`a pending drawing decode cannot overwrite ${action.name}`,async t=>{
+    const h=page(t),decoder=deferDrawingDecodes(h);addArtworkFixture(h,[1]);await h.start();await h.w.openDrawingBoard();
+    action.prepare?.(h);h.w.loadDrawing('drawing_1');action.edit(h);
+    const status=h.w.document.getElementById('drawingStatus').textContent,undo=h.w.document.getElementById('drawingUndo').textContent;
+    decoder.images[0].onload();
+    assert.deepEqual(decoder.painted,[]);
+    assert.equal(h.w.document.getElementById('drawingStatus').textContent,status);
+    assert.equal(h.w.document.getElementById('drawingUndo').textContent,undo);
+    h.w.loadDrawing('drawing_1');decoder.images[1].onload();
+    assert.deepEqual(decoder.painted,['data:image/png;base64,image1']);
+});
+test('an image decoded after the drawing board reopens cannot paint the replacement canvas',async t=>{
+    const h=page(t),decoder=deferDrawingDecodes(h);addArtworkFixture(h,[1]);await h.start();await h.w.openDrawingBoard();
+    h.w.loadDrawing('drawing_1');h.w.closeModal();await h.w.openDrawingBoard();
+    decoder.images[0].onload();assert.deepEqual(decoder.painted,[]);
+    h.w.loadDrawing('drawing_1');decoder.images[1].onload();
+    assert.deepEqual(decoder.painted,['data:image/png;base64,image1']);
+});
