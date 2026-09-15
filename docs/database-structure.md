@@ -20,8 +20,8 @@ games/
     │   ├── weeklyTaskTemplates[]
     │   ├── coopTaskTemplates[]
     │   ├── coopTasks[]
-    │   ├── drawings[]
-    │   ├── drawingAlbum[]
+    │   ├── drawings[]              （最多 3 筆 metadata）
+    │   ├── pendingArtworkDeletes[]
     │   ├── deletedTaskIds[]
     │   ├── deletedCoopTaskIds[]
     │   ├── globalBgImage
@@ -37,6 +37,12 @@ games/
     │           └── json
     ├── lastOperationId
     └── restoredAt                  （初始化或還原後才有）
+artworks/
+└── classroom-115/
+    └── {drawingId}/
+        ├── id
+        ├── savedAt
+        └── data                    （JPEG／PNG Data URL）
 ```
 
 `[]` 表示程式使用的陣列。RTDB 會以 `0`、`1`、`2` 等子節點保存元素；例如 `progress/students/0/id` 通常是 `1`。陣列位置與元素內的 `id` 是不同概念，操作依元素的 `id` 尋找資料。空陣列與 `null` 在 RTDB 可能不留下節點，讀入時會補成程式需要的空陣列或預設值。
@@ -62,8 +68,8 @@ games/
 | `dailyTaskTemplates`、`weeklyTaskTemplates` | 模板陣列 | 產生個人週期任務的設定。 |
 | `coopTaskTemplates` | 模板陣列 | 產生每日或每週協力任務的設定。 |
 | `coopTasks` | 協力任務陣列 | 怪獸、獎勵、完成成員與全班發獎狀態。 |
-| `drawings` | 畫作陣列 | 畫板最近儲存的最多三張作品，新儲存的放前面。 |
-| `drawingAlbum` | 畫作陣列 | 從最近三張移出的舊作品，可由教師刪除。 |
+| `drawings` | 畫作索引陣列 | 最近三張作品的 `{id, savedAt}`，不含圖片。 |
+| `pendingArtworkDeletes` | 畫作 ID 陣列 | 已移出最近三張、等待刪除外部圖片的 ID。 |
 | `deletedTaskIds` | ID 陣列 | 已刪除個人任務的 ID，避免同 ID 任務再次加入。 |
 | `deletedCoopTaskIds` | ID 陣列 | 已刪除協力任務的 ID，避免排程重新產生。 |
 | `globalBgImage` | 字串 | 全站背景圖片；空字串代表未指定。 |
@@ -147,13 +153,20 @@ games/
 
 ## 畫作與刪除記錄
 
-| `drawings[]`／`drawingAlbum[]` 欄位 | 型別 | 意義 |
+| `progress/drawings[]` 欄位 | 型別 | 意義 |
 | --- | --- | --- |
-| `id` | 字串 | 畫作唯一 ID。 |
-| `savedAt` | ISO 8601 字串 | 使用者儲存作品的時間。 |
-| `data` | 字串 | 畫作圖片 Data URL，目前畫板輸出 JPEG。 |
+| `id` | 字串 | 畫作唯一 ID，對應 `/artworks/classroom-115/{drawingId}`。 |
+| `savedAt` | ISO 8601 字串 | 使用者儲存作品的時間，用來排列最新三張。 |
 
-同一畫作 ID 不重複加入。`drawings` 超過三張時，較舊作品移至 `drawingAlbum`；畫冊目前沒有自動數量上限。
+| `/artworks/classroom-115/{drawingId}` 欄位 | 型別 | 意義 |
+| --- | --- | --- |
+| `id` | 字串 | 必須等於節點鍵，格式為 `drawing_` 加英數、底線或連字號。 |
+| `savedAt` | ISO 8601 字串 | 與索引相同的儲存時間。 |
+| `data` | 字串 | JPEG 或 PNG Data URL，上限 1,500,000 個字元。 |
+
+儲存作品時先寫圖片，再以班級交易加入索引。第四張出現時，最舊 ID 加入 `pendingArtworkDeletes`；在線裝置刪除外部圖片成功後，再用 `confirmArtworkDeletion` 移除待辦。安全規則禁止刪除目前三筆索引仍引用的圖片。
+
+一般五秒輪詢只讀 `progress`，因此不下載圖片。畫板開啟後才讀缺少的三張圖片；同一 ID 在該次頁面工作階段會使用記憶體快取。老師後台沒有畫冊或歷史畫作。舊格式的 `drawingAlbum`／內嵌 `data` 只為過渡讀取保留，老師可在「備份」頁明確永久清空，頁面載入不會自動改寫。
 
 刪除個人任務時，會同時移除 `tasks` 中的任務、清除最新全班學生 `doneTasks` 內的同 ID，並加入 `deletedTaskIds`。刪除協力任務則更新 `coopTasks` 與 `deletedCoopTaskIds`。這些 ID 是防止任務重生的刪除記錄，不是已刪任務的內容備份。
 
@@ -170,7 +183,8 @@ flowchart LR
     coop -->|completedBy| student
     deleted["deletedTaskIds / deletedCoopTaskIds"] -.->|阻止同 ID 再加入| task
     deleted -.->|阻止同 ID 再加入| coop
-    recent["drawings：最近三張"] -->|超出三張移出| album["drawingAlbum：畫冊"]
+    recent["progress/drawings：最近三張索引"] -->|id| artwork["artworks/classroom-115/{drawingId}：圖片"]
+    pending["pendingArtworkDeletes"] -.->|刪除後確認| artwork
     last["lastOperationId"] -->|操作 ID| receipt["operations：操作收據"]
 ```
 
@@ -187,7 +201,7 @@ flowchart LR
 | `committedAt` | Unix 毫秒 | Firebase 在成功提交時填入的伺服器時間。 |
 | `result.json` | 字串 | 操作結果經 `JSON.stringify` 後的內容，例如 `{"ok":true,"reward":20}`。讀取收據時以 `JSON.parse` 還原。 |
 
-收據保存結果與基本操作資訊，不保存整份進度或完整命令。支援的操作包含初始化／還原、完成任務、購買、樂透、裝備、寵物互動、協力完成、存畫作、資源加減／設定、衣櫃重置、全班資源重置、人數／性別設定、教師欄位編輯及排程。
+收據保存結果與基本操作資訊，不保存整份進度或完整命令。支援的操作包含初始化／還原、完成任務、購買、樂透、裝備、寵物互動、協力完成、存畫作、確認畫作刪除、清除舊畫作、資源加減／設定、衣櫃重置、全班資源重置、人數／性別設定、教師欄位編輯及排程。
 
 在遵循此操作協定的客戶端之間，相同操作 ID 會直接讀回原結果，避免重複扣款或發獎。收據目前永久保留，會隨成功寫入的操作數持續增加；這些收據不能用來還原完整歷史進度。沒有資料變更的操作直接回傳結果，不另外建立收據。
 
@@ -210,6 +224,6 @@ flowchart LR
 | 教師刪除今日排程任務 | 清除任務及學生完成記錄，保留刪除 ID；同日排程不會補回。 |
 | 教師還原備份 | 取代最新 `progress`、更新 `restoredAt` 並新增還原收據；保留既有收據，較早未確認的一般操作取消。 |
 
-教師下載備份時，會重新讀取最新 `progress` 並輸出 JSON；備份檔只包含遊戲進度，不包含班級根節點的操作收據與共用中繼資料。
+教師下載備份時，會重新讀取最新 `progress`，再按索引取回最多三張完整圖片後輸出 JSON；備份檔不包含班級根節點的操作收據、共用中繼資料或刪除待辦。還原時只接受備份內最多三張有效完整圖片，並配置新的畫作 ID。
 
 實作依據：[操作處理器](../public/game-operations.mjs)、[Firebase 儲存介面](../public/firebase-store.mjs)、[同步控制器](../public/cloud-sync.mjs)、[頁面與備份流程](../public/index.html)、[資料庫規則](../database.rules.json)。

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCloudSync} from '../public/cloud-sync.mjs';
+import {applyOperation,normalizeProgress} from '../public/game-operations.mjs';
 const clone = x => structuredClone(x);
 const progress = tokens => ({students:[{id:1,tokens}],tasks:[]});
 function harness(options={}) {
@@ -116,4 +117,64 @@ test('poll ticks during a slow server read coalesce without keeping refresh aliv
     h.setRead(()=>{if(first){first=false;return new Promise(r=>release=r);}return progress(20);});
     const count=h.reads,reading=h.sync.refresh();await Promise.resolve();void h.tick();release(progress(20));await reading;
     assert.equal(h.reads-count,1);
+});
+
+const settleBackground = () => new Promise(resolve=>setImmediate(resolve));
+function cleanupHarness(t,options={}) {
+    let remote=normalizeProgress({students:[{id:1}],drawings:options.drawings||[],pendingArtworkDeletes:options.pending||['drawing_old']}),counter=0;
+    const events=[],errors=[];
+    let deleteHook=options.deleteArtwork;
+    const sync=createCloudSync({
+        readRemote:async()=>clone(remote),applyState(){},lock(){},status(){},error:error=>errors.push(error),
+        deleteArtwork:async id=>{events.push(`delete:${id}`);if(deleteHook) await deleteHook(id);},
+        execute:async job=>{
+            events.push(`${job.command.type}:${job.command.drawingId||''}`);
+            const outcome=applyOperation(remote,job.command,Date.now());remote=outcome.progress;return outcome;
+        },
+        newId:()=>`cleanup-${++counter}`,setInterval:()=>1,clearInterval(){}
+    });
+    t.after(()=>sync.dispose());
+    return {sync,events,errors,get remote(){return remote;},set remote(value){remote=normalizeProgress(value);},
+        setDelete:fn=>deleteHook=fn,async start(){sync.setConnected(true);await sync.refresh();await settleBackground();}};
+}
+test('accepted progress automatically deletes evicted artwork before confirming its queue entry',async t=>{
+    const h=cleanupHarness(t);await h.start();
+    assert.deepEqual(h.events,['delete:drawing_old','confirmArtworkDeletion:drawing_old']);
+    assert.deepEqual(h.remote.pendingArtworkDeletes,[]);
+    await h.sync.refresh();await settleBackground();assert.equal(h.events.length,2);
+});
+test('failed artwork deletion leaves its queue entry and retries on the next snapshot without locking gameplay',async t=>{
+    let first=true;
+    const h=cleanupHarness(t,{deleteArtwork:()=>{if(first){first=false;throw new TypeError('offline artwork request');}}});
+    await h.start();assert.deepEqual(h.remote.pendingArtworkDeletes,['drawing_old']);
+    assert.deepEqual(h.events,['delete:drawing_old']);assert.equal(h.sync.canEdit(),true);
+    await h.sync.refresh();await settleBackground();
+    assert.deepEqual(h.events,['delete:drawing_old','delete:drawing_old','confirmArtworkDeletion:drawing_old']);
+    assert.deepEqual(h.remote.pendingArtworkDeletes,[]);
+});
+test('concurrent snapshots serialize deletion and newly accepted pending IDs are also cleaned',async t=>{
+    let release;
+    const h=cleanupHarness(t,{deleteArtwork:()=>new Promise(resolve=>release=resolve)});await h.start();
+    h.remote={...h.remote,pendingArtworkDeletes:['drawing_old','drawing_next']};
+    await Promise.all([h.sync.refresh(),h.sync.refresh()]);await settleBackground();
+    assert.deepEqual(h.events,['delete:drawing_old']);
+    h.setDelete(null);release();await settleBackground();
+    assert.deepEqual(h.events,['delete:drawing_old','confirmArtworkDeletion:drawing_old','delete:drawing_next','confirmArtworkDeletion:drawing_next']);
+    assert.deepEqual(h.remote.pendingArtworkDeletes,[]);
+});
+test('reconnecting retries queued artwork deletion but currently retained drawing IDs are untouched',async t=>{
+    const h=cleanupHarness(t,{pending:['drawing_kept','drawing_old'],drawings:[{id:'drawing_kept',savedAt:'2026-09-16T00:00:00.000Z'}],deleteArtwork:()=>{throw new TypeError('offline');}});
+    await h.start();assert.deepEqual(h.events,['delete:drawing_old']);
+    h.sync.setConnected(false);h.setDelete(null);await h.sync.refresh();assert.equal(h.events.length,1);
+    h.sync.setConnected(true);await h.sync.refresh();await settleBackground();
+    assert.deepEqual(h.events,['delete:drawing_old','delete:drawing_old','confirmArtworkDeletion:drawing_old']);
+    assert.deepEqual(h.remote.pendingArtworkDeletes,['drawing_kept']);
+});
+test('an artwork restored during a pending delete is not confirmed out of the queue',async t=>{
+    let finish;
+    const h=cleanupHarness(t,{deleteArtwork:()=>new Promise(resolve=>finish=resolve)});await h.start();
+    h.remote={...h.remote,drawings:[{id:'drawing_old',savedAt:'2026-09-16T00:00:00.000Z'}]};
+    await h.sync.refresh();finish();await settleBackground();
+    assert.deepEqual(h.events,['delete:drawing_old']);
+    assert.deepEqual(h.remote.pendingArtworkDeletes,['drawing_old']);
 });

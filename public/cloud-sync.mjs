@@ -1,15 +1,39 @@
 // The browser never uploads a local snapshot. Only explicit commands may write.
 export function createCloudSync(io) {
     let connected=false,active=true,verified=false,remote,reading=null,working=false;
-    let epoch=0,writeEpoch=0,readAgain=false;
+    let epoch=0,writeEpoch=0,readAgain=false,artworkCleanup=null;
     const jobs=(io.loadPending?.()||[]).map(job=>({...job,restored:true}));
     const canManage=()=>connected && active && verified;
     const canEdit=()=>canManage() && remote!==null;
     const persist=()=>io.persistPending?.(jobs.map(({id,key,command,createdAt})=>({id,key,command,createdAt})));
     const lock=()=>io.lock(!canEdit());
-    const apply=value=>{remote=structuredClone(value);io.applyState(structuredClone(value));};
+    const apply=value=>{remote=structuredClone(value);io.applyState(structuredClone(value));void cleanupEvictedArtworks();};
     const notify=()=>{lock();io.status(connected && verified ? '' : '離線中');};
     const transient=e=>e.retryable===true || e.name==='AbortError' || e instanceof TypeError;
+    function cleanupEvictedArtworks(){
+        if(artworkCleanup) return artworkCleanup;
+        if(!canEdit() || typeof io.deleteArtwork!=='function') return Promise.resolve();
+        artworkCleanup=Promise.resolve().then(async()=>{
+            const attempted=new Set();
+            while(canEdit()){
+                const retained=new Set((remote?.drawings||[]).map(item=>item.id));
+                const id=(remote?.pendingArtworkDeletes||[]).find(id=>!attempted.has(id) && !retained.has(id));
+                if(!id) break;
+                attempted.add(id);
+                try{
+                    await io.deleteArtwork(id);
+                    if(!canEdit()) break;
+                    if((remote.drawings||[]).some(item=>item.id===id)) continue;
+                    await perform({type:'confirmArtworkDeletion',drawingId:id},`artwork-delete:${id}`);
+                }catch(error){
+                    // A failed delete stays in progress for a later snapshot/reconnect.
+                    // Do not turn a separate artwork request into a gameplay outage.
+                    io.error?.(error);
+                }
+            }
+        }).finally(()=>{artworkCleanup=null;});
+        return artworkCleanup;
+    }
     function settle(job,error,result){
         const index=jobs.indexOf(job);if(index>=0) jobs.splice(index,1);
         try{persist();}catch(storageError){io.error?.(storageError);}
@@ -62,7 +86,7 @@ export function createCloudSync(io) {
                 if(ticket!==epoch || !connected || !active){readAgain=connected&&active;continue;}
                 // A read begun before/during a command cannot reverse its acknowledgement.
                 if(writeTicket===writeEpoch && !working) apply(value);
-                verified=true;notify();
+                verified=true;notify();void cleanupEvictedArtworks();
                 await checkReceipts();
             }while(readAgain);
             void work();
@@ -100,7 +124,7 @@ export function createCloudSync(io) {
     }
     const timer=(io.setInterval||globalThis.setInterval)(()=>refresh(),5000);
     return {
-        available:true,canEdit,canManage,perform,refresh,
+        available:true,canEdit,canManage,perform,refresh,cleanupEvictedArtworks,
         editToken:()=>epoch,
         hasPendingSave:()=>jobs.length>0,
         pendingActions:()=>jobs.map(({id,key,command,createdAt})=>({id,key,command,createdAt})),

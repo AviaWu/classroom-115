@@ -1,7 +1,8 @@
 /** Pure domain operations. Call again with the latest transaction snapshot on every retry. */
 const RECORD_COLLECTIONS = ['students','tasks','clothesM','clothesF','layouts','backgrounds',
-    'coopTasks','coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','drawings','drawingAlbum'];
+    'coopTasks','coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates'];
 const TOMBSTONES = ['deletedTaskIds','deletedCoopTaskIds'];
+const ARTWORK_FIELDS = ['drawings','drawingAlbum','pendingArtworkDeletes'];
 const STUDENT_ARRAYS = ['doneTasks','ownedClothes','ownedLayout','equippedLayout','ownedBg'];
 const LEGACY_METADATA = ['syncVersion','revision','baseCommitId','commitId','updatedAt'];
 const IGNORED_DIFF_FIELDS = new Set([...LEGACY_METADATA,'lastSaved']);
@@ -15,6 +16,27 @@ const unique = value => [...new Set(array(value))];
 const numeric = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const safeKey = key => typeof key === 'string' && !['__proto__','prototype','constructor'].includes(key);
 const idValid = id => (typeof id === 'string' && id.length > 0) || (typeof id === 'number' && Number.isFinite(id));
+const validDrawingId = id => typeof id === 'string' && id.length >= 8 && id.length <= 128 && /^drawing_[A-Za-z0-9_-]+$/.test(id);
+
+function legacyArtwork(progress) {
+    return Object.hasOwn(progress,'drawingAlbum') || array(progress.drawings).some(item=>object(item) && Object.hasOwn(item,'data'));
+}
+function indexedDrawings(value) {
+    const seen = new Set();
+    return array(value)
+        .filter(item=>object(item) && validDrawingId(item.id) && Number.isFinite(Date.parse(item.savedAt)))
+        .map(({id,savedAt})=>({id,savedAt}))
+        .sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt))
+        .filter(item=>!seen.has(item.id) && seen.add(item.id))
+        .slice(0,3);
+}
+function drawingIds(value) {
+    return new Set(array(value).filter(item=>object(item) && validDrawingId(item.id)).map(item=>item.id));
+}
+function addArtworkDeletes(progress, ids) {
+    const retained = drawingIds(progress.drawings);
+    progress.pendingArtworkDeletes = unique([...progress.pendingArtworkDeletes,...ids]).filter(id=>validDrawingId(id) && !retained.has(id));
+}
 
 function equal(left, right) {
     if (left == null && right == null) return true;
@@ -67,9 +89,8 @@ export function normalizeProgress(value) {
     progress.coopTaskTemplates = progress.coopTaskTemplates.map(item=>({...templateDefaults(item,true),scheduleType:item.scheduleType === 'weekly' ? 'weekly' : 'daily'}));
     progress.coopTasks = progress.coopTasks.map(task=>({...task,completedBy:unique(task.completedBy),claimed:task.claimed === true,
         startAt:task.startAt == null ? null : numeric(task.startAt,null),dueAt:task.dueAt == null ? null : numeric(task.dueAt,null)}));
-    progress.drawings = progress.drawings.filter(item=>typeof item.data === 'string');
-    progress.drawingAlbum = progress.drawingAlbum.filter(item=>typeof item.data === 'string');
-    if (progress.drawings.length > 3) progress.drawingAlbum.unshift(...progress.drawings.splice(3));
+    if (!legacyArtwork(progress)) progress.drawings = indexedDrawings(progress.drawings);
+    progress.pendingArtworkDeletes = unique(progress.pendingArtworkDeletes).filter(validDrawingId);
     if (typeof progress.globalBgImage !== 'string') progress.globalBgImage = '';
     return progress;
 }
@@ -202,7 +223,7 @@ export function createEditChanges(beforeValue,afterValue) {
     }
     const globalBefore = {}, globalAfter = {};
     for (const key of new Set([...Object.keys(before),...Object.keys(after)])) {
-        if (RECORD_COLLECTIONS.includes(key) || TOMBSTONES.includes(key) || IGNORED_DIFF_FIELDS.has(key) || !safeKey(key)) continue;
+        if (RECORD_COLLECTIONS.includes(key) || TOMBSTONES.includes(key) || ARTWORK_FIELDS.includes(key) || IGNORED_DIFF_FIELDS.has(key) || !safeKey(key)) continue;
         globalBefore[key] = before[key]; globalAfter[key] = after[key];
     }
     diffFields(changes,'$',undefined,globalBefore,globalAfter);
@@ -220,7 +241,7 @@ function setField(progress,patch) {
     if (!target) throw new Error('要修改的資料已刪除，請重新整理後重試');
     const path = patch.path ?? [patch.field];
     if (!Array.isArray(path) || !path.length || !path.every(safeKey) || path[0] === 'id') throw new Error('欄位變更格式不正確');
-    if (patch.collection === '$' && (IGNORED_DIFF_FIELDS.has(path[0]) || RECORD_COLLECTIONS.includes(path[0]) || TOMBSTONES.includes(path[0]))) throw new Error('不允許整批覆蓋此進度欄位');
+    if (patch.collection === '$' && (IGNORED_DIFF_FIELDS.has(path[0]) || RECORD_COLLECTIONS.includes(path[0]) || TOMBSTONES.includes(path[0]) || ARTWORK_FIELDS.includes(path[0]))) throw new Error('不允許整批覆蓋此進度欄位');
     for (const key of path.slice(0,-1)) {
         if (!object(target[key])) throw new Error('資料欄位已被修改，請重新整理以解決衝突');
         target = target[key];
@@ -273,7 +294,10 @@ export function applyOperation(value,command,now = Date.now()) {
     let progress = normalizeProgress(value);
     if (command.type === 'initialize' && progress !== null) return {progress:requireProgress(progress),result:null,changed:false};
     if (command.type === 'initialize' || command.type === 'restore') {
+        const previousArtworkIds = command.type === 'restore' && progress !== null && !legacyArtwork(progress) ? drawingIds(progress.drawings) : new Set();
+        const previousArtworkDeletes = command.type === 'restore' && progress !== null ? progress.pendingArtworkDeletes : [];
         const restored = requireProgress(normalizeProgress(command.value));
+        if (command.type === 'restore') addArtworkDeletes(restored,[...previousArtworkDeletes,...[...previousArtworkIds].filter(id=>!drawingIds(restored.drawings).has(id))]);
         return {progress:restored,result:null,changed:!equal(progress,restored)};
     }
     requireProgress(progress);
@@ -351,10 +375,28 @@ export function applyOperation(value,command,now = Date.now()) {
     }
     case 'saveDrawing': {
         const drawing = command.drawing;
-        if (!object(drawing) || typeof drawing.id !== 'string' || !drawing.id || typeof drawing.data !== 'string' || !drawing.data || !Number.isFinite(Date.parse(drawing.savedAt))) throw new Error('畫作資料格式不正確');
-        if ([...progress.drawings,...progress.drawingAlbum].some(item=>item.id === drawing.id)) break;
-        progress.drawings.unshift(clone(drawing));
-        if (progress.drawings.length > 3) progress.drawingAlbum.unshift(...progress.drawings.splice(3));
+        if (legacyArtwork(progress)) throw new Error('舊畫作資料尚未遷移');
+        if (!object(drawing) || !validDrawingId(drawing.id) || !Number.isFinite(Date.parse(drawing.savedAt)) || Object.hasOwn(drawing,'data')) throw new Error('畫作資料格式不正確');
+        result = {evictedArtworkIds:[]};
+        if (progress.drawings.some(item=>item.id === drawing.id)) break;
+        const candidates = indexedDrawings([drawing,...progress.drawings]);
+        const retainedIds = new Set(candidates.map(item=>item.id));
+        const evictedArtworkIds = [drawing,...progress.drawings].map(item=>item.id).filter(id=>!retainedIds.has(id));
+        progress.drawings = candidates;
+        addArtworkDeletes(progress,evictedArtworkIds);
+        result = {evictedArtworkIds};
+        break;
+    }
+    case 'confirmArtworkDeletion': {
+        if (!validDrawingId(command.drawingId)) throw new Error('畫作編號格式不正確');
+        progress.pendingArtworkDeletes = progress.pendingArtworkDeletes.filter(id=>id !== command.drawingId);
+        break;
+    }
+    case 'migrateArtworks': {
+        if (!Array.isArray(command.drawings)) throw new Error('畫作資料格式不正確');
+        if (!legacyArtwork(progress)) break;
+        progress.drawings = indexedDrawings(command.drawings);
+        delete progress.drawingAlbum;
         break;
     }
     case 'resources': {

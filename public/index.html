@@ -189,10 +189,6 @@ input[type="number"]{width:85px}
 .drawing-tool-actions{display:grid;gap:10px}
 .drawing-tool-actions button.active{background:#9ed7d3}
 .drawing-status{min-height:20px;margin-top:12px;font-size:12px;font-weight:700}
-.backend-album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px}
-.backend-album-item{padding:10px;background:#fff8e8;border:3px solid #20263a;box-shadow:4px 4px 0 #172033;text-align:center}
-.backend-album-item img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff;border:2px solid #20263a;margin-bottom:8px}
-.backend-album-actions{display:flex;justify-content:center;gap:8px;margin-top:8px}
 @media(max-width:800px){.drawing-board-layout{grid-template-columns:1fr}.drawing-canvas-wrap{order:1}.drawing-tools{order:2}.drawing-history{order:3;display:grid;grid-template-columns:repeat(3,minmax(80px,1fr));max-height:none}.drawing-palette{grid-template-columns:repeat(6,1fr)}}
 @media(max-width:520px){.drawing-history{grid-template-columns:repeat(2,1fr)}.drawing-palette{grid-template-columns:repeat(6,1fr)}}
 .product-admin{align-items:flex-start}
@@ -562,7 +558,6 @@ function initialProgress(){ return normalizeState({
         deletedTaskIds:[],
         deletedCoopTaskIds:[],
         drawings:[],
-        drawingAlbum:[],
         dailyTaskTemplates:[],
         weeklyTaskTemplates:[],
         globalBgImage:"",
@@ -586,13 +581,8 @@ function normalizeState(target){
     target.deletedTaskIds = [...new Set(target.deletedTaskIds.filter(id=>typeof id==="string"))];
     target.deletedCoopTaskIds = [...new Set(target.deletedCoopTaskIds.filter(id=>typeof id==="string"))];
     if(!Array.isArray(target.drawings)) target.drawings=[];
-    if(!Array.isArray(target.drawingAlbum)) target.drawingAlbum=[];
-    target.drawings = target.drawings.filter(item=>item && typeof item.data==="string");
-    target.drawingAlbum = target.drawingAlbum.filter(item=>item && typeof item.data==="string");
-    if(target.drawings.length>3){
-        target.drawingAlbum.unshift(...target.drawings.slice(3));
-        target.drawings = target.drawings.slice(0,3);
-    }
+    target.drawings = target.drawings.filter(item=>item && typeof item==="object");
+    // Preserve any legacy artwork fields until the teacher explicitly clears them.
     if(!Array.isArray(target.tasks)) target.tasks=[];
     if(!Array.isArray(target.dailyTaskTemplates)) target.dailyTaskTemplates=[];
     target.dailyTaskTemplates = target.dailyTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
@@ -946,6 +936,7 @@ function applyCloudState(cloudState){
     unsavedChange=false;
     cacheConfirmedState();
     if(changed){ render(); refreshVisibleView(); }
+    else if(currentView?.type==="drawing") void refreshDrawingImages();
     return true;
 }
 
@@ -1052,13 +1043,56 @@ let drawingActive = false;
 let drawingTool = "pen";
 let drawingColor = DRAWING_COLORS[0];
 let drawingUndoStack = [];
+// Every selection or canvas edit invalidates earlier image decodes.
+let drawingEpoch = 0;
+const artworkCache = new Map();
+const artworkRequests = new Map();
+const artworkFailures = new Set();
+
+function drawingImage(item){
+    return typeof item.data==="string" ? item.data : artworkCache.get(item.id)?.data;
+}
 
 function drawingHistoryHtml(){
     if(!state.drawings.length) return `<div class="empty">尚無儲存作品</div>`;
-    return state.drawings.map((item,index)=>`<button class="drawing-thumb" onclick="loadDrawing('${esc(item.id)}')" title="載入這張畫板">
-        <img src="${esc(item.data)}" alt="畫板作品 ${index+1}">
+    return state.drawings.slice(0,3).map((item,index)=>{
+        const data=drawingImage(item);
+        return `<button class="drawing-thumb" onclick="loadDrawing('${esc(item.id)}')" title="載入這張畫板" ${data?'':'disabled'}>
+        ${data?`<img src="${esc(data)}" alt="畫板作品 ${index+1}">`:`<span>${artworkFailures.has(item.id)?"圖片載入失敗，稍後會重試":"圖片載入中"}</span>`}
         <span>${esc(new Date(item.savedAt).toLocaleString())}</span>
-    </button>`).join("");
+    </button>`;
+    }).join("");
+}
+
+async function refreshDrawingImages(){
+    if(currentView?.type!=="drawing") return;
+    const latest=state.drawings.slice(0,3),ids=new Set(latest.map(item=>item.id));
+    for(const id of artworkCache.keys()) if(!ids.has(id)) artworkCache.delete(id);
+    for(const id of artworkFailures) if(!ids.has(id)) artworkFailures.delete(id);
+    const renderHistory=()=>{
+        if(currentView?.type!=="drawing") return;
+        const history=document.getElementById("drawingHistory");
+        if(history) history.innerHTML=drawingHistoryHtml();
+    };
+    const requests=latest.map(item=>{
+        if(drawingImage(item)) return;
+        if(artworkRequests.has(item.id)) return artworkRequests.get(item.id);
+        if(typeof window.artworkStore?.readArtwork!=="function") return;
+        artworkFailures.delete(item.id);
+        const request=Promise.resolve().then(async()=>{
+            if(currentView?.type!=="drawing" || !state.drawings.some(current=>current.id===item.id)) return;
+            const artwork=await window.artworkStore.readArtwork(item.id);
+            if(!artwork || artwork.id!==item.id || typeof artwork.data!=="string" || !artwork.data) throw new Error("畫作圖片無法載入");
+            if(state.drawings.some(current=>current.id===item.id)) artworkCache.set(item.id,artwork);
+        }).catch(()=>{artworkFailures.add(item.id);}).finally(()=>{
+            artworkRequests.delete(item.id);
+            renderHistory();
+        });
+        artworkRequests.set(item.id,request);
+        return request;
+    });
+    renderHistory();
+    await Promise.all(requests);
 }
 
 function openDrawingBoard(){
@@ -1083,11 +1117,13 @@ function openDrawingBoard(){
             </aside>
         </div>`);
     initializeDrawingCanvas();
+    return refreshDrawingImages();
 }
 
 function initializeDrawingCanvas(){
     const canvas = document.getElementById("drawingCanvas");
     if(!canvas) return;
+    drawingEpoch++;
     drawingContext = canvas.getContext("2d",{alpha:false});
     drawingContext.fillStyle = "#ffffff";
     drawingContext.fillRect(0,0,canvas.width,canvas.height);
@@ -1106,6 +1142,7 @@ function initializeDrawingCanvas(){
     };
     canvas.addEventListener("pointerdown",event=>{
         event.preventDefault();
+        drawingEpoch++;
         const p = point(event);
         if(drawingTool==="bucket"){
             floodFillDrawing(Math.floor(p.x),Math.floor(p.y));
@@ -1123,6 +1160,7 @@ function initializeDrawingCanvas(){
     canvas.addEventListener("pointermove",event=>{
         if(!drawingActive) return;
         event.preventDefault();
+        drawingEpoch++;
         const p = point(event);
         drawingContext.lineTo(p.x,p.y);
         applyDrawingStroke();
@@ -1148,6 +1186,7 @@ function pushDrawingUndoState(){
 }
 function undoDrawing(){
     if(!drawingContext || !drawingUndoStack.length) return;
+    drawingEpoch++;
     drawingContext.putImageData(drawingUndoStack.pop(),0,0);
     updateDrawingUndoButton();
     const status = document.getElementById("drawingStatus");
@@ -1190,6 +1229,7 @@ function floodFillDrawing(startX,startY){
     const target = [data[startIndex],data[startIndex+1],data[startIndex+2],data[startIndex+3]];
     const fill = drawingHexToRgba(drawingColor);
     if(target.every((value,index)=>value===fill[index])) return false;
+    drawingEpoch++;
     pushDrawingUndoState();
     const queue = new Int32Array(canvas.width*canvas.height);
     let head = 0;
@@ -1224,6 +1264,7 @@ function floodFillDrawing(startX,startY){
 function clearDrawingBoard(){
     const canvas = document.getElementById("drawingCanvas");
     if(!canvas || !drawingContext || !confirm("確定清空目前畫板？")) return;
+    drawingEpoch++;
     pushDrawingUndoState();
     drawingContext.fillStyle = "#ffffff";
     drawingContext.fillRect(0,0,canvas.width,canvas.height);
@@ -1233,21 +1274,24 @@ async function saveDrawingBoard(){
     const canvas=document.getElementById("drawingCanvas");
     if(!canvas) return;
     const result=await runCommand({type:"saveDrawing",drawing:{id:"drawing_"+crypto.randomUUID(),savedAt:new Date().toISOString(),data:canvas.toDataURL("image/jpeg",.78)}},"save-drawing");
-    if(result && document.getElementById("drawingStatus")) document.getElementById("drawingStatus").textContent="已儲存；最近保留 3 張，舊作已移至後台畫冊";
+    if(result && document.getElementById("drawingStatus")) document.getElementById("drawingStatus").textContent="已儲存；最近保留 3 張作品";
 }
 function loadDrawing(id){
     const item = state.drawings.find(drawing=>drawing.id===id);
     const canvas = document.getElementById("drawingCanvas");
-    if(!item || !canvas || !drawingContext) return;
+    const data=item && drawingImage(item),context=drawingContext;
+    if(!data || !canvas || !context) return;
+    const epoch=++drawingEpoch;
     const image = new Image();
     image.onload = ()=>{
+        if(epoch!==drawingEpoch || currentView?.type!=="drawing" || document.getElementById("drawingCanvas")!==canvas) return;
         pushDrawingUndoState();
-        drawingContext.fillStyle = "#ffffff";
-        drawingContext.fillRect(0,0,canvas.width,canvas.height);
-        drawingContext.drawImage(image,0,0,canvas.width,canvas.height);
+        context.fillStyle = "#ffffff";
+        context.fillRect(0,0,canvas.width,canvas.height);
+        context.drawImage(image,0,0,canvas.width,canvas.height);
         document.getElementById("drawingStatus").textContent = "已載入作品，可繼續繪圖";
     };
-    image.src = item.data;
+    image.src = data;
 }
 
 function petProgress(student){
@@ -1813,7 +1857,7 @@ async function backend(){
     const used = getStorageUsage();
     const usedMb = (used/1024/1024).toFixed(2);
     const full = used > STORAGE_LIMIT * 0.9;
-    const pendingLabels={restore:"備份還原",initialize:"初始化",saveDrawing:"畫板儲存",lottery:"樂透抽獎",purchase:"購買",edit:"後台設定",resources:"資源調整",equip:"裝備設定",completeTask:"完成任務",coopComplete:"協力任務",petMood:"寵物互動"};
+    const pendingLabels={restore:"備份還原",initialize:"初始化",migrateArtworks:"清除舊畫作資料",saveDrawing:"畫板儲存",lottery:"樂透抽獎",purchase:"購買",edit:"後台設定",resources:"資源調整",equip:"裝備設定",completeTask:"完成任務",coopComplete:"協力任務",petMood:"寵物互動"};
     const pendingHtml=window.firebaseGameStore.pendingActions().map(job=>`<div class="row"><span class="grow">未確認：${esc(pendingLabels[job.command.type]||"操作")}（${esc(new Date(job.createdAt).toLocaleString())}）</span><button onclick="retryPendingAction('${esc(job.id)}')">確認上次操作</button></div>`).join("");
 
     //任務統計
@@ -1887,16 +1931,6 @@ async function backend(){
             <button onclick="toggleCoopTemplate('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
             <button class="danger" onclick="deleteCoopTemplate('${esc(template.id)}')">刪除</button>
         </div>`).join("") || `<div class="empty">尚未設定週期協力任務</div>`;
-    const albumHtml = state.drawingAlbum.map((item,index)=>`<article class="backend-album-item">
-        <img src="${esc(item.data)}" alt="畫冊作品 ${index+1}">
-        <b>畫作 ${state.drawingAlbum.length-index}</b>
-        <div class="small">${esc(new Date(item.savedAt).toLocaleString())}</div>
-        <div class="backend-album-actions">
-            <button onclick="downloadAlbumDrawing('${esc(item.id)}')">下載</button>
-            <button class="danger" onclick="deleteAlbumDrawing('${esc(item.id)}')">永久刪除</button>
-        </div>
-    </article>`).join("") || `<div class="empty">畫冊目前沒有作品</div>`;
-
     openModal(`
     <h2>老師後台</h2>
     <nav class="backend-nav" aria-label="後台功能選單">
@@ -1910,7 +1944,6 @@ async function backend(){
         <button onclick="jumpBackend('backend-layouts')">寵物</button>
         <button onclick="jumpBackend('backend-backgrounds')">背景</button>
         <button onclick="jumpBackend('backend-coop')">協力任務</button>
-        <button onclick="jumpBackend('backend-album')">畫冊</button>
     </nav>
     <div id="backend-overview" class="backend-page active">
       ${pendingHtml}
@@ -1924,6 +1957,11 @@ async function backend(){
         <button class="warning" onclick="document.getElementById('importFile').click()">從備份還原</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
       </div>
+      <p class="small">備份只保留最近 3 張完整畫作；還原時不包含歷史作品或缺少圖片的紀錄。</p>
+      ${hasLegacyArtworks(state)?`<div class="row">
+        <p class="grow warn">偵測到舊畫作資料。清除後會永久刪除全部舊畫作，無法復原。</p>
+        <button id="clearLegacyArtworks" class="danger" onclick="clearLegacyArtworks()">清除舊畫作資料</button>
+      </div>`:""}
     </div>
     <section id="backend-tasks" class="backend-page">
     <h3>任務管理</h3>
@@ -2164,11 +2202,6 @@ async function backend(){
     ${bgHtml}
 
     </section>
-    <section id="backend-album" class="backend-page">
-        <h3>畫冊</h3>
-        <p class="small">畫板只顯示最近 3 張；超出的舊作品會自動收藏於此，可下載或永久刪除。</p>
-        <div class="backend-album-grid">${albumHtml}</div>
-    </section>
     `);
 }
 
@@ -2225,25 +2258,6 @@ function refreshBackendPage(targetId){
             refreshedPanel.scrollTop = savedScrollTop;
         });
     });
-}
-
-function downloadAlbumDrawing(id){
-    const item = state.drawingAlbum.find(drawing=>drawing.id===id);
-    if(!item) return;
-    const link = document.createElement("a");
-    link.href = item.data;
-    link.download = `班級畫作_${new Date(item.savedAt).toISOString().replace(/[:.]/g,"-")}.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-}
-function deleteAlbumDrawing(id){
-    const item = state.drawingAlbum.find(drawing=>drawing.id===id);
-    if(!item || !confirm("確定永久刪除這張畫作？此動作無法復原。")) return;
-    state.drawingAlbum = state.drawingAlbum.filter(drawing=>drawing.id!==id);
-    markChanged();
-    save();
-    refreshBackendPage("backend-album");
 }
 
 function updateCoopScheduleFields(){
@@ -2600,12 +2614,54 @@ function deleteItem(listName,id){
 }
 
 //備份匯入匯出
+function hasLegacyArtworks(progress){
+    return !!progress && (Object.hasOwn(progress,"drawingAlbum") || (progress.drawings||[]).some(item=>item && Object.hasOwn(item,"data")));
+}
+function validArtworkDate(value){
+    if(typeof value!=="string" || value.length<20 || value.length>40 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,19})?Z$/.test(value)) return false;
+    const timestamp=Date.parse(value);
+    return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0,19)===value.slice(0,19);
+}
+function validArtworkData(data){
+    return typeof data==="string" && data.length<=1500000 && /^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(data);
+}
+function newestArtworkRecords(drawings){
+    return (Array.isArray(drawings)?drawings:[])
+        .filter(item=>item && typeof item==="object" && validArtworkDate(item.savedAt))
+        .sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt)).slice(0,3);
+}
+async function buildCompleteBackup(progress){
+    const backup=structuredClone(progress);
+    backup.drawings=await Promise.all(newestArtworkRecords(backup.drawings).map(async item=>{
+        const artwork=Object.hasOwn(item,"data") ? item : await window.artworkStore.readArtwork(item.id);
+        if(!artwork || artwork.id!==item.id || !validArtworkData(artwork.data)) throw new Error("畫作圖片無法完整讀取，請稍後重試。");
+        return {id:item.id,savedAt:item.savedAt,data:artwork.data};
+    }));
+    delete backup.drawingAlbum;
+    delete backup.pendingArtworkDeletes;
+    return backup;
+}
+function prepareArtworkRestore(value){
+    if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("檔案不是有效的遊戲備份。");
+    const candidate=structuredClone(value);
+    candidate.drawings=newestArtworkRecords((Array.isArray(candidate.drawings)?candidate.drawings:[]).filter(item=>validArtworkData(item?.data)))
+        .map(({savedAt,data})=>({id:"drawing_"+crypto.randomUUID(),savedAt,data}));
+    delete candidate.drawingAlbum;
+    delete candidate.pendingArtworkDeletes;
+    return window.GameOperations.normalizeProgress(candidate);
+}
+async function clearLegacyArtworks(){
+    if(!backendAuthenticated || !window.firebaseGameStore.canEdit() || !hasLegacyArtworks(state)) return;
+    if(!confirm("將永久清除全部舊畫作資料，無法復原。確定清除？")) return;
+    return runCommand({type:"migrateArtworks",drawings:[]},"clear-legacy-artworks");
+}
 async function exportData(){
     if(!backendAuthenticated) return;
     try{
         const latest=await window.readLatestProgress();
         if(!latest) return alert("雲端目前沒有可備份的資料。");
-        const blob=new Blob([JSON.stringify(latest,null,2)],{type:"application/json"});
+        const backup=await buildCompleteBackup(latest);
+        const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
         const url=URL.createObjectURL(blob),link=document.createElement("a");
         link.href=url;link.download=`班級遊戲_備份_${new Date().toISOString().slice(0,10)}.json`;link.click();
         setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -2614,13 +2670,13 @@ async function exportData(){
 async function importData(input){
     if(!backendAuthenticated || !input.files[0]) return;
     try{
-        const candidate=window.GameOperations.normalizeProgress(JSON.parse(await input.files[0].text()));
+        const candidate=prepareArtworkRestore(JSON.parse(await input.files[0].text()));
         if(!candidate?.students.length) throw new Error("檔案不是有效的遊戲備份。");
-        const detail=`${candidate.students.length} 位成員、${candidate.tasks.length} 個任務、${candidate.coopTasks.length} 個協力任務、${candidate.drawings.length+candidate.drawingAlbum.length} 張畫作`;
+        const detail=`${candidate.students.length} 位成員、${candidate.tasks.length} 個任務、${candidate.coopTasks.length} 個協力任務、${candidate.drawings.length} 張完整畫作`;
         if(!confirm(`將以備份還原全班共用資料（${detail}）。所有裝置都會更新，現有進度將被取代。確定還原？`)) return;
         await runCommand({type:"restore",value:candidate},"restore");
     }catch(error){alert("還原失敗："+error.message);}
-    input.value="";
+    finally{input.value="";}
 }
 
 async function retryPendingAction(id){
@@ -2644,8 +2700,7 @@ function refreshVisibleView(){
     const view=currentView;
     if(!view) return;
     if(view.type==="drawing"){
-        const history=document.getElementById("drawingHistory");
-        if(history) history.innerHTML=drawingHistoryHtml();
+        void refreshDrawingImages();
         return;
     }
     if(view.type==="login") return;
@@ -2686,7 +2741,7 @@ document.addEventListener("input",event=>{
     if(key && draftFields.has(key)) draftFields.get(key).dirty=true;
 });
 // Teacher legacy handlers produce per-record/per-field commands. No delayed save.
-const teacherMutations=["dropItem","deleteAlbumDrawing","publishCoopTask","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
+const teacherMutations=["dropItem","clearLegacyArtworks","publishCoopTask","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
 for(const name of teacherMutations){
     const original=window[name];
     window[name]=function(...args){
@@ -2741,6 +2796,7 @@ setInterval(syncScheduledTasks,30000);
       now:()=>Date.now()+serverOffset
   });
   window.readLatestProgress=store.readRemote;
+  window.artworkStore=store;
   const sync=createCloudSync({
       ...store,applyState:applyCloudState,lock:setSyncLocked,status:setSyncStatus,
       error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},
