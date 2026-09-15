@@ -112,7 +112,7 @@ test('progress drawing indexes reject a fourth metadata record',async()=>{
 
 test('ordinary operations preserve a legacy drawing list above the new limit',async()=>{
     const drawings=Array.from({length:4},(_,index)=>({id:`drawing_legacy${index}`,savedAt:`2026-09-16T00:00:0${index}.000Z`,data:'data:image/png;base64,AA=='}));
-    const progress={...legacy,drawings};
+    const progress={...cleanProgress,drawings};
     await seed({progress});
     await allowed(operation(await room(),{progress}));
 });
@@ -120,7 +120,7 @@ test('ordinary operations preserve a legacy drawing list above the new limit',as
 test('legacy embedded artwork stays byte-for-byte unchanged until migration',async()=>{
     const legacyDrawing={id:'drawing_legacy1',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/png;base64,AA=='};
     const legacyAlbum={id:'drawing_album1',savedAt:'2026-09-15T00:00:00.000Z',data:'data:image/png;base64,AQ=='};
-    const progress={...legacy,drawings:[legacyDrawing],drawingAlbum:[legacyAlbum]};
+    const progress={...cleanProgress,drawings:[legacyDrawing],drawingAlbum:[legacyAlbum]};
     await seed({progress});
     await allowed(operation(await room(),{progress}));
     const unchanged=await room();
