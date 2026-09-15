@@ -55,6 +55,19 @@
 
 此次編輯未部署正式 Hosting 或資料庫規則，也未修改正式雲端遊戲進度。部署後才會對線上使用者生效。
 
+## 部署錯誤：無法取得資料庫執行個體資訊
+
+若部署在取得執行個體資訊時失敗，這不是足以證明規則語法錯誤的訊息。原先只部署 Hosting 的 GitHub 服務帳戶可能沒有管理 Realtime Database 的權限。
+
+1. 執行更新後的 [正式工作流程](../.github/workflows/firebase-hosting-merge.yml)，查看「Deploying as」顯示的服務帳戶電子郵件。該資訊不是私鑰；不要公開或貼出完整服務帳戶金鑰。
+2. 由專案管理者前往 Google Cloud Console → 選擇 classroom-115 → IAM 與管理 → IAM。
+3. 找到上一步的服務帳戶，在 classroom-115 專案授予 **Firebase Realtime Database Admin** 角色。若使用自訂最小權限角色，需由管理者核對 CLI 列出、取得執行個體及部署規則所需權限。不要為了排錯授予 Owner 或 Editor，也不要放寬遊戲資料庫讀寫規則。
+4. 確認 Firebase Console → Realtime Database 中存在 classroom-115-default-rtdb，位於 asia-southeast1。若錯誤明確表示 API 未啟用，再由管理者檢查 Firebase Realtime Database 管理 API。
+5. 等待 IAM 權限傳播後重跑工作流程。已新增手動觸發，無須為重試修改遊戲資料。
+6. 如果仍失敗，需要查看該次 GitHub 執行的除錯紀錄，而不是本機舊紀錄。403 通常指向權限、API 或組織政策；404 則應核對專案與執行個體。分享紀錄前移除憑證、權杖與私鑰。
+
+新版工作流程會先驗證憑證基本格式、顯示帳戶身分並列出可存取的資料庫；任何一步失敗都不部署 Hosting。此檢查不會自動修改 IAM，也不能取代管理者授權。
+
 ## 範圍限制
 
 本次防護處理合作式客戶端的過期寫入，不是使用者權限重設。現有匿名登入仍可存取共用班級進度；若需防止未授權使用者蓄意修改，應另行加入正式登入、角色權限及伺服器端業務驗證。
