@@ -18,9 +18,8 @@
             ".validate": "newData.isString()"
           },
           "drawings": {
-            ".validate": "newData.numChildren() <= 3 || newData.val() === data.val()",
             "$drawingIndex": {
-              ".validate": "newData.hasChildren(['id', 'savedAt'])",
+              ".validate": "($drawingIndex.matches(/^[0-2]$/) || (data.exists() && newData.val() === data.val())) && newData.hasChildren(['id', 'savedAt'])",
               "id": {
                 ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 128 && newData.val().matches(/^drawing_[A-Za-z0-9_-]+$/)"
               },

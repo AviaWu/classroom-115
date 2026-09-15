@@ -107,6 +107,7 @@ test('progress drawing indexes reject a fourth metadata record',async()=>{
     const drawings=Array.from({length:4},(_,index)=>({id:`drawing_index${index}`,savedAt:`2026-09-16T00:00:0${index}.000Z`}));
     await seed({progress:cleanProgress});
     await denied(operation(await room(),{progress:{...cleanProgress,drawings}}));
+    await denied(operation(await room(),{progress:{...cleanProgress,drawings:{0:drawings[0],4:drawings[1]}}}));
 });
 
 test('ordinary operations preserve a legacy drawing list above the new limit',async()=>{
