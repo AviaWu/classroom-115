@@ -1,0 +1,13 @@
+{
+  "name": "classroom-115",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:emulator": "node --test --test-concurrency=1 tests/database-rules.emulator.mjs tests/firebase-store.emulator.mjs",
+    "preview:test": "node tests/preview-server.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}

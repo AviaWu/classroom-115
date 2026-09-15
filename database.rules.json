@@ -4,30 +4,15 @@
     ".write": false,
     "games": {
       "classroom-115": {
+        ".read": "auth != null",
+        ".write": "auth != null && newData.hasChildren(['progress', 'operations', 'lastOperationId']) && newData.child('lastOperationId').isString() && !data.child('operations').child(newData.child('lastOperationId').val()).exists() && newData.child('operations').child(newData.child('lastOperationId').val()).child('uid').val() === auth.uid && newData.child('operations').child(newData.child('lastOperationId').val()).child('committedAt').val() === now && (!data.child('lastOperationId').exists() || newData.child('operations').child(data.child('lastOperationId').val()).exists()) && (data.child('progress').exists() || (newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore')) && (newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() !== 'initialize' || !data.child('progress').exists()) && (!data.child('restoredAt').exists() || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('createdAt').val() > data.child('restoredAt').val()) && (((newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore') && newData.child('restoredAt').val() === now) || (!(newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'initialize' || newData.child('operations').child(newData.child('lastOperationId').val()).child('type').val() === 'restore') && newData.child('restoredAt').val() === data.child('restoredAt').val()))",
         "progress": {
-          ".read": "auth != null",
-          ".write": "auth != null && newData.exists() && newData.child('syncVersion').val() === 3 && newData.child('revision').isNumber() && ((!data.exists() && newData.child('revision').val() === 1 && newData.child('baseCommitId').val() === 'initial') || (data.exists() && !data.child('revision').exists() && newData.child('revision').val() === 1 && newData.child('baseCommitId').val() === 'legacy') || (data.child('syncVersion').val() === 3 && data.child('revision').isNumber() && newData.child('revision').val() === data.child('revision').val() + 1 && newData.child('baseCommitId').val() === data.child('commitId').val()))",
-          ".validate": "newData.hasChildren(['students', 'lastSaved', 'syncVersion', 'revision', 'baseCommitId', 'commitId', 'updatedAt'])",
-          "syncVersion": {
-            ".validate": "newData.val() === 3"
-          },
-          "revision": {
-            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 9007199254740991 && newData.val() % 1 === 0"
-          },
-          "baseCommitId": {
-            ".validate": "newData.isString() && newData.val().length > 0"
-          },
-          "commitId": {
-            ".validate": "newData.isString() && newData.val().length >= 16 && newData.val().length <= 128 && (!data.exists() || newData.val() !== data.val())"
-          },
-          "updatedAt": {
-            ".validate": "newData.isNumber() && newData.val() === now"
-          },
+          ".validate": "newData.hasChildren(['students', 'lastSaved']) && !newData.hasChild('syncVersion') && !newData.hasChild('revision') && !newData.hasChild('baseCommitId') && !newData.hasChild('commitId') && !newData.hasChild('updatedAt')",
           "students": {
             ".validate": "newData.hasChildren(['0'])"
           },
           "globalBgImage": {
-            ".validate": "!newData.exists() || newData.isString()"
+            ".validate": "newData.isString()"
           },
           "lastSaved": {
             ".validate": "newData.isString()"
@@ -35,6 +20,47 @@
           "$other": {
             ".validate": true
           }
+        },
+        "operations": {
+          "$operationId": {
+            ".validate": "newData.hasChildren(['id', 'uid', 'type', 'createdAt', 'committedAt', 'result']) && ((!data.exists() && $operationId === newData.parent().parent().child('lastOperationId').val()) || (data.exists() && newData.child('id').val() === data.child('id').val() && newData.child('uid').val() === data.child('uid').val() && newData.child('type').val() === data.child('type').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('committedAt').val() === data.child('committedAt').val() && newData.child('result').child('json').val() === data.child('result').child('json').val()))",
+            "id": {
+              ".validate": "newData.isString() && newData.val() === $operationId && newData.val().length >= 16 && newData.val().length <= 128 && newData.val().matches(/^[A-Za-z0-9_-]+$/)"
+            },
+            "uid": {
+              ".validate": "newData.isString() && (data.exists() || newData.val() === auth.uid)"
+            },
+            "type": {
+              ".validate": "newData.isString() && newData.val().matches(/^(initialize|restore|completeTask|purchase|lottery|equip|petMood|coopComplete|saveDrawing|resources|resetCloset|resetResources|resizeStudents|gender|edit|schedule)$/)"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber() && (data.exists() || (newData.val() >= now - 86400000 && newData.val() <= now + 60000))"
+            },
+            "committedAt": {
+              ".validate": "newData.isNumber() && (data.exists() || newData.val() === now)"
+            },
+            "result": {
+              ".validate": "newData.hasChildren(['json'])",
+              "json": {
+                ".validate": "newData.isString()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "lastOperationId": {
+          ".validate": "newData.isString() && newData.parent().child('operations').child(newData.val()).exists()"
+        },
+        "restoredAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
         }
       }
     }
