@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {createFirebaseStore} from '../public/firebase-store.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
 function server(){
-    let room=initial(),artworks={},etag=1,writes=0,drop=false,conflict=false,conflictMutation;const calls=[];
+    let room=initial(),artworks={},etag=1,writes=0,drop=false,conflict=false,conflictMutation,dropDelete=false;const calls=[];
     const resolve=v=>{if(v && typeof v==='object'){if(v['.sv']==='timestamp')return 100000;return Array.isArray(v)?v.map(resolve):Object.fromEntries(Object.entries(v).map(([k,x])=>[k,resolve(x)]));}return v;};
     const fetch=async(url,options)=>{
         calls.push({url,options});await Promise.resolve();const path=new URL(url).pathname;
         if(path.startsWith('/artworks/classroom-115/')){
             const id=decodeURIComponent(path.split('/').pop().replace('.json',''));
             if(options.method==='PUT'){artworks[id]=JSON.parse(options.body);return Response.json(artworks[id]);}
-            if(options.method==='DELETE'){delete artworks[id];return Response.json(null);}
+            if(options.method==='DELETE'){if(dropDelete){dropDelete=false;throw new TypeError('network lost during delete');}delete artworks[id];return Response.json(null);}
             return Response.json(artworks[id]||null);
         }
         if(options.method==='PUT'){
@@ -24,7 +24,7 @@ function server(){
         return Response.json(value,{headers:{etag:String(etag)}});
     };
     const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'fake-token',getUid:()=> 'test-user',now:()=>100000,fetch});
-    return {store,get room(){return room;},set room(v){room=v;etag++;},get artworks(){return artworks;},get writes(){return writes;},get calls(){return calls;},dropNext:()=>drop=true,conflictNext:mutation=>{conflict=true;conflictMutation=mutation;}};
+    return {store,get room(){return room;},set room(v){room=v;etag++;},get artworks(){return artworks;},get writes(){return writes;},get calls(){return calls;},dropNext:()=>drop=true,dropNextDelete:()=>dropDelete=true,conflictNext:mutation=>{conflict=true;conflictMutation=mutation;}};
 }
 const job=(id,command)=>({id,createdAt:90000,command});
 test('artwork REST methods keep drawing payloads outside the room transaction',async()=>{
@@ -102,6 +102,12 @@ test('a drawing uploaded before a restore conflict is deleted before the stale c
     assert.equal(s.artworks[drawing.id],undefined);
     assert.equal(s.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,1);
     assert.equal(s.calls.filter(call=>call.options.method==='DELETE' && call.url.includes('/artworks/')).length,1);
+});
+test('a transient orphan cleanup failure stays retryable',async()=>{
+    const s=server(),drawing={id:'drawing_orphan2',savedAt:'2026-09-16T00:00:00Z',data:'data:image/jpeg;base64,AA=='};
+    s.conflictNext(room=>({...room,restoredAt:100000}));s.dropNextDelete();
+    await assert.rejects(s.store.execute(job('restore-race-offline',{type:'saveDrawing',drawing})),error=>error instanceof TypeError && error.retryable===true);
+    assert.deepEqual(s.artworks[drawing.id],drawing);
 });
 test('server read does not upgrade or upload legacy progress',async()=>{
     const s=server(),value=await s.store.readRemote();assert.equal(value.students[0].tokens,100);assert.equal(s.writes,0);assert.equal(s.room.progress.revision,9);

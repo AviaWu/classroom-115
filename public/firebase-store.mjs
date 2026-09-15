@@ -130,7 +130,9 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             if(room.restoredAt && job.createdAt<=room.restoredAt && !['restore','initialize'].includes(candidate.type)){
                 if(artwork?.type==='saveDrawing'){
                     try{await deleteArtwork(artwork.drawings[0].id);}
-                    catch(error){if(error.retryable) throw error;}
+                    catch(error){
+                        if(error.retryable || error.name==='AbortError' || error instanceof TypeError){error.retryable=true;throw error;}
+                    }
                 }
                 throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
             }
