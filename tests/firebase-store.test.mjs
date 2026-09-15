@@ -86,6 +86,15 @@ test('completed drawing receipts skip preprocessing and ETag retries upload once
     await retry.store.execute(job('conflict-drawing',{type:'saveDrawing',drawing}));
     assert.equal(retry.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,1);
 });
+test('drawing commands rejected by the latest room do not upload artwork',async()=>{
+    const drawing={id:'drawing_rejected1',savedAt:'2026-09-16T00:00:00Z',data:'data:image/jpeg;base64,AA=='};
+    const legacy=server();legacy.room={...legacy.room,progress:{...legacy.room.progress,drawingAlbum:[]}};
+    await assert.rejects(legacy.store.execute(job('legacy-drawing',{type:'saveDrawing',drawing})),/畫作|遷移/);
+    assert.equal(legacy.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,0);
+    const restored=server();restored.room={...restored.room,restoredAt:100000};
+    await assert.rejects(restored.store.execute(job('stale-drawing',{type:'saveDrawing',drawing})),/還原/);
+    assert.equal(restored.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,0);
+});
 test('server read does not upgrade or upload legacy progress',async()=>{
     const s=server(),value=await s.store.readRemote();assert.equal(value.students[0].tokens,100);assert.equal(s.writes,0);assert.equal(s.room.progress.revision,9);
 });

@@ -81,6 +81,17 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(command.type==='migrateArtworks') return {type:'migrateArtworks',drawings:newestArtworks(command.drawings)};
         return null;
     }
+    function indexCommand(command,artwork){
+        if(!artwork) return command;
+        const drawings=artwork.drawings.map(({id,savedAt})=>({id,savedAt}));
+        if(artwork.type==='saveDrawing') return {...command,drawing:drawings[0]};
+        if(artwork.type==='restore'){
+            const {drawingAlbum,...restored}=command.value;
+            return {...command,value:{...restored,drawings}};
+        }
+        if(artwork.type==='migrateArtworks') return {...command,drawings};
+        return command;
+    }
     async function prepareCommand(command,artwork){
         if(!artwork) return command;
         if(artwork.type==='saveDrawing') return {...command,drawing:await writeArtwork(artwork.drawings[0])};
@@ -115,12 +126,13 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             if(receipt) return {progress:normalizeProgress(room.progress??null),result:JSON.parse(receipt.result.json)};
             const clock=now();
             if(clock-job.createdAt>24*60*60*1000) throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
-            command ??= await prepareCommand(job.command,artwork);
-            if(room.restoredAt && job.createdAt<=room.restoredAt && !['restore','initialize'].includes(command.type)){
+            const candidate=command ?? indexCommand(job.command,artwork);
+            if(room.restoredAt && job.createdAt<=room.restoredAt && !['restore','initialize'].includes(candidate.type)){
                 throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
             }
-            const outcome=applyOperation(room.progress??null,command,clock);
+            const outcome=applyOperation(room.progress??null,candidate,clock);
             if(!outcome.changed) return {progress:outcome.progress,result:outcome.result||{ok:true}};
+            command ??= await prepareCommand(job.command,artwork);
             const result={ok:true,...outcome.result};
             const next={...room,
                 progress:{...outcome.progress,lastSaved:new Date(clock).toISOString()},
