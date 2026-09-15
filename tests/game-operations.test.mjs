@@ -194,6 +194,7 @@ test('invalid ticket rewards are rejected before recording any coop member compl
 test('drawing indexes retain the latest three metadata records and queue evictions', () => {
     const meta = id => ({id:`drawing_${id}`,savedAt:`2026-09-16T00:00:0${id}.000Z`});
     let current = state({drawings:[meta('3'),meta('2'),meta('1')]});
+    delete current.drawingAlbum;
     const saved = run(current,'saveDrawing',{drawing:meta('4')});
     assert.deepEqual(saved.progress.drawings.map(item=>item.id),['drawing_4','drawing_3','drawing_2']);
     assert.deepEqual(saved.progress.pendingArtworkDeletes,['drawing_1']);
@@ -205,6 +206,15 @@ test('drawing indexes retain the latest three metadata records and queue evictio
     const migrated = run(legacy,'migrateArtworks',{drawings:[meta('5'),meta('4'),meta('3')]});
     assert.deepEqual(migrated.progress.drawings.map(item=>item.id),['drawing_5','drawing_4','drawing_3']);
     assert.equal('drawingAlbum' in migrated.progress,false);
+});
+
+test('an empty legacy album blocks saves until explicit migration removes it', () => {
+    const meta = {id:'drawing_4',savedAt:'2026-09-16T00:00:04.000Z'};
+    const legacy = state();
+    assert.throws(() => run(legacy,'saveDrawing',{drawing:meta}),/畫作|遷移/);
+    const migrated = run(legacy,'migrateArtworks',{drawings:[]});
+    assert.equal('drawingAlbum' in migrated.progress,false);
+    assert.deepEqual(run(migrated.progress,'saveDrawing',{drawing:meta}).progress.drawings,[meta]);
 });
 
 test('legacy artwork remains byte-for-byte intact until explicit migration', () => {
@@ -223,6 +233,8 @@ test('restore queues displaced external artwork while preserving cleanup already
     const meta = id => ({id:`drawing_${id}`,savedAt:`2026-09-16T00:00:0${id}.000Z`});
     const current = state({drawings:[meta('3'),meta('2'),meta('1')],pendingArtworkDeletes:['drawing_pending','drawing_3']});
     const restored = state({drawings:[meta('5'),meta('4'),meta('3')],pendingArtworkDeletes:['drawing_existing']});
+    delete current.drawingAlbum;
+    delete restored.drawingAlbum;
     const result = run(current,'restore',{value:restored});
     assert.deepEqual(result.progress.drawings.map(item=>item.id),['drawing_5','drawing_4','drawing_3']);
     assert.deepEqual(result.progress.pendingArtworkDeletes,['drawing_existing','drawing_pending','drawing_3','drawing_2','drawing_1']);

@@ -19,7 +19,7 @@ const idValid = id => (typeof id === 'string' && id.length > 0) || (typeof id ==
 const validDrawingId = id => typeof id === 'string' && id.length >= 8 && id.length <= 128 && /^drawing_[A-Za-z0-9_-]+$/.test(id);
 
 function legacyArtwork(progress) {
-    return array(progress.drawings).some(item=>object(item) && Object.hasOwn(item,'data')) || array(progress.drawingAlbum).length > 0;
+    return Object.hasOwn(progress,'drawingAlbum') || array(progress.drawings).some(item=>object(item) && Object.hasOwn(item,'data'));
 }
 function indexedDrawings(value) {
     const seen = new Set();
