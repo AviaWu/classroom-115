@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
@@ -29,11 +30,21 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLASSROOM_115 }}
         run: |
+          set -euo pipefail
           credentials="$RUNNER_TEMP/firebase-service-account.json"
           trap 'rm -f "$credentials"' EXIT
+          umask 077
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$credentials"
           export GOOGLE_APPLICATION_CREDENTIALS="$credentials"
-          firebase deploy --only database --project classroom-115 --non-interactive
+          node -e 'const fs = require("fs"); const account = JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf8")); if (account.type !== "service_account" || !account.client_email || !account.private_key) throw new Error("Invalid Firebase service account secret"); console.log("Deploying as: " + account.client_email); console.log("Credential project: " + account.project_id);'
+          if ! firebase database:instances:list --project classroom-115 --non-interactive; then
+            echo "::error::Cannot list Realtime Database instances. Check the deployment service account's Firebase Realtime Database Admin role in project classroom-115, API availability, and organization policies. See docs/cloud-sync-deployment.md. Hosting has NOT been deployed."
+            exit 1
+          fi
+          if ! firebase deploy --only database --project classroom-115 --non-interactive; then
+            echo "::error::Database rules deployment failed. Confirm classroom-115-default-rtdb exists in project classroom-115 and that the deployment account has Firebase Realtime Database Admin permissions. Do not bypass this step to deploy Hosting."
+            exit 1
+          fi
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
