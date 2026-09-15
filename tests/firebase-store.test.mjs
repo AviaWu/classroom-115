@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createFirebaseStore} from '../public/firebase-store.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
 function server(){
-    let room=initial(),artworks={},etag=1,writes=0,drop=false,conflict=false;const calls=[];
+    let room=initial(),artworks={},etag=1,writes=0,drop=false,conflict=false,conflictMutation;const calls=[];
     const resolve=v=>{if(v && typeof v==='object'){if(v['.sv']==='timestamp')return 100000;return Array.isArray(v)?v.map(resolve):Object.fromEntries(Object.entries(v).map(([k,x])=>[k,resolve(x)]));}return v;};
     const fetch=async(url,options)=>{
         calls.push({url,options});await Promise.resolve();const path=new URL(url).pathname;
@@ -14,7 +14,7 @@ function server(){
             return Response.json(artworks[id]||null);
         }
         if(options.method==='PUT'){
-            if(conflict){conflict=false;etag++;return new Response('{}',{status:412});}
+            if(conflict){conflict=false;room=conflictMutation?.(room)??room;etag++;return new Response('{}',{status:412});}
             if(options.headers['if-match']!==String(etag))return new Response('{}',{status:412});
             room=resolve(JSON.parse(options.body));writes++;etag++;
             if(drop){drop=false;throw new TypeError('network lost after commit');}
@@ -24,7 +24,7 @@ function server(){
         return Response.json(value,{headers:{etag:String(etag)}});
     };
     const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'fake-token',getUid:()=> 'test-user',now:()=>100000,fetch});
-    return {store,get room(){return room;},set room(v){room=v;etag++;},get artworks(){return artworks;},get writes(){return writes;},get calls(){return calls;},dropNext:()=>drop=true,conflictNext:()=>conflict=true};
+    return {store,get room(){return room;},set room(v){room=v;etag++;},get artworks(){return artworks;},get writes(){return writes;},get calls(){return calls;},dropNext:()=>drop=true,conflictNext:mutation=>{conflict=true;conflictMutation=mutation;}};
 }
 const job=(id,command)=>({id,createdAt:90000,command});
 test('artwork REST methods keep drawing payloads outside the room transaction',async()=>{
@@ -94,6 +94,14 @@ test('drawing commands rejected by the latest room do not upload artwork',async(
     const restored=server();restored.room={...restored.room,restoredAt:100000};
     await assert.rejects(restored.store.execute(job('stale-drawing',{type:'saveDrawing',drawing})),/還原/);
     assert.equal(restored.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,0);
+});
+test('a drawing uploaded before a restore conflict is deleted before the stale command is cancelled',async()=>{
+    const s=server(),drawing={id:'drawing_orphan1',savedAt:'2026-09-16T00:00:00Z',data:'data:image/jpeg;base64,AA=='};
+    s.conflictNext(room=>({...room,restoredAt:100000}));
+    await assert.rejects(s.store.execute(job('restore-race',{type:'saveDrawing',drawing})),/還原/);
+    assert.equal(s.artworks[drawing.id],undefined);
+    assert.equal(s.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,1);
+    assert.equal(s.calls.filter(call=>call.options.method==='DELETE' && call.url.includes('/artworks/')).length,1);
 });
 test('server read does not upgrade or upload legacy progress',async()=>{
     const s=server(),value=await s.store.readRemote();assert.equal(value.students[0].tokens,100);assert.equal(s.writes,0);assert.equal(s.room.progress.revision,9);

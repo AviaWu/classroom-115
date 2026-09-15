@@ -128,6 +128,10 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             if(clock-job.createdAt>24*60*60*1000) throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
             const candidate=command ?? indexCommand(job.command,artwork);
             if(room.restoredAt && job.createdAt<=room.restoredAt && !['restore','initialize'].includes(candidate.type)){
+                if(artwork?.type==='saveDrawing'){
+                    try{await deleteArtwork(artwork.drawings[0].id);}
+                    catch(error){if(error.retryable) throw error;}
+                }
                 throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
             }
             const outcome=applyOperation(room.progress??null,candidate,clock);
