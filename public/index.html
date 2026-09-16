@@ -21,7 +21,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .warning{background:#fff4cc}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px}
 .card{padding:0;background:transparent;border:none;box-shadow:none;text-align:center}
-.avatar{width:100%;aspect-ratio:9/16;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:64px;overflow:hidden;position:relative;background:#F0ECE9}
+.avatar{width:100%;aspect-ratio:9/16;border:4px solid var(--member-level-color,#20263a);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:64px;overflow:hidden;position:relative;background:#F0ECE9}
 .avatar .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center;pointer-events:none}
 .avatar .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
 .avatar .layout-item{position:absolute;inset:0;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
@@ -125,14 +125,15 @@ input[type="number"]{width:85px}
 .shop-level{--level-color:#768195;--level-bg:#eef1f5;margin:22px 0 30px;padding:16px;border:4px solid var(--level-color);background:var(--level-bg);box-shadow:7px 7px 0 #172033}
 .shop-level:first-child{margin-top:10px}
 .shop-level-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-16px -16px 18px;padding:11px 14px;background:var(--level-color);color:#fff;border-bottom:4px solid #20263a}
-.shop-level-header h3{display:flex;align-items:center;gap:10px;margin:0;color:inherit;font-size:22px;text-shadow:2px 2px 0 rgba(0,0,0,.35)}
-.level-badge{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:5px 10px;background:#fff;color:var(--level-color);border:3px solid #20263a;box-shadow:3px 3px 0 #172033;font-size:24px;line-height:1}
+.shop-level-header h3{display:flex;align-items:center;gap:10px;margin:0;color:inherit;font-size:22px;font-weight:900;text-shadow:none}
+.level-badge{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:5px 10px;background:#fff;color:var(--level-color);border:3px solid #20263a;box-shadow:none;font-size:24px;font-weight:900;line-height:1}
 .level-price{font-weight:900;white-space:nowrap}
+.shop-level.level-gift{--level-color:#d05c78;--level-bg:#fff0f4}
 .shop-level.level-r{--level-color:#687386;--level-bg:#eef1f5}
 .shop-level.level-sr{--level-color:#27868c;--level-bg:#e4f7f4}
 .shop-level.level-ssr{--level-color:#8960b5;--level-bg:#f1e8ff}
 .shop-level.level-ur{--level-color:#c18418;--level-bg:#fff1bf;background-image:linear-gradient(135deg,#fff8da 0,#ffe7a0 50%,#fff4c9 100%)}
-.shop-level .product{border-color:var(--level-color)}
+.shop-level .product{border:3px solid var(--level-color)}
 .product-level-badge{display:inline-block;margin:7px 0 2px;padding:3px 9px;border:2px solid var(--level-color);background:var(--level-color);color:#fff;font-size:13px;font-weight:900}
 @media(max-width:600px){.shop-level-header{align-items:flex-start;flex-direction:column}.level-price{padding-left:2px}}
 .dangerzone{margin-top:24px;padding:12px;border:2px dashed #ffcccc;border-radius:14px}
@@ -989,6 +990,8 @@ function render(){
         const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
         const eqCloth = clothPool.find(x=>x.id===s.equippedClothes);
 
+        const memberLevelColor = levelColor(eqCloth?.level);
+
         let bgHtml = eqBg ? `<div class="bg-layer" style="background-image:url('${esc(eqBg.image)}')"></div>` : "";
         let charHtml;
         if(eqCloth?.image){
@@ -999,7 +1002,7 @@ function render(){
         }
 
         return `<div class="card">
-            <div class="avatar pet-interaction-trigger" role="button" tabindex="0" aria-label="查看${s.id}號的寵物心情互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
+            <div class="avatar pet-interaction-trigger" style="--member-level-color:${memberLevelColor}" role="button" tabindex="0" aria-label="查看${s.id}號的寵物心情互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
             <div class="resource-line">
                 <span class="num">${s.id}</span>
                 <span class="tokens">🪙 ${s.tokens}</span>
@@ -1588,11 +1591,17 @@ async function completeCoopMember(taskId,studentId){
 }
 
 //商店
+function levelColor(level){
+    return ({"活動贈送":"#d05c78",R:"#687386",SR:"#27868c",SSR:"#8960b5",UR:"#c18418"})[level] || "#20263a";
+}
+function levelClass(level){
+    return level==="活動贈送" ? "gift" : String(level||"R").toLowerCase();
+}
 function groupedShopCards(id,list,card){
     const activeItems = list.filter(p=>p.active!==false);
     return LEVEL_ORDER.map(level=>{
         const items = activeItems.filter(p=>(p.level||"R")===level);
-        return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
+        return items.length ? `<section class="shop-level level-${levelClass(level)}">
             <div class="shop-level-header">
                 <h3><span class="level-badge">${level}</span>${level==="活動贈送"?"商品":`${level} 等級商品`}</h3>
                 <span class="level-price">🪙 每件 ${priceForLevel(level)} 代幣</span>
@@ -1780,7 +1789,7 @@ function groupedClosetCards(list,card,emptyText){
     if(!list.length) return `<div class="empty">${emptyText}</div>`;
     return LEVEL_ORDER.map(level=>{
         const items = list.filter(item=>(item.level||"R")===level);
-        return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
+        return items.length ? `<section class="shop-level level-${levelClass(level)}">
             <div class="shop-level-header"><h3><span class="level-badge">${level}</span>${level==="活動贈送"?"":`${level} 等級`}</h3><span>${items.length} 件</span></div>
             <div class="shopgrid">${items.map(card).join("")}</div>
         </section>` : "";
