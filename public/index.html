@@ -354,8 +354,8 @@ const STUDENT_PASSWORDS = Object.freeze({
 });
 const DEFAULT_PET_IMAGE = "/images/Dec2/1000095494-removebg-preview.png";
 const DEFAULT_PET_NAME = "小嗶";
-const LEVEL_PRICES = {R:50, SR:100, SSR:200, UR:300};
-const LEVEL_ORDER = ["R","SR","SSR","UR"];
+const LEVEL_PRICES = {"活動贈送":0, R:50, SR:100, SSR:200, UR:300};
+const LEVEL_ORDER = ["活動贈送","R","SR","SSR","UR"];
 const PET_MOOD_ICONS = {
     快樂:"(＾▽＾)", 喜悅:"ヽ(・∀・)ﾉ", 興奮:"٩(ˊᗜˋ*)و", 平靜:"( ´ ▽ ` )", 期待:"(☆▽☆)", 焦慮:"(；´Д｀)",
     緊張:"(⊙﹏⊙)", 恐懼:"Σ(°△°|||)", 煩躁:"(¬_¬)", 無聊:"(￣o￣)", 悲傷:"(╥﹏╥)", 痛苦:"(ಥ﹏ಥ)"
@@ -434,7 +434,7 @@ const PET_MOOD_RESPONSES = {
         "無論現在多黑暗，請不要放棄讓別人陪你找到出口。"
     ]
 };
-function priceForLevel(level){ return LEVEL_PRICES[level] || DEFAULT_PRICE; }
+function priceForLevel(level){ return LEVEL_PRICES[level] ?? DEFAULT_PRICE; }
 const BUILTIN_MONSTERS = [
     {name:"怪獸 1", image:"/images/mon/m%20(1).jpg"},
     {name:"怪獸 2", image:"/images/mon/m%20(2).jpg"},
@@ -724,15 +724,24 @@ function seedBuiltinBoyClothes(persist=true){
         "b (37).png", "b (38).png", "b (39).png", "b (40).png", "b (41).png",
         "b (42).png", "b (43).png", "b (44).png"
     ];
-    filenames.forEach((filename, index)=>{
-        const image = `/images/boy/${encodeURIComponent(filename)}`;
+    const products = filenames.map((filename,index)=>({
+        filename,
+        id:`builtin_boy_${index}`,
+        name:`男生服裝 ${index+1}`,
+        level:"R"
+    })).concat([
+        {filename:"ba1.png",id:"builtin_boy_event_ba1",name:"男生活動服裝 1",level:"活動贈送"},
+        {filename:"ba2.png",id:"builtin_boy_event_ba2",name:"男生活動服裝 2",level:"活動贈送"}
+    ]);
+    products.forEach(product=>{
+        const image = `/images/boy/${encodeURIComponent(product.filename)}`;
         if(!state.clothesM.some(item=>item.image===image)){
             state.clothesM.push({
-                id: `builtin_boy_${index}`,
-                name: `男生服裝 ${index+1}`,
-                level: "R",
-                price: priceForLevel("R"),
-                active: true,
+                id:product.id,
+                name:product.name,
+                level:product.level,
+                price:priceForLevel(product.level),
+                active:true,
                 image
             });
             changed = true;
@@ -746,7 +755,14 @@ function seedBuiltinBoyClothes(persist=true){
 // 內建女生服裝：以 public/images/girl/ 的商品圖片完整取代舊商品；g0 僅作預設服裝
 function seedBuiltinGirlClothes(persist=true){
     const filenames = Array.from({length:42}, (_,index)=>`g (${index+1}).png`);
-    const allowedImages = new Set(filenames.map(filename=>`/images/girl/${encodeURIComponent(filename)}`));
+    const eventProducts = [
+        {filename:"ga1.png",id:"builtin_girl_event_ga1",name:"女生活動服裝 1",level:"活動贈送"},
+        {filename:"ga2.png",id:"builtin_girl_event_ga2",name:"女生活動服裝 2",level:"活動贈送"}
+    ];
+    const allowedImages = new Set(
+        [...filenames,...eventProducts.map(product=>product.filename)]
+            .map(filename=>`/images/girl/${encodeURIComponent(filename)}`)
+    );
     const removedIds = state.clothesF.filter(item=>!allowedImages.has(item.image)).map(item=>item.id);
     let changed = removedIds.length>0;
     if(changed){
@@ -756,15 +772,21 @@ function seedBuiltinGirlClothes(persist=true){
             if(removedIds.includes(s.equippedClothes)) s.equippedClothes = null;
         });
     }
-    filenames.forEach((filename, index)=>{
-        const image = `/images/girl/${encodeURIComponent(filename)}`;
+    const products = filenames.map((filename,index)=>({
+        filename,
+        id:`builtin_girl_${index}`,
+        name:`女生服裝 ${index+1}`,
+        level:"R"
+    })).concat(eventProducts);
+    products.forEach(product=>{
+        const image = `/images/girl/${encodeURIComponent(product.filename)}`;
         if(!state.clothesF.some(item=>item.image===image)){
             state.clothesF.push({
-                id: `builtin_girl_${index}`,
-                name: `女生服裝 ${index+1}`,
-                level: "R",
-                price: priceForLevel("R"),
-                active: true,
+                id:product.id,
+                name:product.name,
+                level:product.level,
+                price:priceForLevel(product.level),
+                active:true,
                 image
             });
             changed = true;
@@ -942,6 +964,12 @@ function applyCloudState(cloudState){
 
 function esc(x){
     return String(x).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function datetimeLocalValue(timestamp){
+    if(!timestamp) return "";
+    const date=new Date(timestamp);
+    if(Number.isNaN(date.getTime())) return "";
+    return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
 }
 
 function applyGlobalBg(){
@@ -1489,7 +1517,7 @@ function tasks(id){
         <h2>${id}號｜任務</h2>
         ${todo.length ? todo.map(t=>`
         <div class="row">
-            <div class="grow"><b>${esc(t.title)}</b><div class="small">完成可獲得 ${t.reward} 代幣</div></div>
+            <div class="grow"><b>${esc(t.title)}</b>${t.content?`<div>${esc(t.content)}</div>`:""}<div class="small">完成可獲得 ${t.reward} 代幣</div></div>
             <button class="primary" onclick="finishTask(${id},'${esc(t.id)}')">完成</button>
         </div>`).join("") : `<div class="empty">🎉 全部任務已完成！</div>`}
     `);
@@ -1867,12 +1895,17 @@ async function backend(){
         const doneIds = doneStudents.map(s=>s.id+"號").join("、");
         const undoneIds = undoneStudents.map(s=>s.id+"號").join("、");
         const expired = t.dueAt && Date.now() > t.dueAt;
-        const dueText = t.dueAt ? new Date(t.dueAt).toLocaleString() : "無期限";
         return `
-        <div class="row">
+        <div class="row product-admin">
             <div class="grow">
-                <b>${esc(t.title)}</b> <span class="small">(獎勵 ${t.reward} 🪙)</span>
-                <div class="task-stat">期限：${esc(dueText)} ${expired?'<span class="warn">｜已到期</span>':''}</div>
+                <b>${esc(t.title)}</b>
+                <div class="edit-item-row">
+                    <input data-field="tasks:${esc(t.id)}:title" value="${esc(t.title)}" onchange="updatePublishedTask('${esc(t.id)}','title',this.value)" placeholder="任務名稱">
+                    <input data-field="tasks:${esc(t.id)}:reward" type="number" min="0" value="${esc(t.reward)}" onchange="updatePublishedTask('${esc(t.id)}','reward',this.value)" placeholder="代幣獎勵">
+                    <label>截止：<input data-field="tasks:${esc(t.id)}:dueAt" type="datetime-local" value="${esc(datetimeLocalValue(t.dueAt))}" onchange="updatePublishedTask('${esc(t.id)}','dueAt',this.value)"></label>
+                </div>
+                <textarea data-field="tasks:${esc(t.id)}:content" rows="2" style="width:100%;margin-top:8px" onchange="updatePublishedTask('${esc(t.id)}','content',this.value)" placeholder="任務內容">${esc(t.content||"")}</textarea>
+                ${expired?'<div class="warn">已到期</div>':''}
                 <div class="task-stat">✅已完成：${doneStudents.length} / ${state.students.length}</div>
                 <div class="student-list">已完成：${doneIds||"無"}</div>
                 <div class="student-list">未完成：${undoneIds||"全部完成"}</div>
@@ -1968,7 +2001,8 @@ async function backend(){
     <div class="row">
         <div class="grow">
             <input id="newTaskTitle" placeholder="新任務名稱">
-            <input id="newTaskReward" type="number" placeholder="代幣" style="width:90px">
+            <input id="newTaskContent" placeholder="任務內容">
+            <input id="newTaskReward" type="number" min="0" placeholder="代幣" style="width:90px">
             <label>完成期限：<input id="newTaskDueAt" type="datetime-local"></label>
         </div>
         <button class="primary" onclick="addTask()">新增任務</button>
@@ -2053,10 +2087,22 @@ async function backend(){
     <h3 style="margin-top:20px">協力任務紀錄</h3>
     ${state.coopTasks.map(t=>{
         const now=Date.now();
-        const scheduleText=t.startAt?`${new Date(t.startAt).toLocaleString()} 開始｜${t.dueAt?new Date(t.dueAt).toLocaleString()+" 截止":"無期限"}`:"立即開始｜無期限";
         const status=t.claimed?"已完成":t.startAt&&now<t.startAt?"尚未開始":t.dueAt&&now>t.dueAt?"已截止":"進行中";
-        return `<div class="row">
-            <div class="grow"><b>${esc(t.monsterName)}</b><div class="small">${esc(t.content)}｜${esc(scheduleText)}｜獎勵 ${t.reward} ${t.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}｜進度 ${(t.completedBy||[]).length}/${state.students.length}｜${status}</div></div>
+        return `<div class="row product-admin">
+            <div class="grow">
+                <b>${esc(t.monsterName)}</b>
+                <div class="edit-item-row">
+                    <input data-field="coopTasks:${esc(t.id)}:monsterName" value="${esc(t.monsterName)}" onchange="updatePublishedCoopTask('${esc(t.id)}','monsterName',this.value)" placeholder="任務名稱">
+                    <select data-field="coopTasks:${esc(t.id)}:rewardType" onchange="updatePublishedCoopTask('${esc(t.id)}','rewardType',this.value)"><option value="token" ${t.rewardType!=="ticket"?"selected":""}>🪙 代幣</option><option value="ticket" ${t.rewardType==="ticket"?"selected":""}>🎟️ 樂透券</option></select>
+                    <input data-field="coopTasks:${esc(t.id)}:reward" type="number" min="0" value="${esc(t.reward)}" onchange="updatePublishedCoopTask('${esc(t.id)}','reward',this.value)" placeholder="獎勵">
+                </div>
+                <textarea data-field="coopTasks:${esc(t.id)}:content" rows="2" style="width:100%;margin-top:8px" onchange="updatePublishedCoopTask('${esc(t.id)}','content',this.value)" placeholder="任務內容">${esc(t.content||"")}</textarea>
+                <div class="edit-item-row" style="margin-top:8px">
+                    <label>開始：<input data-field="coopTasks:${esc(t.id)}:startAt" type="datetime-local" value="${esc(datetimeLocalValue(t.startAt))}" onchange="updatePublishedCoopTask('${esc(t.id)}','startAt',this.value)"></label>
+                    <label>截止：<input data-field="coopTasks:${esc(t.id)}:dueAt" type="datetime-local" value="${esc(datetimeLocalValue(t.dueAt))}" onchange="updatePublishedCoopTask('${esc(t.id)}','dueAt',this.value)"></label>
+                </div>
+                <div class="small">進度 ${(t.completedBy||[]).length}/${state.students.length}｜${status}</div>
+            </div>
             <button class="danger" onclick="deleteCoopTask('${esc(t.id)}')">刪除</button>
         </div>`;
     }).join("") || `<div class="empty">尚無協力任務紀錄</div>`}
@@ -2419,18 +2465,75 @@ async function batchAddBg(){
 }
 
 //任務
+function editFieldBefore(collection,id,field,currentValue,convert=value=>value){
+    const draft=draftFields.get(`${collection}:${id}:${field}`);
+    return draft ? convert(draft.before) : currentValue;
+}
+async function updatePublishedTask(id,field,rawValue){
+    const task=state.tasks.find(item=>item.id===id);
+    if(!task) return alert("這項任務已被刪除，未儲存的輸入已保留。");
+    const key=`tasks:${id}:${field}`;
+    let value=rawValue,convert=input=>input;
+    if(field==="title"){
+        value=rawValue.trim();
+        if(!value) return alert("任務名稱不可空白");
+    }else if(field==="content"){
+        value=rawValue.trim();
+    }else if(field==="reward"){
+        value=Number(rawValue);
+        convert=input=>Number(input);
+        if(!Number.isFinite(value)||value<0) return alert("獎勵必須是 0 以上的數字");
+    }else if(field==="dueAt"){
+        value=rawValue?new Date(rawValue).getTime():null;
+        convert=input=>input?new Date(input).getTime():null;
+        if(value!==null&&!Number.isFinite(value)) return alert("請輸入有效的截止時間");
+    }else return;
+    const before=editFieldBefore("tasks",id,field,task[field],convert);
+    const result=await runCommand({type:"edit",changes:[{collection:"tasks",id,action:"set",field,before,value}]},key);
+    if(result) draftFields.delete(key);
+}
+async function updatePublishedCoopTask(id,field,rawValue){
+    const task=state.coopTasks.find(item=>item.id===id);
+    if(!task) return alert("這項協力任務已被刪除，未儲存的輸入已保留。");
+    const key=`coopTasks:${id}:${field}`;
+    let value=rawValue,convert=input=>input;
+    if(field==="monsterName"||field==="content"){
+        value=rawValue.trim();
+        if(!value) return alert(field==="monsterName"?"任務名稱不可空白":"任務內容不可空白");
+    }else if(field==="rewardType"){
+        if(!["token","ticket"].includes(value)) return;
+        if(value==="ticket"&&!Number.isInteger(Number(task.reward))) return alert("樂透券獎勵必須是整數");
+    }else if(field==="reward"){
+        value=Number(rawValue);
+        convert=input=>Number(input);
+        if(!Number.isFinite(value)||value<0) return alert("獎勵必須是 0 以上的數字");
+        if(task.rewardType==="ticket"&&!Number.isInteger(value)) return alert("樂透券獎勵必須是整數");
+    }else if(field==="startAt"||field==="dueAt"){
+        value=rawValue?new Date(rawValue).getTime():null;
+        convert=input=>input?new Date(input).getTime():null;
+        if(value!==null&&!Number.isFinite(value)) return alert("請輸入有效時間");
+        const startAt=field==="startAt"?value:task.startAt;
+        const dueAt=field==="dueAt"?value:task.dueAt;
+        if(startAt&&dueAt&&dueAt<=startAt) return alert("協力任務截止時間必須晚於開始時間");
+    }else return;
+    const before=editFieldBefore("coopTasks",id,field,task[field],convert);
+    const result=await runCommand({type:"edit",changes:[{collection:"coopTasks",id,action:"set",field,before,value}]},key);
+    if(result) draftFields.delete(key);
+}
 function addTask(){
     const title = document.getElementById("newTaskTitle").value.trim();
-    const reward = Number(document.getElementById("newTaskReward").value)||0;
+    const content = document.getElementById("newTaskContent").value.trim();
+    const reward = Math.max(0,Number(document.getElementById("newTaskReward").value)||0);
     const dueValue = document.getElementById("newTaskDueAt").value;
     const dueAt = dueValue ? new Date(dueValue).getTime() : null;
     if(!title){alert("請輸入任務名稱");return;}
     if(dueAt && dueAt<=Date.now()){alert("完成期限必須晚於現在");return;}
     state.tasks.push({
         id: makeTaskId(),
-        title: title,
-        reward: reward,
-        dueAt: dueAt
+        title,
+        content,
+        reward,
+        dueAt
     });
     markChanged(); save(); refreshBackendPage("backend-tasks");
 }
