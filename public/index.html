@@ -1879,8 +1879,39 @@ async function checkBackendPw(){
     }
 }
 
+function missingBuiltinEventClothingChanges(){
+    const catalogues=[
+        {
+            collection:"clothesM",
+            builtInPattern:/^\/images\/boy\/b(?:%20| )\(/,
+            products:[
+                {id:"builtin_boy_event_ba1",name:"男生活動服裝 1",level:"活動贈送",price:0,active:true,image:"/images/boy/ba1.png"},
+                {id:"builtin_boy_event_ba2",name:"男生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/boy/ba2.png"}
+            ]
+        },
+        {
+            collection:"clothesF",
+            builtInPattern:/^\/images\/girl\/g(?:%20| )\(/,
+            products:[
+                {id:"builtin_girl_event_ga1",name:"女生活動服裝 1",level:"活動贈送",price:0,active:true,image:"/images/girl/ga1.png"},
+                {id:"builtin_girl_event_ga2",name:"女生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/girl/ga2.png"}
+            ]
+        }
+    ];
+    return catalogues.flatMap(({collection,builtInPattern,products})=>{
+        const list=state[collection];
+        if(!list.some(item=>builtInPattern.test(item.image||""))) return [];
+        return products
+            .filter(product=>!list.some(item=>item.id===product.id||item.image===product.image))
+            .map(product=>({collection,id:product.id,action:"add",value:product}));
+    });
+}
 async function backend(){
     if(currentUser?.role!=="teacher" || !backendAuthenticated) return;
+    const eventClothingChanges=missingBuiltinEventClothingChanges();
+    if(eventClothingChanges.length){
+        await runCommand({type:"edit",changes:eventClothingChanges},"seed:builtin-event-clothing-v1");
+    }
     currentView={type:"backend"};
     const used = getStorageUsage();
     const usedMb = (used/1024/1024).toFixed(2);
