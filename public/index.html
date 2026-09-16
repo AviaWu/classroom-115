@@ -346,7 +346,8 @@ const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
-const TEACHER_PASSWORD = "5905606";
+const TEACHER_PASSWORD = "1127";
+const BACKEND_PASSWORD = "5905606";
 const STUDENT_PASSWORDS = Object.freeze({
     1:"3847",2:"1926",3:"5063",4:"7412",5:"2895",6:"6031",7:"4758",8:"9203",9:"1567",10:"8340",
     11:"2691",12:"5127",13:"9482",14:"3056",15:"7719",16:"4283",17:"6905",18:"1348",19:"8672",20:"2510",
@@ -1873,7 +1874,7 @@ openBackend = function(){
 }
 async function checkBackendPw(){
     const pw = document.getElementById("backendPw").value;
-    if(currentUser?.role==="teacher" && pw === TEACHER_PASSWORD){
+    if(currentUser?.role==="teacher" && pw === BACKEND_PASSWORD){
         backendAuthenticated=true;
         closeModal();
         await backend();
