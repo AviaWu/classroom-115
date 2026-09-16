@@ -85,7 +85,18 @@ test('event gifts remain free and omit the level wording in shop and closet',asy
     await h.run('closet(1)');const closet=h.w.document.getElementById('closetTabContent').textContent;
     assert.match(closet,/活動贈送/);assert.doesNotMatch(closet,/活動贈送\s*等級/);
     await h.run("equipClothes(1,'event')");h.w.closeModal();
-    assert.equal(h.w.document.querySelector('.avatar').style.getPropertyValue('--member-level-color'),'#d05c78');
+    const memberCard=h.w.document.querySelector('.card');
+    assert.equal(memberCard.dataset.clothingLevel,'活動贈送');
+    assert.equal(memberCard.style.getPropertyValue('--member-level-color'),'#d05c78');
+});
+test('member card border follows every equipped clothing level',async t=>{
+    const h=page(t);h.cloud={...h.cloud,clothesM:['R','SR','SSR','UR'].map(level=>({id:`cloth-${level}`,name:level,level,price:0,active:true,image:`/${level}.png`})),students:[{...h.cloud.students[0],ownedClothes:['cloth-R','cloth-SR','cloth-SSR','cloth-UR']},h.cloud.students[1]]};
+    await h.start();
+    for(const [level,color] of Object.entries({R:'#687386',SR:'#27868c',SSR:'#8960b5',UR:'#c18418'})){
+        await h.run(`equipClothes(1,'cloth-${level}')`);
+        const card=h.w.document.querySelector('.card');
+        assert.equal(card.dataset.clothingLevel,level);assert.equal(card.style.getPropertyValue('--member-level-color'),color);
+    }
 });
 test('teacher edits daily and weekly task templates through conflict-safe commands',async t=>{
     const h=page(t);h.cloud={...h.cloud,

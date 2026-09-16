@@ -20,8 +20,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .danger{background:#ffdede}
 .warning{background:#fff4cc}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px}
-.card{padding:0;background:transparent;border:none;box-shadow:none;text-align:center}
-.avatar{width:100%;aspect-ratio:9/16;border:4px solid var(--member-level-color,#20263a);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:64px;overflow:hidden;position:relative;background:#F0ECE9}
+.card{padding:8px;background:rgba(255,255,255,.72);border:4px solid var(--member-level-color,#20263a);border-radius:20px;box-shadow:none;text-align:center}
+.avatar{width:100%;aspect-ratio:9/16;border:2px solid var(--member-level-color,#20263a);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:64px;overflow:hidden;position:relative;background:#F0ECE9}
 .avatar .bg-layer{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center;pointer-events:none}
 .avatar .character{position:absolute;inset:0;z-index:2;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
 .avatar .layout-item{position:absolute;inset:0;background-size:contain;background-position:center bottom;background-repeat:no-repeat;pointer-events:none}
@@ -1012,8 +1012,8 @@ function render(){
             charHtml = `<div class="character" style="background-image:url('${defaultImage}')"></div>`;
         }
 
-        return `<div class="card">
-            <div class="avatar pet-interaction-trigger" style="--member-level-color:${memberLevelColor}" role="button" tabindex="0" aria-label="查看${s.id}號的寵物心情互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
+        return `<div class="card" style="--member-level-color:${memberLevelColor}" data-clothing-level="${esc(eqCloth?.level||"default")}">
+            <div class="avatar pet-interaction-trigger" role="button" tabindex="0" aria-label="查看${s.id}號的寵物心情互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
             <div class="resource-line">
                 <span class="num">${s.id}</span>
                 <span class="tokens">🪙 ${s.tokens}</span>
