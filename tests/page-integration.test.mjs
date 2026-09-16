@@ -39,7 +39,7 @@ function page(t){
     w.firebaseGameStore=sync;
     t.after(()=>{sync.dispose();w.close();});
     const signIn=(account,password)=>{w.document.getElementById('loginAccount').value=account;w.document.getElementById('loginPassword').value=password;w.login(new w.Event('submit'));};
-    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="1127";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
+    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','5905606');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="5905606";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
 }
 test('inline scripts and modules parse',()=>{
     for(const [,attributes,source] of scripts){
@@ -52,7 +52,7 @@ test('login screen accepts configured teacher and student credentials and reject
     assert.equal(h.w.document.getElementById('loginAccount').options.length,31);
     h.signIn('student-1','0000');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);assert.match(h.w.document.getElementById('loginMessage').textContent,/錯誤/);
     h.signIn('student-1','3847');assert.equal(h.w.document.getElementById('loginScreen').hidden,true);assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 1 號');
-    h.w.logout();h.signIn('teacher','1127');assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');assert.equal(h.w.document.getElementById('backendButton').hidden,false);
+    h.w.logout();h.signIn('teacher','5905606');assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');assert.equal(h.w.document.getElementById('backendButton').hidden,false);
 });
 test('student can use own features and drawing but is blocked from every other student',async t=>{
     const h=page(t);await h.start();h.w.logout();h.signIn('student-1','3847');
@@ -66,7 +66,43 @@ test('teacher has all student access but must enter the password again for backe
     const h=page(t);await h.start();await h.run('tasks(2)');assert.deepEqual(h.alerts,[]);
     h.w.openBackend();assert.ok(h.w.document.getElementById('backendPw'));assert.match(h.w.document.getElementById('body').textContent,/登入後台/);
     h.w.document.getElementById('backendPw').value='0000';await h.w.checkBackendPw();assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);assert.ok(h.alerts.includes('密碼錯誤！'));
-    h.w.openBackend();h.w.document.getElementById('backendPw').value='1127';await h.w.checkBackendPw();assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
+    h.w.openBackend();h.w.document.getElementById('backendPw').value='5905606';await h.w.checkBackendPw();assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
+});
+test('event gifts remain free and omit the level wording in shop and closet',async t=>{
+    const h=page(t);h.cloud={...h.cloud,clothesM:[...h.cloud.clothesM,{id:'event',name:'活動服裝',level:'活動贈送',price:0,active:true,image:'/images/boy/ba1.png'}]};
+    await h.start();await h.run('shop(1)');
+    const shop=h.w.document.getElementById('shopTabContent').textContent;
+    assert.match(shop,/活動贈送/);assert.doesNotMatch(shop,/活動贈送\s*等級/);assert.match(shop,/R\s*等級/);
+    await h.run("buyCloth(1,'event')");assert.equal(h.cloud.students[0].tokens,200);
+    await h.run('closet(1)');const closet=h.w.document.getElementById('closetTabContent').textContent;
+    assert.match(closet,/活動贈送/);assert.doesNotMatch(closet,/活動贈送\s*等級/);
+});
+test('teacher edits daily and weekly task templates through conflict-safe commands',async t=>{
+    const h=page(t);h.cloud={...h.cloud,
+        dailyTaskTemplates:[{id:'daily',title:'每日舊名稱',reward:10,appearTime:'08:00',dueTime:'23:59',enabled:true}],
+        weeklyTaskTemplates:[{id:'weekly',title:'每週舊名稱',reward:20,appearWeekday:1,appearTime:'08:00',dueWeekday:5,dueTime:'23:59',enabled:true}]};
+    await h.start();await h.login();
+    assert.ok(h.w.document.querySelector('[data-field="dailyTaskTemplates:daily:title"]'));
+    assert.ok(h.w.document.querySelector('[data-field="weeklyTaskTemplates:weekly:appearWeekday"]'));
+    await h.run("updateTaskTemplate('dailyTaskTemplates','daily','title','每日新名稱')");
+    await h.run("updateTaskTemplate('weeklyTaskTemplates','weekly','reward','42')");
+    await h.run("updateTaskTemplate('weeklyTaskTemplates','weekly','dueWeekday','6')");
+    assert.equal(h.cloud.dailyTaskTemplates[0].title,'每日新名稱');
+    assert.equal(h.cloud.weeklyTaskTemplates[0].reward,42);assert.equal(h.cloud.weeklyTaskTemplates[0].dueWeekday,6);
+});
+test('teacher edits daily and weekly coop templates through conflict-safe commands',async t=>{
+    const h=page(t);h.cloud={...h.cloud,coopTaskTemplates:[
+        {id:'coop-daily',monsterName:'每日怪獸',content:'每日內容',reward:5,rewardType:'token',scheduleType:'daily',appearTime:'08:00',dueTime:'23:59',enabled:true},
+        {id:'coop-weekly',monsterName:'每週怪獸',content:'每週內容',reward:1,rewardType:'ticket',scheduleType:'weekly',appearWeekday:1,appearTime:'08:00',dueWeekday:5,dueTime:'23:59',enabled:true}
+    ]};
+    await h.start();await h.login();
+    assert.ok(h.w.document.querySelector('[data-field="coopTaskTemplates:coop-daily:content"]'));
+    assert.ok(h.w.document.querySelector('[data-field="coopTaskTemplates:coop-weekly:appearWeekday"]'));
+    await h.run("updateCoopTaskTemplate('coop-daily','content','更新每日內容')");
+    await h.run("updateCoopTaskTemplate('coop-weekly','dueTime','21:30')");
+    await h.run("updateCoopTaskTemplate('coop-weekly','reward','3')");
+    assert.equal(h.cloud.coopTaskTemplates.find(item=>item.id==='coop-daily').content,'更新每日內容');
+    const weekly=h.cloud.coopTaskTemplates.find(item=>item.id==='coop-weekly');assert.equal(weekly.dueTime,'21:30');assert.equal(weekly.reward,3);
 });
 test('startup and opening all student views never writes; task button commits live reward',async t=>{
     const h=page(t);await h.start();
