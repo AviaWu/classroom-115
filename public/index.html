@@ -303,7 +303,7 @@ input[type="number"]{width:85px}
     <div class="login-card">
         <h1>班級冒險登入</h1>
         <p>選擇你的身分，輸入 4 位數密碼</p>
-        <form class="login-form" onsubmit="login(event)">
+        <form id="loginForm" class="login-form">
             <label for="loginAccount">登入者
                 <select id="loginAccount" required></select>
             </label>
@@ -465,9 +465,20 @@ window.firebaseGameStore = {
 };
 function initializeLogin(){
     const account=document.getElementById("loginAccount");
+    const form=document.getElementById("loginForm");
+    const password=document.getElementById("loginPassword");
     account.innerHTML='<option value="teacher">老師</option>'+Array.from({length:30},(_,index)=>`<option value="student-${index+1}">學生 ${index+1} 號</option>`).join("");
+    if(!form.dataset.loginBound){
+        form.addEventListener("submit",login);
+        password.addEventListener("keydown",event=>{
+            if(event.key!=="Enter") return;
+            event.preventDefault();
+            login(event);
+        });
+        form.dataset.loginBound="true";
+    }
     document.getElementById("loginScreen").hidden=false;
-    document.getElementById("loginPassword").focus();
+    password.focus();
     updateSessionUi();
 }
 function login(event){
@@ -1870,7 +1881,7 @@ openBackend = function(){
     backendAuthenticated=false;
     currentView={type:"login"};
     openModal(`
-    <form onsubmit="checkBackendPw(event)">
+    <form id="backendLoginForm">
         <h2>登入後台</h2>
         <div class="row">
             <label>管理密碼：</label>
@@ -1882,6 +1893,15 @@ openBackend = function(){
         </div>
     </form>
     `);
+    const form=document.getElementById("backendLoginForm");
+    const password=document.getElementById("backendPw");
+    form.addEventListener("submit",checkBackendPw);
+    password.addEventListener("keydown",event=>{
+        if(event.key!=="Enter") return;
+        event.preventDefault();
+        checkBackendPw(event);
+    });
+    password.focus();
 }
 async function checkBackendPw(event){
     event?.preventDefault();

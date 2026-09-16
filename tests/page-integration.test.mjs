@@ -53,8 +53,9 @@ test('login screen accepts configured teacher and student credentials and reject
     h.signIn('student-1','0000');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);assert.match(h.w.document.getElementById('loginMessage').textContent,/錯誤/);
     h.signIn('student-1','3847');assert.equal(h.w.document.getElementById('loginScreen').hidden,true);assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 1 號');
     h.w.logout();h.signIn('teacher','5905606');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);
-    assert.equal(h.w.document.querySelector('.login-form button').type,'submit');
-    h.signIn('teacher','1127');assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');assert.equal(h.w.document.getElementById('backendButton').hidden,false);
+    const loginPassword=h.w.document.getElementById('loginPassword');loginPassword.value='1127';
+    loginPassword.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+    assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');assert.equal(h.w.document.getElementById('backendButton').hidden,false);
 });
 test('student can use own features and drawing but is blocked from every other student',async t=>{
     const h=page(t);await h.start();h.w.logout();h.signIn('student-1','3847');
@@ -68,10 +69,9 @@ test('teacher has all student access but must enter the password again for backe
     const h=page(t);await h.start();await h.run('tasks(2)');assert.deepEqual(h.alerts,[]);
     h.w.openBackend();assert.ok(h.w.document.getElementById('backendPw'));assert.match(h.w.document.getElementById('body').textContent,/登入後台/);
     h.w.document.getElementById('backendPw').value='0000';await h.w.checkBackendPw();assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);assert.ok(h.alerts.includes('密碼錯誤！'));
-    h.w.openBackend();const backendPassword=h.w.document.getElementById('backendPw');
-    assert.ok(backendPassword.form);assert.equal(backendPassword.form.querySelector('.primary').type,'submit');
-    backendPassword.value='5905606';let prevented=false;await h.w.checkBackendPw({preventDefault(){prevented=true;}});
-    assert.equal(prevented,true);assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
+    h.w.openBackend();const backendPassword=h.w.document.getElementById('backendPw');backendPassword.value='5905606';
+    backendPassword.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+    await new Promise(resolve=>setTimeout(resolve,0));assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
 });
 test('event gifts remain free and omit the level wording in shop and closet',async t=>{
     const h=page(t);h.cloud={...h.cloud,clothesM:[...h.cloud.clothesM,{id:'event',name:'活動服裝',level:'活動贈送',price:0,active:true,image:'/images/boy/ba1.png'}]};
