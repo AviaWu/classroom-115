@@ -1861,18 +1861,21 @@ openBackend = function(){
     backendAuthenticated=false;
     currentView={type:"login"};
     openModal(`
-    <h2>登入後台</h2>
-    <div class="row">
-        <label>管理密碼：</label>
-        <input type="password" id="backendPw">
-    </div>
-    <div class="row">
-        <button class="primary" onclick="checkBackendPw()">登入</button>
-        <button onclick="closeModal()">取消</button>
-    </div>
+    <form onsubmit="checkBackendPw(event)">
+        <h2>登入後台</h2>
+        <div class="row">
+            <label>管理密碼：</label>
+            <input type="password" id="backendPw" autofocus>
+        </div>
+        <div class="row">
+            <button class="primary" type="submit">登入</button>
+            <button type="button" onclick="closeModal()">取消</button>
+        </div>
+    </form>
     `);
 }
-async function checkBackendPw(){
+async function checkBackendPw(event){
+    event?.preventDefault();
     const pw = document.getElementById("backendPw").value;
     if(currentUser?.role==="teacher" && pw === BACKEND_PASSWORD){
         backendAuthenticated=true;
