@@ -346,7 +346,7 @@ const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
-const TEACHER_PASSWORD = "1127";
+const TEACHER_PASSWORD = "5905606";
 const STUDENT_PASSWORDS = Object.freeze({
     1:"3847",2:"1926",3:"5063",4:"7412",5:"2895",6:"6031",7:"4758",8:"9203",9:"1567",10:"8340",
     11:"2691",12:"5127",13:"9482",14:"3056",15:"7719",16:"4283",17:"6905",18:"1348",19:"8672",20:"2510",
@@ -1593,7 +1593,7 @@ function groupedShopCards(id,list,card){
         const items = activeItems.filter(p=>(p.level||"R")===level);
         return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
             <div class="shop-level-header">
-                <h3><span class="level-badge">${level}</span>${level} 等級商品</h3>
+                <h3><span class="level-badge">${level}</span>${level==="活動贈送"?"商品":`${level} 等級商品`}</h3>
                 <span class="level-price">🪙 每件 ${priceForLevel(level)} 代幣</span>
             </div>
             <div class="shopgrid">${items.map(p=>card(id,p)).join("")}</div>
@@ -1616,13 +1616,17 @@ function addItemToWardrobe(student,type,itemId){
     collection.push(itemId);
     return true;
 }
+function productLevelLabel(level){
+    const normalized=level||"R";
+    return normalized==="活動贈送" ? normalized : `${normalized} 等級`;
+}
 function clothCard(id,p){
     const s = state.students[id-1];
     const own = itemOwnedByStudent(s,"clothes",p.id);
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"👗"}</div>
         <b>${esc(p.name)}</b>
-        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
+        <div class="product-level-badge">${esc(productLevelLabel(p.level))}</div>
         <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyCloth(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
@@ -1633,7 +1637,7 @@ function layCard(id,p){
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"✨"}</div>
         <b>${esc(p.name)}</b>
-        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
+        <div class="product-level-badge">${esc(productLevelLabel(p.level))}</div>
         <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyLayout(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
@@ -1644,7 +1648,7 @@ function bgCard(id,p){
     return `<div class="product">
         <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="">`:"🖼"}</div>
         <b>${esc(p.name)}</b>
-        <div class="product-level-badge">${esc(p.level||"R")} 等級</div>
+        <div class="product-level-badge">${esc(productLevelLabel(p.level))}</div>
         <div class="price">🪙 ${priceForLevel(p.level)}</div>
         <div class="owned">${own?"✓已擁有":`<button onclick="buyBg(${id},'${esc(p.id)}')">購買</button>`}</div>
     </div>`;
@@ -1776,7 +1780,7 @@ function groupedClosetCards(list,card,emptyText){
     return LEVEL_ORDER.map(level=>{
         const items = list.filter(item=>(item.level||"R")===level);
         return items.length ? `<section class="shop-level level-${level.toLowerCase()}">
-            <div class="shop-level-header"><h3><span class="level-badge">${level}</span>${level} 等級</h3><span>${items.length} 件</span></div>
+            <div class="shop-level-header"><h3><span class="level-badge">${level}</span>${level==="活動贈送"?"":`${level} 等級`}</h3><span>${items.length} 件</span></div>
             <div class="shopgrid">${items.map(card).join("")}</div>
         </section>` : "";
     }).join("");
@@ -1945,17 +1949,29 @@ async function backend(){
         </div>`;
     }).join("") || `<div class="empty">尚無任務</div>`;
     const dailyTaskHtml = state.dailyTaskTemplates.map(template=>`
-        <div class="row">
+        <div class="row product-admin">
             <div class="grow">
-                <b>${esc(template.title)}</b> <span class="small">每天 ${esc(template.appearTime)} 出現｜${esc(template.dueTime)} 截止｜獎勵 ${Number(template.reward)||0} 🪙</span>
+                <b>${esc(template.title)}</b>
+                <div class="edit-item-row">
+                    <input data-field="dailyTaskTemplates:${esc(template.id)}:title" value="${esc(template.title)}" onchange="updateTaskTemplate('dailyTaskTemplates','${esc(template.id)}','title',this.value)" placeholder="每日任務名稱">
+                    <input data-field="dailyTaskTemplates:${esc(template.id)}:reward" type="number" min="0" step="1" value="${esc(template.reward)}" onchange="updateTaskTemplate('dailyTaskTemplates','${esc(template.id)}','reward',this.value)" placeholder="代幣獎勵">
+                    <label>出現：<input data-field="dailyTaskTemplates:${esc(template.id)}:appearTime" type="time" value="${esc(template.appearTime)}" onchange="updateTaskTemplate('dailyTaskTemplates','${esc(template.id)}','appearTime',this.value)"></label>
+                    <label>截止：<input data-field="dailyTaskTemplates:${esc(template.id)}:dueTime" type="time" value="${esc(template.dueTime)}" onchange="updateTaskTemplate('dailyTaskTemplates','${esc(template.id)}','dueTime',this.value)"></label>
+                </div>
             </div>
             <button onclick="toggleDailyTask('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
             <button class="danger" onclick="deleteDailyTask('${esc(template.id)}')">刪除</button>
         </div>`).join("") || `<div class="empty">尚未設定每日任務</div>`;
     const weeklyTaskHtml = state.weeklyTaskTemplates.map(template=>`
-        <div class="row">
+        <div class="row product-admin">
             <div class="grow">
-                <b>${esc(template.title)}</b> <span class="small">每週${WEEKDAY_NAMES[template.appearWeekday]} ${esc(template.appearTime)} 出現｜${WEEKDAY_NAMES[template.dueWeekday]} ${esc(template.dueTime)} 截止｜獎勵 ${Number(template.reward)||0} 🪙</span>
+                <b>${esc(template.title)}</b>
+                <div class="edit-item-row">
+                    <input data-field="weeklyTaskTemplates:${esc(template.id)}:title" value="${esc(template.title)}" onchange="updateTaskTemplate('weeklyTaskTemplates','${esc(template.id)}','title',this.value)" placeholder="每週任務名稱">
+                    <input data-field="weeklyTaskTemplates:${esc(template.id)}:reward" type="number" min="0" step="1" value="${esc(template.reward)}" onchange="updateTaskTemplate('weeklyTaskTemplates','${esc(template.id)}','reward',this.value)" placeholder="代幣獎勵">
+                    <label>出現：<select data-field="weeklyTaskTemplates:${esc(template.id)}:appearWeekday" onchange="updateTaskTemplate('weeklyTaskTemplates','${esc(template.id)}','appearWeekday',this.value)">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${Number(template.appearWeekday)===index?"selected":""}>${name}</option>`).join("")}</select><input data-field="weeklyTaskTemplates:${esc(template.id)}:appearTime" type="time" value="${esc(template.appearTime)}" onchange="updateTaskTemplate('weeklyTaskTemplates','${esc(template.id)}','appearTime',this.value)"></label>
+                    <label>截止：<select data-field="weeklyTaskTemplates:${esc(template.id)}:dueWeekday" onchange="updateTaskTemplate('weeklyTaskTemplates','${esc(template.id)}','dueWeekday',this.value)">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${Number(template.dueWeekday)===index?"selected":""}>${name}</option>`).join("")}</select><input data-field="weeklyTaskTemplates:${esc(template.id)}:dueTime" type="time" value="${esc(template.dueTime)}" onchange="updateTaskTemplate('weeklyTaskTemplates','${esc(template.id)}','dueTime',this.value)"></label>
+                </div>
             </div>
             <button onclick="toggleWeeklyTask('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
             <button class="danger" onclick="deleteWeeklyTask('${esc(template.id)}')">刪除</button>
@@ -1987,10 +2003,22 @@ async function backend(){
     let layHtml = adminProductGroups("layouts",state.layouts);
     let bgHtml = adminProductGroups("backgrounds",state.backgrounds);
     const coopTemplateHtml = state.coopTaskTemplates.map(template=>`
-        <div class="row">
+        <div class="row product-admin">
             <div class="grow">
                 <b>${esc(template.monsterName)}</b>
-                <div class="small">${template.scheduleType==="weekly"?`每週${WEEKDAY_NAMES[template.appearWeekday]} ${esc(template.appearTime)} 出現｜${WEEKDAY_NAMES[template.dueWeekday]} ${esc(template.dueTime)} 截止`:`每天 ${esc(template.appearTime)} 出現｜${esc(template.dueTime)} 截止`}｜獎勵 ${Number(template.reward)||0} ${template.rewardType==="ticket"?"🎟️ 樂透券":"🪙 代幣"}</div>
+                <div class="small">${template.scheduleType==="weekly"?"每週協力任務":"每日協力任務"}</div>
+                <div class="edit-item-row">
+                    <input data-field="coopTaskTemplates:${esc(template.id)}:monsterName" value="${esc(template.monsterName)}" onchange="updateCoopTaskTemplate('${esc(template.id)}','monsterName',this.value)" placeholder="任務名稱">
+                    <select data-field="coopTaskTemplates:${esc(template.id)}:rewardType" onchange="updateCoopTaskTemplate('${esc(template.id)}','rewardType',this.value)"><option value="token" ${template.rewardType!=="ticket"?"selected":""}>🪙 代幣</option><option value="ticket" ${template.rewardType==="ticket"?"selected":""}>🎟️ 樂透券</option></select>
+                    <input data-field="coopTaskTemplates:${esc(template.id)}:reward" type="number" min="0" value="${esc(template.reward)}" onchange="updateCoopTaskTemplate('${esc(template.id)}','reward',this.value)" placeholder="獎勵">
+                </div>
+                <textarea data-field="coopTaskTemplates:${esc(template.id)}:content" rows="2" style="width:100%;margin-top:8px" onchange="updateCoopTaskTemplate('${esc(template.id)}','content',this.value)" placeholder="任務內容">${esc(template.content||"")}</textarea>
+                <div class="edit-item-row" style="margin-top:8px">
+                    ${template.scheduleType==="weekly"?`<label>出現：<select data-field="coopTaskTemplates:${esc(template.id)}:appearWeekday" onchange="updateCoopTaskTemplate('${esc(template.id)}','appearWeekday',this.value)">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${Number(template.appearWeekday)===index?"selected":""}>${name}</option>`).join("")}</select></label>`:""}
+                    <input data-field="coopTaskTemplates:${esc(template.id)}:appearTime" type="time" value="${esc(template.appearTime)}" onchange="updateCoopTaskTemplate('${esc(template.id)}','appearTime',this.value)">
+                    ${template.scheduleType==="weekly"?`<label>截止：<select data-field="coopTaskTemplates:${esc(template.id)}:dueWeekday" onchange="updateCoopTaskTemplate('${esc(template.id)}','dueWeekday',this.value)">${WEEKDAY_NAMES.map((name,index)=>`<option value="${index}" ${Number(template.dueWeekday)===index?"selected":""}>${name}</option>`).join("")}</select></label>`:""}
+                    <input data-field="coopTaskTemplates:${esc(template.id)}:dueTime" type="time" value="${esc(template.dueTime)}" onchange="updateCoopTaskTemplate('${esc(template.id)}','dueTime',this.value)">
+                </div>
             </div>
             <button onclick="toggleCoopTemplate('${esc(template.id)}')">${template.enabled!==false?"停用":"啟用"}</button>
             <button class="danger" onclick="deleteCoopTemplate('${esc(template.id)}')">刪除</button>
@@ -2551,6 +2579,60 @@ async function updatePublishedCoopTask(id,field,rawValue){
     const result=await runCommand({type:"edit",changes:[{collection:"coopTasks",id,action:"set",field,before,value}]},key);
     if(result) draftFields.delete(key);
 }
+function validTemplateTime(value){
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+async function updateTaskTemplate(collection,id,field,rawValue){
+    if(!["dailyTaskTemplates","weeklyTaskTemplates"].includes(collection)) return;
+    const template=state[collection].find(item=>item.id===id);
+    if(!template) return alert("這項週期任務設定已被刪除，未儲存的輸入已保留。");
+    const key=`${collection}:${id}:${field}`;
+    let value=rawValue,convert=input=>input;
+    if(field==="title"){
+        value=rawValue.trim();
+        if(!value) return alert("任務名稱不可空白");
+    }else if(field==="reward"){
+        value=Number(rawValue);
+        convert=input=>Number(input);
+        if(!Number.isInteger(value)||value<0) return alert("代幣獎勵必須是 0 以上的整數");
+    }else if(field==="appearTime"||field==="dueTime"){
+        if(!validTemplateTime(value)) return alert("請輸入有效時間");
+    }else if(collection==="weeklyTaskTemplates"&&(field==="appearWeekday"||field==="dueWeekday")){
+        value=Number(rawValue);
+        convert=input=>Number(input);
+        if(!Number.isInteger(value)||value<0||value>6) return alert("請選擇有效星期");
+    }else return;
+    const before=editFieldBefore(collection,id,field,template[field],convert);
+    const result=await runCommand({type:"edit",changes:[{collection,id,action:"set",field,before,value}]},key);
+    if(result) draftFields.delete(key);
+}
+async function updateCoopTaskTemplate(id,field,rawValue){
+    const template=state.coopTaskTemplates.find(item=>item.id===id);
+    if(!template) return alert("這項週期協力任務設定已被刪除，未儲存的輸入已保留。");
+    const key=`coopTaskTemplates:${id}:${field}`;
+    let value=rawValue,convert=input=>input;
+    if(field==="monsterName"||field==="content"){
+        value=rawValue.trim();
+        if(!value) return alert(field==="monsterName"?"任務名稱不可空白":"任務內容不可空白");
+    }else if(field==="rewardType"){
+        if(!["token","ticket"].includes(value)) return;
+        if(value==="ticket"&&!Number.isInteger(Number(template.reward))) return alert("樂透券獎勵必須是整數");
+    }else if(field==="reward"){
+        value=Number(rawValue);
+        convert=input=>Number(input);
+        if(!Number.isFinite(value)||value<0) return alert("獎勵必須是 0 以上的數字");
+        if(template.rewardType==="ticket"&&!Number.isInteger(value)) return alert("樂透券獎勵必須是整數");
+    }else if(field==="appearTime"||field==="dueTime"){
+        if(!validTemplateTime(value)) return alert("請輸入有效時間");
+    }else if(template.scheduleType==="weekly"&&(field==="appearWeekday"||field==="dueWeekday")){
+        value=Number(rawValue);
+        convert=input=>Number(input);
+        if(!Number.isInteger(value)||value<0||value>6) return alert("請選擇有效星期");
+    }else return;
+    const before=editFieldBefore("coopTaskTemplates",id,field,template[field],convert);
+    const result=await runCommand({type:"edit",changes:[{collection:"coopTaskTemplates",id,action:"set",field,before,value}]},key);
+    if(result) draftFields.delete(key);
+}
 function addTask(){
     const title = document.getElementById("newTaskTitle").value.trim();
     const content = document.getElementById("newTaskContent").value.trim();
@@ -2875,7 +2957,7 @@ document.addEventListener("input",event=>{
     if(key && draftFields.has(key)) draftFields.get(key).dirty=true;
 });
 // Teacher legacy handlers produce per-record/per-field commands. No delayed save.
-const teacherMutations=["dropItem","clearLegacyArtworks","publishCoopTask","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
+const teacherMutations=["dropItem","clearLegacyArtworks","publishCoopTask","updatePublishedTask","updatePublishedCoopTask","updateTaskTemplate","updateCoopTaskTemplate","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
 for(const name of teacherMutations){
     const original=window[name];
     window[name]=function(...args){
