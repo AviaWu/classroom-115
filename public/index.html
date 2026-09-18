@@ -3178,7 +3178,12 @@ setInterval(syncScheduledTasks,30000);
       now:()=>Date.now()+serverOffset,
       transactRoom:async update=>{
           const warmed=(await get(roomRef)).val();
-          const result=await runTransaction(roomRef,current=>update(selectTransactionRoom(current,warmed)),{applyLocally:false});
+          let warmedUsed=false;
+          const result=await runTransaction(roomRef,current=>{
+              const room=!warmedUsed ? selectTransactionRoom(current,warmed) : current;
+              warmedUsed=true;
+              return update(room);
+          },{applyLocally:false});
           return {committed:result.committed,value:result.snapshot.val()};
       }
   });
