@@ -16,6 +16,7 @@ games/
     │   ├── clothesF[]
     │   ├── layouts[]
     │   ├── backgrounds[]
+    │   ├── bosses[]
     │   ├── dailyTaskTemplates[]
     │   ├── weeklyTaskTemplates[]
     │   ├── coopTaskTemplates[]
@@ -65,6 +66,7 @@ artworks/
 | `clothesM`、`clothesF` | 商品陣列 | 男生、女生服裝目錄。 |
 | `layouts` | 商品陣列 | 寵物目錄；欄位沿用 `layout` 名稱。 |
 | `backgrounds` | 商品陣列 | 可購買的角色背景目錄。 |
+| `bosses` | BOSS 陣列 | 已發布的多隻 BOSS、題庫、生命值設定、獎勵與啟用狀態。舊版單一 `boss` 會在正規化後轉入此陣列。 |
 | `dailyTaskTemplates`、`weeklyTaskTemplates` | 模板陣列 | 產生個人週期任務的設定。 |
 | `coopTaskTemplates` | 模板陣列 | 產生每日或每週協力任務的設定。 |
 | `coopTasks` | 協力任務陣列 | 怪獸、獎勵、完成成員與全班發獎狀態。 |
@@ -94,6 +96,7 @@ artworks/
 | `equippedLayout` | 商品 ID 陣列 | 最多一個已裝備寵物；空陣列使用預設寵物。 |
 | `ownedBg` | 商品 ID 陣列 | 已擁有背景，對應 `backgrounds[].id`。 |
 | `equippedBg` | 商品 ID 或 `null` | 目前使用的角色背景。 |
+| `bossProgress` | BOSS 進度陣列 | 該學生對各 BOSS 的剩餘生命值、密碼驗證、已答對題目、擊敗狀態與完成時間，以 `bossId` 對應 `progress/bosses[].id`。 |
 
 衣櫃重置只清除該學生的持有與裝備欄位。全班資源重置會清除目前全體學生的代幣、樂透券及衣櫃，保留 `doneTasks`、`petAffection` 與 `lastPetMoodDate`。
 

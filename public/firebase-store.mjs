@@ -1,6 +1,6 @@
 import {applyOperation,normalizeProgress} from './game-operations.mjs';
 
-const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','coopTasks',
+const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','coopTasks',
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
     'drawings','pendingArtworkDeletes','globalBgImage','lastSaved'];
 

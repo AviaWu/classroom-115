@@ -47,7 +47,7 @@ function sdkServer(options={}) {
 }
 const clone=value=>structuredClone(value);
 const job=(id,command)=>({id,createdAt:90000,command});
-const progressFields=['students','tasks','clothesM','clothesF','layouts','backgrounds','coopTasks',
+const progressFields=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','coopTasks',
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
     'drawings','pendingArtworkDeletes','globalBgImage','lastSaved'];
 function subscriptionServer() {
@@ -61,16 +61,24 @@ function subscriptionServer() {
 }
 const settleSubscription=()=>new Promise(resolve=>setImmediate(resolve));
 test('progress subscription waits for every child once then publishes merged child updates',async()=>{
-    const s=subscriptionServer(),values={students:[{id:1,tokens:10}],tasks:[{id:'task',reward:5}],drawings:[{id:'drawing_test1',savedAt:'2026-09-16T00:00:00Z'}]},published=[],errors=[];
+    const boss={id:'dragon',name:'巨龍',maxHp:20,questions:[]};
+    const s=subscriptionServer(),values={students:[{id:1,tokens:10}],tasks:[{id:'task',reward:5}],bosses:[boss],drawings:[{id:'drawing_test1',savedAt:'2026-09-16T00:00:00Z'}]},published=[],errors=[];
     const stop=s.subscribe(value=>published.push(value),error=>errors.push(error));await settleSubscription();
     assert.equal(s.tokenReads,1);assert.deepEqual([...s.listeners.keys()],progressFields.map(field=>`games/classroom-115/progress/${field}`));
     for(const field of progressFields.slice(0,-1)) s.emit(field,values[field]??null);
     assert.deepEqual(published,[]);
     s.emit('lastSaved','2026-09-16T00:00:00Z');
-    assert.equal(published.length,1);assert.equal(published[0].students[0].tokens,10);assert.deepEqual(published[0].tasks,values.tasks);
+    assert.equal(published.length,1);assert.equal(published[0].students[0].tokens,10);assert.deepEqual(published[0].tasks,values.tasks);assert.deepEqual(published[0].bosses,[{...boss,name:'巨龍',image:'',maxHp:20,attackPassword:'',reward:0,questions:[],active:true,publishedAt:0}]);
     s.emit('students',[{id:1,tokens:25}]);
-    assert.equal(published.length,2);assert.equal(published[1].students[0].tokens,25);assert.deepEqual(published[1].tasks,values.tasks);
+    assert.equal(published.length,2);assert.equal(published[1].students[0].tokens,25);assert.deepEqual(published[1].tasks,values.tasks);assert.deepEqual(published[1].bosses,published[0].bosses);
     assert.deepEqual(errors,[]);stop();assert.deepEqual(s.unsubscribed,[...s.listeners.keys()]);
+});
+test('progress subscription converts a legacy single boss into the current bosses array',async()=>{
+    const legacyBoss={id:'legacy-dragon',name:'舊巨龍',hp:12,questions:[]};
+    const s=subscriptionServer(),published=[],errors=[];
+    s.subscribe(value=>published.push(value),error=>errors.push(error));await settleSubscription();
+    for(const field of progressFields) s.emit(field,field==='students'?[{id:1}]:field==='boss'?legacyBoss:field==='lastSaved'?'2026-09-16T00:00:00Z':null);
+    assert.equal(published.length,1);assert.equal(published[0].boss,undefined);assert.equal(published[0].bosses.length,1);assert.equal(published[0].bosses[0].id,legacyBoss.id);assert.equal(published[0].bosses[0].maxHp,12);assert.deepEqual(errors,[]);
 });
 test('progress subscription reports malformed merged data and ignores callbacks after unsubscribe',async()=>{
     const s=subscriptionServer(),published=[],errors=[];
