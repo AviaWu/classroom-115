@@ -58,12 +58,16 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         });
         const operation=(async()=>{
             const token=await getToken();
-            const silent=options.method==='PUT';
+            // Firebase rejects print=silent when a conditional ETag header is
+            // present. Keep silent responses for unconditional artwork writes;
+            // room transactions must retain If-Match for conflict safety.
+            const silent=options.method==='PUT' && !options.headers?.['if-match'];
             const response=await request(`${databaseURL}/${targetPath}.json?auth=${encodeURIComponent(token)}${silent?'&print=silent':''}`,{
                 ...options,cache:'no-store',signal:controller.signal,
             });
             if(!response.ok && response.status!==412){
-                const error=new Error(`雲端存取失敗 (${response.status})`);
+                const detail=(await response.text()).trim();
+                const error=new Error(`雲端存取失敗 (${response.status})${detail?`: ${detail}`:''}`);
                 error.retryable=response.status>=500 || response.status===408 || response.status===429;
                 throw error;
             }
