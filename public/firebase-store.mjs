@@ -4,6 +4,17 @@ const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backg
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
     'drawings','pendingArtworkDeletes','globalBgImage','lastSaved'];
 
+// Firebase may invoke a transaction updater once with an empty local snapshot
+// while the server value fetched immediately before the transaction is already
+// available. Keep that transient value from being mistaken for an uninitialized
+// classroom; genuinely empty rooms still pass through unchanged.
+export function selectTransactionRoom(current,warmed) {
+    const empty=current===null || current===undefined ||
+        (current && typeof current==='object' && !Array.isArray(current) && Object.keys(current).length===0);
+    const hasWarmedProgress=warmed && typeof warmed==='object' && !Array.isArray(warmed) && warmed.progress;
+    return empty && hasWarmedProgress ? warmed : current;
+}
+
 export function createProgressSubscriber({database,getToken,ref,onValue,path='games/classroom-115/progress'}) {
     return (onProgress,onError)=>{
         let stopped=false,unsubscribers=[];

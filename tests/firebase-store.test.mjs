@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createFirebaseStore,createProgressSubscriber} from '../public/firebase-store.mjs';
+import {createFirebaseStore,createProgressSubscriber,selectTransactionRoom} from '../public/firebase-store.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
 const resolveServerValues=(value,clock=100000)=>{
     if(value && typeof value==='object'){
@@ -257,6 +257,13 @@ test('transactions retain at most one hour and 100 receipts while protecting pen
 test('malformed nonempty cloud does not become an editable empty classroom',async()=>{
     const s=server();s.room={...s.room,progress:{students:[]}};
     await assert.rejects(s.store.readRemote(),/格式|成員/);
+});
+test('transaction uses the warmed server room when Firebase first supplies an empty snapshot',()=>{
+    const warmed=initial();
+    assert.equal(selectTransactionRoom(null,warmed),warmed);
+    assert.equal(selectTransactionRoom({},warmed),warmed);
+    assert.deepEqual(selectTransactionRoom({progress:warmed.progress},warmed),{progress:warmed.progress});
+    assert.equal(selectTransactionRoom(null,null),null);
 });
 test('a broken successful acknowledgement remains retryable for receipt recovery',async()=>{
     let written=false;

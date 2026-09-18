@@ -3153,7 +3153,7 @@ setInterval(syncScheduledTasks,30000);
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
   import { get, getDatabase, onValue, ref, runTransaction } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
-  import { createFirebaseStore, createProgressSubscriber, createTokenProvider } from "./firebase-store.mjs";
+  import { createFirebaseStore, createProgressSubscriber, createTokenProvider, selectTransactionRoom } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
@@ -3177,8 +3177,8 @@ setInterval(syncScheduledTasks,30000);
       getToken,getUid:()=>auth.currentUser.uid,
       now:()=>Date.now()+serverOffset,
       transactRoom:async update=>{
-          await get(roomRef);
-          const result=await runTransaction(roomRef,update,{applyLocally:false});
+          const warmed=(await get(roomRef)).val();
+          const result=await runTransaction(roomRef,current=>update(selectTransactionRoom(current,warmed)),{applyLocally:false});
           return {committed:result.committed,value:result.snapshot.val()};
       }
   });
