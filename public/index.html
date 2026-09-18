@@ -3011,9 +3011,9 @@ setInterval(syncScheduledTasks,30000);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { getDatabase, onValue, ref } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { get, getDatabase, onValue, ref, runTransaction } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
-  import { createFirebaseStore, createTokenProvider } from "./firebase-store.mjs";
+  import { createFirebaseStore, createProgressSubscriber, createTokenProvider } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
@@ -3030,15 +3030,24 @@ setInterval(syncScheduledTasks,30000);
   const app=initializeApp(firebaseConfig),auth=getAuth(app),database=getDatabase(app);
   let serverOffset=0;
   const pendingKey="classroom-pending-operations";
+  const roomRef=ref(database,"games/classroom-115");
+  const getToken=createTokenProvider(auth,signInAnonymously);
   const store=createFirebaseStore({
       databaseURL:firebaseConfig.databaseURL,
-      getToken:createTokenProvider(auth,signInAnonymously),getUid:()=>auth.currentUser.uid,
-      now:()=>Date.now()+serverOffset
+      getToken,getUid:()=>auth.currentUser.uid,
+      now:()=>Date.now()+serverOffset,
+      transactRoom:async update=>{
+          await get(roomRef);
+          const result=await runTransaction(roomRef,update,{applyLocally:false});
+          return {committed:result.committed,value:result.snapshot.val()};
+      }
   });
   window.readLatestProgress=store.readRemote;
   window.artworkStore=store;
+  const subscribeProgress=createProgressSubscriber({database,getToken,ref,onValue});
   const sync=createCloudSync({
       ...store,applyState:applyCloudState,lock:setSyncLocked,status:setSyncStatus,
+      subscribeRemote:subscribeProgress,
       error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},
       newId:()=>crypto.randomUUID(),now:()=>Date.now()+serverOffset,
       loadPending:()=>{try{return JSON.parse(sessionStorage.getItem(pendingKey)||"[]");}catch{return [];}},

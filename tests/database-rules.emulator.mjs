@@ -211,7 +211,7 @@ test('a new receipt cannot carry legacy progress metadata or malformed progress'
     }
 });
 
-test('retained receipts are immutable and the latest receipt cannot be removed',async()=>{
+test('retained receipts are immutable',async()=>{
     const previous = await seedLedger();
     const firstId = Object.keys(previous.operations).find(id=>id !== previous.lastOperationId);
     await denied(operation(previous,{id:firstId}));
@@ -229,14 +229,19 @@ test('retained receipts are immutable and the latest receipt cannot be removed',
         next.operations[firstId][field] = value;
         await denied(next);
     }
-    for (const removedIds of [[previous.lastOperationId],Object.keys(previous.operations)]) {
-        const next = operation(previous);
-        for (const id of removedIds) delete next.operations[id];
-        await denied(next);
-    }
     await denied(null,{path:`${roomPath}/operations/${firstId}`});
     await denied({[firstId]:null},{path:`${roomPath}/operations`,method:'PATCH'});
     await allowed(operation(previous,{result:{item:{id:'hat',name:'帽子',price:12},duplicate:false}}));
+});
+
+test('a new authenticated transaction may prune old receipts',async()=>{
+    const previous = await seedLedger();
+    const next = operation(previous);
+    const removedIds = Object.keys(previous.operations);
+    for (const id of removedIds) delete next.operations[id];
+    await allowed(next);
+    const saved = await room();
+    assert.deepEqual(Object.keys(saved.operations),[next.lastOperationId]);
 });
 
 test('deleting progress, receipts or the whole room is denied at every write depth',async()=>{
