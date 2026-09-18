@@ -995,9 +995,13 @@ function applyGlobalBg(){
 }
 
 function render(){
+    const now = Date.now();
     const html = state.students.map(s=>{
         const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
-        const hasTodo = state.tasks.some(t=>!s.doneTasks.includes(t.id));
+        const hasTodo = state.tasks.some(t=>
+            !s.doneTasks.includes(t.id) &&
+            (!t.dueAt || now<=t.dueAt)
+        );
         const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
         const eqCloth = clothPool.find(x=>x.id===s.equippedClothes);
 

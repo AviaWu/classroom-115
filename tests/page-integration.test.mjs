@@ -131,6 +131,13 @@ test('startup and opening all student views never writes; task button commits li
     assert.equal(h.writes,0);await h.run("finishTask(1,'task')");
     assert.equal(h.cloud.students[0].tokens,220);assert.deepEqual(h.cloud.students[0].doneTasks,['task']);
 });
+test('NEW disappears when every unfinished task has expired',async t=>{
+    const h=page(t);h.cloud={...h.cloud,tasks:[{id:'expired',title:'過期任務',reward:20,dueAt:Date.now()-1000}]};
+    await h.start();
+    assert.equal(h.w.document.querySelector('.task-new'),null);
+    await h.run('tasks(1)');
+    assert.match(h.w.document.getElementById('modal').textContent,/目前沒有可完成的任務/);
+});
 test('purchase, wardrobe and pet controls commit immediately without processing UI',async t=>{
     const h=page(t);await h.start();await h.run('shop(1)');await h.run("buyCloth(1,'shirt')");
     await h.run("buyLayout(1,'pet')");await h.run("buyBg(1,'bg')");await h.run('closet(1)');
