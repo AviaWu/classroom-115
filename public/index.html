@@ -3151,9 +3151,9 @@ setInterval(syncScheduledTasks,30000);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { get, getDatabase, onValue, ref, runTransaction } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { getDatabase, onValue, ref } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
-  import { createFirebaseStore, createProgressSubscriber, createTokenProvider, selectTransactionRoom } from "./firebase-store.mjs";
+  import { createFirebaseStore, createProgressSubscriber, createTokenProvider } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
@@ -3170,22 +3170,11 @@ setInterval(syncScheduledTasks,30000);
   const app=initializeApp(firebaseConfig),auth=getAuth(app),database=getDatabase(app);
   let serverOffset=0;
   const pendingKey="classroom-pending-operations";
-  const roomRef=ref(database,"games/classroom-115");
   const getToken=createTokenProvider(auth,signInAnonymously);
   const store=createFirebaseStore({
       databaseURL:firebaseConfig.databaseURL,
       getToken,getUid:()=>auth.currentUser.uid,
-      now:()=>Date.now()+serverOffset,
-      transactRoom:async update=>{
-          const warmed=(await get(roomRef)).val();
-          let warmedUsed=false;
-          const result=await runTransaction(roomRef,current=>{
-              const room=!warmedUsed ? selectTransactionRoom(current,warmed) : current;
-              warmedUsed=true;
-              return update(room);
-          },{applyLocally:false});
-          return {committed:result.committed,value:result.snapshot.val()};
-      }
+      now:()=>Date.now()+serverOffset
   });
   window.readLatestProgress=store.readRemote;
   window.artworkStore=store;
