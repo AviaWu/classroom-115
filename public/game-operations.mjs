@@ -13,10 +13,10 @@ const TAIWAN_OFFSET = 8 * 3_600_000;
 const clone = value => structuredClone(value);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const array = value => Array.isArray(value) ? value : [];
-const unique = value => [...new Set(array(value))];
 const numeric = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const safeKey = key => typeof key === 'string' && !['__proto__','prototype','constructor'].includes(key);
 const idValid = id => (typeof id === 'string' && id.length > 0) || (typeof id === 'number' && Number.isFinite(id));
+const unique = value => [...new Set(array(value).filter(idValid))];
 const validDrawingId = id => typeof id === 'string' && id.length >= 8 && id.length <= 128 && /^drawing_[A-Za-z0-9_-]+$/.test(id);
 
 function indexedDrawings(value) {
