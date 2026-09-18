@@ -71,6 +71,14 @@ test('student can use own features and drawing but is blocked from every other s
     assert.equal(h.alerts.filter(message=>message==='點錯啦!這不是你的人物喔!').length,5);assert.equal(h.writes,0);
     h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
 });
+test('Escape closes an open shared modal',async t=>{
+    const h=page(t);await h.start();await h.run('shop(1)');
+    const modal=h.w.document.getElementById('modal');
+    assert.equal(modal.classList.contains('open'),true);
+    h.w.document.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+    assert.equal(modal.classList.contains('open'),false);
+    assert.equal(h.w.document.getElementById('body').innerHTML,'');
+});
 test('teacher has all student access but must enter the password again for backend',async t=>{
     const h=page(t);await h.start();await h.run('tasks(2)');assert.deepEqual(h.alerts,[]);
     h.w.openBackend();assert.ok(h.w.document.getElementById('backendPw'));assert.match(h.w.document.getElementById('body').textContent,/登入後台/);
