@@ -37,6 +37,17 @@ test('restore clones data, strips protocol metadata and preserves an intentional
     assert.equal(normalizeProgress(null),null);
 });
 
+test('normalization removes sparse holes and invalid values from stored ID arrays', () => {
+    const current=state();
+    current.students[0].doneTasks=Array(23);current.students[0].doneTasks[0]='a';current.students[0].doneTasks[22]='b';
+    current.coopTasks[0].completedBy=Array(23);current.coopTasks[0].completedBy[0]=1;current.coopTasks[0].completedBy[22]=2;
+    current.students[0].ownedLayout=['cat',null,undefined,{},'cat'];
+    const normalized=normalizeProgress(current);
+    assert.deepEqual(normalized.students[0].doneTasks,['a','b']);
+    assert.deepEqual(normalized.students[0].ownedLayout,['cat']);
+    assert.deepEqual(normalized.coopTasks[0].completedBy,[1,2]);
+});
+
 test('initialization never replaces existing progress and commands cannot recreate deleted progress', () => {
     assert.equal(run(null,'initialize',{value:state()}).progress.students.length,2);
     assert.equal(run(state(),'initialize',{value:state({students:[student(9)]})}).changed,false);

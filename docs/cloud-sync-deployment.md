@@ -55,6 +55,7 @@ Node 測試涵蓋操作規則、60 秒備援輪詢、子路徑訂閱生命週期
 
 - 移除 `progress` 內的 `syncVersion`、`revision`、`baseCommitId`、`commitId`、`updatedAt`。
 - 將舊版單一 `progress/boss` 轉成目前使用的 `progress/bosses[]`，並移除舊欄位。
+- 壓縮協力完成名單、任務完成記錄與持有物品等 ID 陣列的舊空洞，避免 Firebase transaction 寫入 `undefined`。
 - 保留最近一小時且位於最新 100 筆範圍內的操作收據。
 - 保留執行交易之裝置目前 `sessionStorage` 待確認佇列所列的收據。
 - 保持 `progress` 其他內容與 `/artworks/classroom-115` 不變。
