@@ -10,8 +10,8 @@ function harness(options={}) {
     let tick,interval;
     const sync=createCloudSync({
         readRemote:async()=>{reads++;return readHook ? readHook() : clone(remote);},
-        execute:async job=>{
-            if(executeHook) await executeHook(job);
+        execute:async (job,pendingIds)=>{
+            if(executeHook) await executeHook(job,pendingIds);
             if(receipts.has(job.id)) return clone(receipts.get(job.id));
             remote.students[0].tokens+=job.command.amount;
             writes++;
@@ -35,10 +35,67 @@ test('opening and refreshing reads cloud without uploading local state or migrat
     assert.equal(h.local.students[0].tokens,42);assert.equal(h.writes,0);
     await h.sync.refresh();assert.equal(h.writes,0);
 });
-test('polling reads changed cloud data at five seconds and emits no processing message',async()=>{
-    const h=harness();await h.start();assert.equal(h.interval,5000);
+test('fallback polling reads changed cloud data once per minute and emits no processing message',async()=>{
+    const h=harness();await h.start();assert.equal(h.interval,60000);
     h.remote=progress(50);await h.tick();assert.equal(h.local.students[0].tokens,50);
     assert.ok(h.messages.every(x=>x==='' || x==='離線中'));
+});
+
+function subscriptionHarness(options={}) {
+    let remote=progress(20),local=progress(999),reads=0,subscribes=0,unsubscribes=0,tick,interval;
+    let onProgress,onSubscriptionError;
+    const messages=[],locks=[],errors=[],callbacks=[];
+    const sync=createCloudSync({
+        readRemote:async()=>{reads++;return clone(remote);},
+        subscribeRemote:(next,error)=>{
+            subscribes++;onProgress=next;onSubscriptionError=error;
+            callbacks.push({next,error});
+            let active=true;
+            return ()=>{if(active){active=false;unsubscribes++;}};
+        },
+        execute:async job=>{
+            remote.students[0].tokens+=job.command.amount;
+            return {progress:clone(remote),result:{tokens:remote.students[0].tokens}};
+        },
+        applyState:value=>{local=clone(value);},lock:value=>locks.push(value),status:value=>messages.push(value),error:error=>errors.push(error),
+        newId:()=> 'subscription-operation',now:()=>1000,
+        setInterval:(fn,ms)=>{tick=fn;interval=ms;return 1;},clearInterval:()=>{},
+        loadPending:()=>options.pending||[],persistPending:()=>{},readReceipt:async()=>null,
+    });
+    return {sync,messages,locks,errors,callbacks,
+        get local(){return local;},get reads(){return reads;},get subscribes(){return subscribes;},get unsubscribes(){return unsubscribes;},get interval(){return interval;},
+        emit:value=>onProgress(clone(value)),fail:error=>onSubscriptionError(error),tick:async()=>{tick();await Promise.resolve();}
+    };
+}
+test('a subscription snapshot verifies the connection and every later snapshot updates the page',async t=>{
+    const h=subscriptionHarness();t.after(()=>h.sync.dispose());
+    h.sync.setConnected(true);
+    assert.equal(h.sync.canEdit(),false);assert.equal(h.subscribes,1);assert.equal(h.reads,0);
+    h.emit(progress(42));await Promise.resolve();
+    assert.equal(h.local.students[0].tokens,42);assert.equal(h.sync.canEdit(),true);
+    h.emit(progress(57));await Promise.resolve();
+    assert.equal(h.local.students[0].tokens,57);assert.ok(h.messages.every(value=>value===''||value==='離線中'));
+});
+test('subscriptions stop while hidden or offline and restart when the page becomes usable',async t=>{
+    const h=subscriptionHarness();t.after(()=>h.sync.dispose());
+    h.sync.setConnected(true);h.emit(progress(20));await Promise.resolve();
+    h.sync.setActive(false);assert.equal(h.unsubscribes,1);assert.equal(h.sync.canEdit(),false);
+    h.sync.setActive(true);assert.equal(h.subscribes,2);h.emit(progress(30));await Promise.resolve();
+    h.sync.setConnected(false);assert.equal(h.unsubscribes,2);assert.equal(h.sync.canEdit(),false);
+    h.sync.setConnected(true);assert.equal(h.subscribes,3);h.emit(progress(40));await Promise.resolve();
+    assert.equal(h.local.students[0].tokens,40);assert.equal(h.sync.canEdit(),true);
+});
+test('the one-minute fallback timer does not download progress while a live subscription exists',async t=>{
+    const h=subscriptionHarness();t.after(()=>h.sync.dispose());
+    h.sync.setConnected(true);h.emit(progress(20));await Promise.resolve();
+    assert.equal(h.interval,60000);await h.tick();assert.equal(h.reads,0);
+});
+test('a subscription failure locks mutations and reports offline without applying stale callbacks',async t=>{
+    const h=subscriptionHarness();t.after(()=>h.sync.dispose());
+    h.sync.setConnected(true);h.emit(progress(20));await Promise.resolve();
+    const stale=h.callbacks[0].next;h.fail(Object.assign(new TypeError('network lost'),{retryable:true}));
+    assert.equal(h.sync.canEdit(),false);assert.equal(h.messages.at(-1),'離線中');assert.deepEqual(h.errors,[]);
+    h.sync.setActive(false);stale(progress(99));assert.equal(h.local.students[0].tokens,20);
 });
 test('actions write immediately while other controls remain available',async()=>{
     const h=harness();await h.start();let release;
@@ -79,6 +136,13 @@ test('uncertain network outcome retries same operation id after server read',asy
     await new Promise(r=>setImmediate(r));assert.equal(h.sync.canEdit(),false);assert.equal(h.stored.length,1);
     await h.sync.refresh();await pending;
     assert.equal(seen[0],seen[1]);assert.equal(h.writes,1);assert.equal(h.stored.length,0);
+});
+test('each transaction receives every locally pending operation id',async()=>{
+    const h=harness({pending:[{id:'unresolved-operation',key:'old',createdAt:500,command:{type:'resources',amount:3}}]});
+    await h.start();let protectedIds;
+    h.setExecute((job,pendingIds)=>{protectedIds=pendingIds;});
+    await h.sync.perform({type:'resources',amount:5},'new');
+    assert.deepEqual(new Set(protectedIds),new Set(['unresolved-operation','operation-1']));
 });
 test('returning to tab refreshes cloud without uploading cached changes',async()=>{
     const h=harness();await h.start();h.sync.setActive(false);h.remote=progress(81);

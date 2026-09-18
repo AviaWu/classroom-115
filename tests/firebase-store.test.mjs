@@ -1,10 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createFirebaseStore} from '../public/firebase-store.mjs';
+import {createFirebaseStore,createProgressSubscriber} from '../public/firebase-store.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
+const resolveServerValues=(value,clock=100000)=>{
+    if(value && typeof value==='object'){
+        if(value['.sv']==='timestamp') return clock;
+        return Array.isArray(value)?value.map(item=>resolveServerValues(item,clock)):Object.fromEntries(Object.entries(value).map(([key,item])=>[key,resolveServerValues(item,clock)]));
+    }
+    return value;
+};
 function server(){
     let room=initial(),artworks={},etag=1,writes=0,drop=false,conflict=false,conflictMutation,dropDelete=false;const calls=[];
-    const resolve=v=>{if(v && typeof v==='object'){if(v['.sv']==='timestamp')return 100000;return Array.isArray(v)?v.map(resolve):Object.fromEntries(Object.entries(v).map(([k,x])=>[k,resolve(x)]));}return v;};
     const fetch=async(url,options)=>{
         calls.push({url,options});await Promise.resolve();const path=new URL(url).pathname;
         if(path.startsWith('/artworks/classroom-115/')){
@@ -16,7 +22,7 @@ function server(){
         if(options.method==='PUT'){
             if(conflict){conflict=false;room=conflictMutation?.(room)??room;etag++;return new Response('{}',{status:412});}
             if(options.headers['if-match']!==String(etag))return new Response('{}',{status:412});
-            room=resolve(JSON.parse(options.body));writes++;etag++;
+            room=resolveServerValues(JSON.parse(options.body));writes++;etag++;
             if(drop){drop=false;throw new TypeError('network lost after commit');}
             return Response.json(room);
         }
@@ -26,7 +32,61 @@ function server(){
     const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'fake-token',getUid:()=> 'test-user',now:()=>100000,fetch});
     return {store,get room(){return room;},set room(v){room=v;etag++;},get artworks(){return artworks;},get writes(){return writes;},get calls(){return calls;},dropNext:()=>drop=true,dropNextDelete:()=>dropDelete=true,conflictNext:mutation=>{conflict=true;conflictMutation=mutation;}};
 }
+function sdkServer(options={}) {
+    let room=initial(),transactions=0;const fetchCalls=[];
+    const transactRoom=options.transactRoom|| (async update=>{
+        transactions++;
+        const next=update(clone(room));
+        if(next===undefined) return {committed:false,value:clone(room)};
+        room=resolveServerValues(next,options.now?.()??100000);
+        return {committed:true,value:clone(room)};
+    });
+    const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'fake-token',getUid:()=> 'test-user',
+        now:options.now||(()=>100000),fetch:async(...args)=>{fetchCalls.push(args);throw new Error('unexpected REST request');},transactRoom});
+    return {store,get room(){return room;},set room(value){room=clone(value);},get transactions(){return transactions;},fetchCalls};
+}
+const clone=value=>structuredClone(value);
 const job=(id,command)=>({id,createdAt:90000,command});
+const progressFields=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','coopTasks',
+    'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
+    'drawings','pendingArtworkDeletes','globalBgImage','lastSaved'];
+function subscriptionServer() {
+    const listeners=new Map(),unsubscribed=[];let tokenReads=0;
+    const subscribe=createProgressSubscriber({database:{},getToken:async()=>{tokenReads++;return 'token';},
+        ref:(_database,path)=>path,onValue:(path,next,error)=>{
+            listeners.set(path,{next,error});return ()=>unsubscribed.push(path);
+        }});
+    const emit=(field,value)=>listeners.get(`games/classroom-115/progress/${field}`).next({val:()=>clone(value)});
+    return {subscribe,listeners,unsubscribed,emit,get tokenReads(){return tokenReads;}};
+}
+const settleSubscription=()=>new Promise(resolve=>setImmediate(resolve));
+test('progress subscription waits for every child once then publishes merged child updates',async()=>{
+    const boss={id:'dragon',name:'巨龍',maxHp:20,questions:[]};
+    const s=subscriptionServer(),values={students:[{id:1,tokens:10}],tasks:[{id:'task',reward:5}],bosses:[boss],drawings:[{id:'drawing_test1',savedAt:'2026-09-16T00:00:00Z'}]},published=[],errors=[];
+    const stop=s.subscribe(value=>published.push(value),error=>errors.push(error));await settleSubscription();
+    assert.equal(s.tokenReads,1);assert.deepEqual([...s.listeners.keys()],progressFields.map(field=>`games/classroom-115/progress/${field}`));
+    for(const field of progressFields.slice(0,-1)) s.emit(field,values[field]??null);
+    assert.deepEqual(published,[]);
+    s.emit('lastSaved','2026-09-16T00:00:00Z');
+    assert.equal(published.length,1);assert.equal(published[0].students[0].tokens,10);assert.deepEqual(published[0].tasks,values.tasks);assert.deepEqual(published[0].bosses,[{...boss,name:'巨龍',image:'',maxHp:20,attackPassword:'',reward:0,questions:[],active:true,publishedAt:0}]);
+    s.emit('students',[{id:1,tokens:25}]);
+    assert.equal(published.length,2);assert.equal(published[1].students[0].tokens,25);assert.deepEqual(published[1].tasks,values.tasks);assert.deepEqual(published[1].bosses,published[0].bosses);
+    assert.deepEqual(errors,[]);stop();assert.deepEqual(s.unsubscribed,[...s.listeners.keys()]);
+});
+test('progress subscription converts a legacy single boss into the current bosses array',async()=>{
+    const legacyBoss={id:'legacy-dragon',name:'舊巨龍',hp:12,questions:[]};
+    const s=subscriptionServer(),published=[],errors=[];
+    s.subscribe(value=>published.push(value),error=>errors.push(error));await settleSubscription();
+    for(const field of progressFields) s.emit(field,field==='students'?[{id:1}]:field==='boss'?legacyBoss:field==='lastSaved'?'2026-09-16T00:00:00Z':null);
+    assert.equal(published.length,1);assert.equal(published[0].boss,undefined);assert.equal(published[0].bosses.length,1);assert.equal(published[0].bosses[0].id,legacyBoss.id);assert.equal(published[0].bosses[0].maxHp,12);assert.deepEqual(errors,[]);
+});
+test('progress subscription reports malformed merged data and ignores callbacks after unsubscribe',async()=>{
+    const s=subscriptionServer(),published=[],errors=[];
+    const stop=s.subscribe(value=>published.push(value),error=>errors.push(error));await settleSubscription();
+    for(const field of progressFields) s.emit(field,field==='lastSaved'?'2026-09-16T00:00:00Z':null);
+    assert.equal(published.length,0);assert.match(errors[0].message,/成員/);
+    stop();s.emit('students',[{id:1,tokens:99}]);assert.equal(published.length,0);
+});
 test('artwork REST methods keep drawing payloads outside the room transaction',async()=>{
     const s=server(),drawing={id:'drawing_1abc',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='};
     assert.deepEqual(await s.store.writeArtwork(drawing),{id:drawing.id,savedAt:drawing.savedAt});
@@ -127,6 +187,72 @@ test('same task from two devices pays once and unrelated prior receipts survive'
     const s=server();s.room={...s.room,progress:{...s.room.progress,tasks:[{id:'task',reward:20}]}};
     await Promise.all(['a','b'].map(id=>s.store.execute(job(id,{type:'completeTask',studentId:1,taskId:'task'}))));
     assert.equal(s.room.progress.students[0].tokens,120);assert.equal(s.writes,1);
+});
+test('SDK transactions commit progress and receipts without using the REST room PUT path',async()=>{
+    const s=sdkServer();
+    const outcome=await s.store.execute(job('sdk-operation-id',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(outcome.progress.students[0].tokens,105);assert.equal(outcome.result.ok,true);
+    assert.equal(s.room.progress.students[0].tokens,105);assert.equal(s.room.progress.lastSaved,'1970-01-01T00:01:40.000Z');
+    assert.equal(s.room.progress.revision,undefined);assert.equal(s.room.operations['sdk-operation-id'].committedAt,100000);
+    assert.equal(s.transactions,1);assert.deepEqual(s.fetchCalls,[]);
+});
+test('SDK transaction retries recalculate an operation from the newest room value',async()=>{
+    let room=initial(),updates=0;
+    const s=sdkServer({transactRoom:async update=>{
+        update(clone(room));updates++;
+        room={...room,progress:{...room.progress,students:[{...room.progress.students[0],tokens:130}]}};
+        const next=update(clone(room));updates++;
+        room=resolveServerValues(next);
+        return {committed:true,value:clone(room)};
+    }});
+    const result=await s.store.execute(job('sdk-retry-operation',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(updates,2);assert.equal(result.progress.students[0].tokens,135);
+});
+test('SDK transaction returns an existing receipt without applying the command again',async()=>{
+    const s=sdkServer();
+    s.room={...s.room,operations:{duplicate_operation:{id:'duplicate_operation',uid:'test-user',type:'resources',createdAt:90000,committedAt:95000,result:{json:'{"ok":true,"tokens":123}'}}}};
+    const outcome=await s.store.execute(job('duplicate_operation',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(outcome.progress.students[0].tokens,100);assert.deepEqual(outcome.result,{ok:true,tokens:123});assert.equal(s.transactions,1);
+});
+test('SDK transaction pruning keeps local pending receipts and the newest receipts within one hour',async()=>{
+    const s=sdkServer(),operations={};
+    for(let index=0;index<105;index++){
+        const id=`sdk-recent-${String(index).padStart(3,'0')}`;
+        operations[id]={id,uid:'test-user',type:'resources',createdAt:100000-index,committedAt:100000-index,result:{json:'{"ok":true}'}};
+    }
+    operations.sdk_old_pending={id:'sdk_old_pending',uid:'test-user',type:'resources',createdAt:1,committedAt:1,result:{json:'{"ok":true}'}};
+    operations.sdk_expired={id:'sdk_expired',uid:'test-user',type:'resources',createdAt:2,committedAt:2,result:{json:'{"ok":true}'}};
+    s.room={...s.room,operations,lastOperationId:'sdk-recent-104'};
+    await s.store.execute(job('sdk-new-operation',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:1}),['sdk_old_pending']);
+    assert.equal(Object.keys(s.room.operations).length,100);assert.ok(s.room.operations.sdk_old_pending);
+    assert.equal(s.room.operations.sdk_expired,undefined);assert.ok(s.room.operations['sdk-recent-000']);assert.equal(s.room.operations['sdk-recent-104'],undefined);
+});
+test('SDK transactions enforce the restore barrier and mark database network errors retryable',async()=>{
+    const restored=sdkServer();restored.room={...restored.room,restoredAt:95000};
+    await assert.rejects(restored.store.execute(job('sdk-stale-operation',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),/還原/);
+    assert.equal(restored.room.progress.students[0].tokens,100);
+    const failure=Object.assign(new Error('disconnected'),{code:'database/disconnected'});
+    const offline=sdkServer({transactRoom:async()=>{throw failure;}});
+    await assert.rejects(offline.store.execute(job('sdk-offline-operation',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),error=>error===failure&&error.retryable===true);
+});
+test('transactions retain at most one hour and 100 receipts while protecting pending ids',async()=>{
+    const s=server(),recent={},clock=100000;
+    for(let index=0;index<105;index++){
+        const id=`recent-operation-${String(index).padStart(3,'0')}`;
+        recent[id]={id,uid:'test-user',type:'resources',createdAt:clock-index,committedAt:clock-index,result:{json:'{"ok":true}'}};
+    }
+    const oldId='old-pending-operation';
+    const expiredId='expired-operation-id';
+    s.room={...s.room,operations:{...recent,
+        [oldId]:{id:oldId,uid:'test-user',type:'resources',createdAt:1,committedAt:1,result:{json:'{"ok":true}'}},
+        [expiredId]:{id:expiredId,uid:'test-user',type:'resources',createdAt:2,committedAt:2,result:{json:'{"ok":true}'}}
+    },lastOperationId:'recent-operation-104'};
+    await s.store.execute(job('new-operation-id',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:1}),[oldId]);
+    assert.equal(Object.keys(s.room.operations).length,100);
+    assert.ok(s.room.operations[oldId]);
+    assert.equal(s.room.operations[expiredId],undefined);
+    assert.ok(s.room.operations['recent-operation-000']);
+    assert.equal(s.room.operations['recent-operation-104'],undefined);
 });
 test('malformed nonempty cloud does not become an editable empty classroom',async()=>{
     const s=server();s.room={...s.room,progress:{students:[]}};

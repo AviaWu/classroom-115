@@ -1,8 +1,37 @@
 import {applyOperation,normalizeProgress} from './game-operations.mjs';
 
-// Firebase REST conditional requests implement a transaction without the SDK's
-// offline write queue. ETags stay inside this transport; no progress versions exist.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch}) {
+const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','coopTasks',
+    'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
+    'drawings','pendingArtworkDeletes','globalBgImage','lastSaved'];
+
+export function createProgressSubscriber({database,getToken,ref,onValue,path='games/classroom-115/progress'}) {
+    return (onProgress,onError)=>{
+        let stopped=false,unsubscribers=[];
+        const report=error=>{if(!stopped) onError(error);};
+        void Promise.resolve().then(getToken).then(()=>{
+            if(stopped) return;
+            const values={},loaded=new Set();
+            const publish=()=>{
+                if(stopped || loaded.size!==PROGRESS_FIELDS.length) return;
+                const entries=Object.entries(values).filter(([,value])=>value!==null);
+                if(!entries.length){onProgress(null);return;}
+                const progress=normalizeProgress(Object.fromEntries(entries));
+                if(!progress?.students.length) throw new Error('雲端資料格式不正確：缺少成員，已停止操作。');
+                onProgress(progress);
+            };
+            unsubscribers=PROGRESS_FIELDS.map(field=>onValue(ref(database,`${path}/${field}`),snapshot=>{
+                if(stopped) return;
+                values[field]=snapshot.val();loaded.add(field);
+                try{publish();}catch(error){report(error);}
+            },report));
+        }).catch(report);
+        return ()=>{stopped=true;for(const unsubscribe of unsubscribers)unsubscribe();unsubscribers=[];};
+    };
+}
+
+// REST handles direct reads and artwork payloads. The page injects the Firebase SDK
+// transaction transport; the REST ETag path remains available to non-browser tools.
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -116,8 +145,77 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         const {value:receipt}=await call(`/operations/${id}`);
         return receipt ? {...receipt,result:JSON.parse(receipt.result.json)} : null;
     }
-    async function execute(job){
+    function retainedOperations(operations,pendingIds,clock){
+        const pending=new Set(Array.isArray(pendingIds)?pendingIds:[]);
+        const entries=Object.entries(operations||{});
+        const protectedEntries=entries.filter(([id])=>pending.has(id));
+        const protectedSet=new Set(protectedEntries.map(([id])=>id));
+        const recent=entries.filter(([id,receipt])=>!protectedSet.has(id) && Number.isFinite(receipt?.committedAt) && receipt.committedAt>=clock-3_600_000)
+            .sort(([idA,a],[idB,b])=>b.committedAt-a.committedAt || (b.createdAt||0)-(a.createdAt||0) || idA.localeCompare(idB));
+        const slots=Math.max(0,99-protectedEntries.length);
+        return Object.fromEntries([...protectedEntries,...recent.slice(0,slots)]);
+    }
+    async function executeSdkTransaction(job,pendingIds,artwork){
+        if(now()-job.createdAt>24*60*60*1000){
+            await cleanupRejectedArtwork(artwork);
+            throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
+        }
+        let command=await prepareCommand(job.command,artwork),settled;
+        try{
+            const transaction=await transactRoom(current=>{
+                const room=current || {};
+                const receipt=room.operations?.[job.id];
+                if(receipt){
+                    settled={progress:normalizeProgress(room.progress??null),result:JSON.parse(receipt.result.json)};
+                    return;
+                }
+                const clock=now();
+                if(clock-job.createdAt>24*60*60*1000){
+                    settled={error:new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。')};
+                    return;
+                }
+                if(room.restoredAt && job.createdAt<=room.restoredAt && !['restore','initialize'].includes(command.type)){
+                    settled={error:new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。')};
+                    return;
+                }
+                const outcome=applyOperation(room.progress??null,command,clock);
+                if(!outcome.changed){
+                    settled={progress:outcome.progress,result:outcome.result||{ok:true}};
+                    return;
+                }
+                const result={ok:true,...outcome.result};
+                const next={...room,
+                    progress:{...outcome.progress,lastSaved:new Date(clock).toISOString()},
+                    operations:{...retainedOperations(room.operations,pendingIds,clock),[job.id]:{
+                        id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,
+                        committedAt:{'.sv':'timestamp'},result:{json:JSON.stringify(result)},
+                    }},
+                    lastOperationId:job.id,
+                };
+                if(['restore','initialize'].includes(command.type)) next.restoredAt={'.sv':'timestamp'};
+                settled={progress:normalizeProgress(next.progress),result};
+                return next;
+            });
+            if(settled?.error){await cleanupRejectedArtwork(artwork);throw settled.error;}
+            if(!transaction.committed){
+                if(settled) return settled;
+                throw Object.assign(new Error('雲端交易未完成，稍後會重試。'),{retryable:true});
+            }
+            const saved=transaction.value;
+            const receipt=saved?.operations?.[job.id];
+            if(saved?.progress && receipt?.result?.json){
+                return {progress:normalizeProgress(saved.progress),result:JSON.parse(receipt.result.json)};
+            }
+            if(settled) return settled;
+            throw Object.assign(new Error('雲端交易回應不完整，稍後會重試。'),{retryable:true});
+        }catch(error){
+            if(error?.code?.includes('network') || error?.code==='database/disconnected') error.retryable=true;
+            throw error;
+        }
+    }
+    async function execute(job,pendingIds=[]){
         const artwork=preflightArtwork(job.command);
+        if(transactRoom) return executeSdkTransaction(job,pendingIds,artwork);
         let command;
         // Same command, ID and lottery samples survive every retry.
         for(let attempt=0;attempt<20;attempt++){
@@ -141,7 +239,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             const result={ok:true,...outcome.result};
             const next={...room,
                 progress:{...outcome.progress,lastSaved:new Date(clock).toISOString()},
-                operations:{...room.operations,[job.id]:{
+                operations:{...retainedOperations(room.operations,pendingIds,clock),[job.id]:{
                     id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,
                     committedAt:{'.sv':'timestamp'},result:{json:JSON.stringify(result)},
                 }},

@@ -29,6 +29,10 @@ async function seed(progress) {
         body:JSON.stringify(progress === null ? null : {progress})});
     assert.equal(response.status,200,await response.text());
 }
+async function seedRoom(value) {
+    const response = await fetch(endpoint(),{method:'PUT',headers:{Authorization:'Bearer owner'},body:JSON.stringify(value)});
+    assert.equal(response.status,200,await response.text());
+}
 async function rawRoom() {
     const response = await fetch(`${endpoint()}&auth=${encodeURIComponent(token('reader'))}`);
     assert.equal(response.status,200,await response.clone().text());
@@ -209,6 +213,24 @@ test('a concurrent restore rejects an older operation after its real ETag confli
     assert.equal(typeof raw.restoredAt,'number');
     assertReceipt(raw.operations[restore.id],restore.id,'restore');
     assert.deepEqual((await store().readRemote()).clothesM,[]);
+});
+
+test('a real transaction prunes expired and excess receipts while retaining its pending receipt',async()=>{
+    const clock=Date.now(),operations={};
+    for(let index=0;index<105;index++){
+        const id=`receipt_recent_${String(index).padStart(3,'0')}`;
+        operations[id]={id,uid:'device-one',type:'resources',createdAt:clock-index,committedAt:clock-index,result:{json:'{"ok":true}'}};
+    }
+    const pendingId='receipt_pending_old';
+    const expiredId='receipt_expired_old';
+    operations[pendingId]={id:pendingId,uid:'device-one',type:'resources',createdAt:1,committedAt:1,result:{json:'{"ok":true}'}};
+    operations[expiredId]={id:expiredId,uid:'device-one',type:'resources',createdAt:2,committedAt:2,result:{json:'{"ok":true}'}};
+    await seedRoom({progress:fixture(),operations,lastOperationId:'receipt_recent_104'});
+    const request=job({type:'resources',studentId:1,field:'tokens',mode:'add',amount:1});
+    await store().execute(request,[pendingId]);
+    const raw=await rawRoom(),ids=Object.keys(raw.operations);
+    assert.equal(ids.length,100);assert.ok(raw.operations[pendingId]);assert.ok(raw.operations[request.id]);
+    assert.equal(raw.operations[expiredId],undefined);assert.ok(raw.operations.receipt_recent_000);assert.equal(raw.operations.receipt_recent_104,undefined);
 });
 
 for (const [command,verify] of [

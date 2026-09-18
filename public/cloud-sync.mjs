@@ -1,7 +1,7 @@
 // The browser never uploads a local snapshot. Only explicit commands may write.
 export function createCloudSync(io) {
     let connected=false,active=true,verified=false,remote,reading=null,working=false;
-    let epoch=0,writeEpoch=0,readAgain=false,artworkCleanup=null;
+    let epoch=0,writeEpoch=0,readAgain=false,artworkCleanup=null,unsubscribeRemote=null;
     const jobs=(io.loadPending?.()||[]).map(job=>({...job,restored:true}));
     const canManage=()=>connected && active && verified;
     const canEdit=()=>canManage() && remote!==null;
@@ -10,6 +10,21 @@ export function createCloudSync(io) {
     const apply=value=>{remote=structuredClone(value);io.applyState(structuredClone(value));void cleanupEvictedArtworks();};
     const notify=()=>{lock();io.status(connected && verified ? '' : '離線中');};
     const transient=e=>e.retryable===true || e.name==='AbortError' || e instanceof TypeError;
+    const stopSubscription=()=>{unsubscribeRemote?.();unsubscribeRemote=null;};
+    function startSubscription(){
+        if(!io.subscribeRemote || unsubscribeRemote || !connected || !active) return;
+        const ticket=epoch;
+        unsubscribeRemote=io.subscribeRemote(value=>{
+            if(ticket!==epoch || !connected || !active) return;
+            apply(value);verified=true;notify();void checkReceipts().then(()=>work()).catch(error=>{
+                verified=false;notify();io.error?.(error);
+            });
+        },error=>{
+            if(ticket!==epoch) return;
+            verified=false;notify();
+            if(!transient(error)) io.error?.(error);
+        });
+    }
     function cleanupEvictedArtworks(){
         if(artworkCleanup) return artworkCleanup;
         if(!canEdit() || typeof io.deleteArtwork!=='function') return Promise.resolve();
@@ -48,7 +63,7 @@ export function createCloudSync(io) {
                 if(!job) break;
                 writeEpoch++;
                 try{
-                    const outcome=await io.execute(job);
+                    const outcome=await io.execute(job,jobs.map(item=>item.id));
                     writeEpoch++;
                     apply(outcome.progress);
                     settle(job,null,outcome.result);
@@ -122,7 +137,7 @@ export function createCloudSync(io) {
         void work();
         return job.promise;
     }
-    const timer=(io.setInterval||globalThis.setInterval)(()=>refresh(),5000);
+    const timer=(io.setInterval||globalThis.setInterval)(()=>{if(!io.subscribeRemote)void refresh();},60_000);
     return {
         available:true,canEdit,canManage,perform,refresh,cleanupEvictedArtworks,
         editToken:()=>epoch,
@@ -136,13 +151,14 @@ export function createCloudSync(io) {
         },
         setConnected(value){
             if(connected===value) return;
-            connected=value;verified=false;epoch++;lock();
-            if(value) void refresh();else io.status('離線中');
+            connected=value;verified=false;epoch++;lock();stopSubscription();
+            if(value){if(io.subscribeRemote)startSubscription();else void refresh();}else io.status('離線中');
         },
         setActive(value){
-            active=value;verified=false;epoch++;lock();
-            if(value) void refresh();
+            if(active===value) return;
+            active=value;verified=false;epoch++;lock();stopSubscription();
+            if(value){if(io.subscribeRemote)startSubscription();else void refresh();}
         },
-        dispose(){(io.clearInterval||globalThis.clearInterval)(timer);active=false;epoch++;},
+        dispose(){(io.clearInterval||globalThis.clearInterval)(timer);stopSubscription();active=false;epoch++;},
     };
 }
