@@ -4,17 +4,6 @@ const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backg
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
     'drawings','pendingArtworkDeletes','globalBgImage','lastSaved'];
 
-// Firebase may invoke a transaction updater once with an empty local snapshot
-// while the server value fetched immediately before the transaction is already
-// available. Keep that transient value from being mistaken for an uninitialized
-// classroom; genuinely empty rooms still pass through unchanged.
-export function selectTransactionRoom(current,warmed) {
-    const empty=current===null || current===undefined ||
-        (current && typeof current==='object' && !Array.isArray(current) && Object.keys(current).length===0);
-    const hasWarmedProgress=warmed && typeof warmed==='object' && !Array.isArray(warmed) && warmed.progress;
-    return empty && hasWarmedProgress ? warmed : current;
-}
-
 export function createProgressSubscriber({database,getToken,ref,onValue,path='games/classroom-115/progress'}) {
     return (onProgress,onError)=>{
         let stopped=false,unsubscribers=[];
@@ -69,7 +58,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         });
         const operation=(async()=>{
             const token=await getToken();
-            const response=await request(`${databaseURL}/${targetPath}.json?auth=${encodeURIComponent(token)}`,{
+            const silent=options.method==='PUT';
+            const response=await request(`${databaseURL}/${targetPath}.json?auth=${encodeURIComponent(token)}${silent?'&print=silent':''}`,{
                 ...options,cache:'no-store',signal:controller.signal,
             });
             if(!response.ok && response.status!==412){
@@ -78,7 +68,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 throw error;
             }
             try{
-                return {status:response.status,headers:response.headers,value:response.status===412?null:await response.json()};
+                return {status:response.status,headers:response.headers,value:response.status===412 || response.status===204?null:await response.json()};
             }catch(error){
                 if(options.method==='PUT') error.retryable=true; // The server may already have committed.
                 throw error;
@@ -261,11 +251,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             if(!etag) throw new Error('雲端未提供交易鎖定資訊，已停止寫入。');
             const written=await call('',{method:'PUT',headers:{'Content-Type':'application/json','if-match':etag},body:JSON.stringify(next)});
             if(written.status===412) continue;
-            try{
-                const saved=written.value;
-                if(!saved?.progress || !saved.operations?.[job.id]?.result?.json) throw new Error('雲端回應不完整，將查證操作結果。');
-                return {progress:normalizeProgress(saved.progress),result:JSON.parse(saved.operations[job.id].result.json)};
-            }catch(error){error.retryable=true;throw error;}
+            return {progress:normalizeProgress(next.progress),result};
         }
         throw Object.assign(new Error('雲端正在接收其他裝置的操作，稍後會重試。'),{retryable:true});
     }
