@@ -52,7 +52,7 @@ test('browser module wires child subscriptions and SDK transactions into cloud s
     assert.match(moduleSource,/createProgressSubscriber\(\{database,getToken,ref,onValue\}\)/);
     assert.match(moduleSource,/subscribeRemote:subscribeProgress/);
     assert.match(moduleSource,/transactRoom:async update/);
-    assert.match(moduleSource,/runTransaction\(roomRef,update,\{applyLocally:false\}\)/);
+    assert.match(moduleSource,/runTransaction\(roomRef,current=>update\(selectTransactionRoom\(current,warmed\)\),\{applyLocally:false\}\)/);
 });
 test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{
     const h=page(t);h.sync.setConnected(true);await h.sync.refresh();
