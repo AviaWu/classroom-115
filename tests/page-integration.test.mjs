@@ -136,7 +136,7 @@ test('NEW disappears when every unfinished task has expired',async t=>{
     await h.start();
     assert.equal(h.w.document.querySelector('.task-new'),null);
     await h.run('tasks(1)');
-    assert.match(h.w.document.getElementById('modal').textContent,/目前沒有可完成的任務/);
+    assert.match(h.w.document.getElementById('modal').textContent,/全部任務已完成/);
 });
 test('purchase, wardrobe and pet controls commit immediately without processing UI',async t=>{
     const h=page(t);await h.start();await h.run('shop(1)');await h.run("buyCloth(1,'shirt')");
