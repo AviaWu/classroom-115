@@ -16,7 +16,7 @@ function state(extra = {}) {
         backgrounds:[{id:'sky',name:'天空',level:'SSR',price:80,active:true}],
         coopTasks:[{id:'boss',monsterName:'怪獸',content:'一起完成',reward:10,rewardType:'token',completedBy:[],claimed:false}],
         coopTaskTemplates:[], dailyTaskTemplates:[], weeklyTaskTemplates:[], deletedTaskIds:[], deletedCoopTaskIds:[],
-        drawings:[], drawingAlbum:[], globalBgImage:'', ...extra};
+        drawings:[], globalBgImage:'', ...extra};
 }
 const run = (value, type, payload = {}, now = NOW) => applyOperation(value, {type,...payload}, now);
 const edit = (before, after) => ({type:'edit',changes:createEditChanges(before,after)});
@@ -194,7 +194,6 @@ test('invalid ticket rewards are rejected before recording any coop member compl
 test('drawing indexes retain the latest three metadata records and queue evictions', () => {
     const meta = id => ({id:`drawing_${id}`,savedAt:`2026-09-16T00:00:0${id}.000Z`});
     let current = state({drawings:[meta('3'),meta('2'),meta('1')]});
-    delete current.drawingAlbum;
     const saved = run(current,'saveDrawing',{drawing:meta('4')});
     assert.deepEqual(saved.progress.drawings.map(item=>item.id),['drawing_4','drawing_3','drawing_2']);
     assert.deepEqual(saved.progress.pendingArtworkDeletes,['drawing_1']);
@@ -202,57 +201,31 @@ test('drawing indexes retain the latest three metadata records and queue evictio
     assert.equal('data' in saved.progress.drawings[0],false);
     const confirmed = run(saved.progress,'confirmArtworkDeletion',{drawingId:'drawing_1'});
     assert.deepEqual(confirmed.progress.pendingArtworkDeletes,[]);
-    const legacy = state({drawings:[{...meta('3'),data:'data:image/png;base64,3'}],drawingAlbum:[{...meta('2'),data:'data:image/png;base64,2'}]});
-    const migrated = run(legacy,'migrateArtworks',{drawings:[meta('5'),meta('4'),meta('3')]});
-    assert.deepEqual(migrated.progress.drawings.map(item=>item.id),['drawing_5','drawing_4','drawing_3']);
-    assert.equal('drawingAlbum' in migrated.progress,false);
 });
 
-test('an empty legacy album blocks saves until explicit migration removes it', () => {
-    const meta = {id:'drawing_4',savedAt:'2026-09-16T00:00:04.000Z'};
-    const legacy = state();
-    assert.throws(() => run(legacy,'saveDrawing',{drawing:meta}),/畫作|遷移/);
-    const migrated = run(legacy,'migrateArtworks',{drawings:[]});
-    assert.equal('drawingAlbum' in migrated.progress,false);
-    assert.deepEqual(run(migrated.progress,'saveDrawing',{drawing:meta}).progress.drawings,[meta]);
-});
-
-test('a stale legacy cleanup cannot erase drawings saved after another device migrated', () => {
-    const current = state({drawings:[{id:'drawing_newest',savedAt:'2026-09-16T00:00:00.000Z'}]});
-    delete current.drawingAlbum;
-    const result = run(current,'migrateArtworks',{drawings:[]});
-    assert.equal(result.changed,false);
-    assert.deepEqual(result.progress.drawings,current.drawings);
-});
-
-test('legacy artwork remains byte-for-byte intact until explicit migration', () => {
-    const legacy = state({drawings:[{id:'drawing_3',savedAt:'2026-09-16T00:00:03.000Z',data:'data:image/png;base64,three'}],
-        drawingAlbum:[{id:'drawing_2',savedAt:'2026-09-16T00:00:02.000Z',data:'data:image/png;base64,two'}]});
-    const normalized = normalizeProgress(legacy);
-    assert.deepEqual(normalized.drawings,legacy.drawings);
-    assert.deepEqual(normalized.drawingAlbum,legacy.drawingAlbum);
-    const updated = run(legacy,'resources',{studentId:1,field:'tokens',mode:'add',amount:1});
-    assert.deepEqual(updated.progress.drawings,legacy.drawings);
-    assert.deepEqual(updated.progress.drawingAlbum,legacy.drawingAlbum);
-    assert.throws(() => run(legacy,'saveDrawing',{drawing:{id:'drawing_4',savedAt:'2026-09-16T00:00:04.000Z'}}),/畫作|遷移/);
+test('normalization keeps only drawing metadata and removes retired album data', () => {
+    const normalized = normalizeProgress(state({
+        drawings:[{id:'drawing_3',savedAt:'2026-09-16T00:00:03.000Z',data:'data:image/png;base64,three'}],
+        drawingAlbum:[{id:'drawing_2',savedAt:'2026-09-16T00:00:02.000Z',data:'data:image/png;base64,two'}]
+    }));
+    assert.deepEqual(normalized.drawings,[{id:'drawing_3',savedAt:'2026-09-16T00:00:03.000Z'}]);
+    assert.equal('drawingAlbum' in normalized,false);
+    assert.throws(() => run(normalized,'migrateArtworks',{drawings:[]}),/不支援的遊戲操作/);
 });
 
 test('restore queues displaced external artwork while preserving cleanup already pending', () => {
     const meta = id => ({id:`drawing_${id}`,savedAt:`2026-09-16T00:00:0${id}.000Z`});
     const current = state({drawings:[meta('3'),meta('2'),meta('1')],pendingArtworkDeletes:['drawing_pending','drawing_3']});
     const restored = state({drawings:[meta('5'),meta('4'),meta('3')],pendingArtworkDeletes:['drawing_existing']});
-    delete current.drawingAlbum;
-    delete restored.drawingAlbum;
     const result = run(current,'restore',{value:restored});
     assert.deepEqual(result.progress.drawings.map(item=>item.id),['drawing_5','drawing_4','drawing_3']);
     assert.deepEqual(result.progress.pendingArtworkDeletes,['drawing_existing','drawing_pending','drawing_2','drawing_1']);
 });
 
-test('teacher edit changes cannot replace drawing indexes or legacy albums', () => {
+test('teacher edit changes cannot replace drawing indexes', () => {
     const before = state({drawings:[{id:'drawing_1',savedAt:'2026-09-16T00:00:01.000Z'}]});
     const after = clone(before);
     after.drawings = [{id:'drawing_2',savedAt:'2026-09-16T00:00:02.000Z'}];
-    after.drawingAlbum = [{id:'drawing_legacy',data:'data:image/png;base64,legacy'}];
     assert.deepEqual(createEditChanges(before,after),[]);
 });
 

@@ -2,7 +2,7 @@
 const RECORD_COLLECTIONS = ['students','tasks','clothesM','clothesF','layouts','backgrounds',
     'coopTasks','coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates'];
 const TOMBSTONES = ['deletedTaskIds','deletedCoopTaskIds'];
-const ARTWORK_FIELDS = ['drawings','drawingAlbum','pendingArtworkDeletes'];
+const ARTWORK_FIELDS = ['drawings','pendingArtworkDeletes'];
 const STUDENT_ARRAYS = ['doneTasks','ownedClothes','ownedLayout','equippedLayout','ownedBg'];
 const LEGACY_METADATA = ['syncVersion','revision','baseCommitId','commitId','updatedAt'];
 const IGNORED_DIFF_FIELDS = new Set([...LEGACY_METADATA,'lastSaved']);
@@ -18,9 +18,6 @@ const safeKey = key => typeof key === 'string' && !['__proto__','prototype','con
 const idValid = id => (typeof id === 'string' && id.length > 0) || (typeof id === 'number' && Number.isFinite(id));
 const validDrawingId = id => typeof id === 'string' && id.length >= 8 && id.length <= 128 && /^drawing_[A-Za-z0-9_-]+$/.test(id);
 
-function legacyArtwork(progress) {
-    return Object.hasOwn(progress,'drawingAlbum') || array(progress.drawings).some(item=>object(item) && Object.hasOwn(item,'data'));
-}
 function indexedDrawings(value) {
     const seen = new Set();
     return array(value)
@@ -89,7 +86,8 @@ export function normalizeProgress(value) {
     progress.coopTaskTemplates = progress.coopTaskTemplates.map(item=>({...templateDefaults(item,true),scheduleType:item.scheduleType === 'weekly' ? 'weekly' : 'daily'}));
     progress.coopTasks = progress.coopTasks.map(task=>({...task,completedBy:unique(task.completedBy),claimed:task.claimed === true,
         startAt:task.startAt == null ? null : numeric(task.startAt,null),dueAt:task.dueAt == null ? null : numeric(task.dueAt,null)}));
-    if (!legacyArtwork(progress)) progress.drawings = indexedDrawings(progress.drawings);
+    progress.drawings = indexedDrawings(progress.drawings);
+    delete progress.drawingAlbum;
     progress.pendingArtworkDeletes = unique(progress.pendingArtworkDeletes).filter(validDrawingId);
     if (typeof progress.globalBgImage !== 'string') progress.globalBgImage = '';
     return progress;
@@ -294,7 +292,7 @@ export function applyOperation(value,command,now = Date.now()) {
     let progress = normalizeProgress(value);
     if (command.type === 'initialize' && progress !== null) return {progress:requireProgress(progress),result:null,changed:false};
     if (command.type === 'initialize' || command.type === 'restore') {
-        const previousArtworkIds = command.type === 'restore' && progress !== null && !legacyArtwork(progress) ? drawingIds(progress.drawings) : new Set();
+        const previousArtworkIds = command.type === 'restore' && progress !== null ? drawingIds(progress.drawings) : new Set();
         const previousArtworkDeletes = command.type === 'restore' && progress !== null ? progress.pendingArtworkDeletes : [];
         const restored = requireProgress(normalizeProgress(command.value));
         if (command.type === 'restore') addArtworkDeletes(restored,[...previousArtworkDeletes,...[...previousArtworkIds].filter(id=>!drawingIds(restored.drawings).has(id))]);
@@ -375,7 +373,6 @@ export function applyOperation(value,command,now = Date.now()) {
     }
     case 'saveDrawing': {
         const drawing = command.drawing;
-        if (legacyArtwork(progress)) throw new Error('舊畫作資料尚未遷移');
         if (!object(drawing) || !validDrawingId(drawing.id) || !Number.isFinite(Date.parse(drawing.savedAt)) || Object.hasOwn(drawing,'data')) throw new Error('畫作資料格式不正確');
         result = {evictedArtworkIds:[]};
         if (progress.drawings.some(item=>item.id === drawing.id)) break;
@@ -390,13 +387,6 @@ export function applyOperation(value,command,now = Date.now()) {
     case 'confirmArtworkDeletion': {
         if (!validDrawingId(command.drawingId)) throw new Error('畫作編號格式不正確');
         progress.pendingArtworkDeletes = progress.pendingArtworkDeletes.filter(id=>id !== command.drawingId);
-        break;
-    }
-    case 'migrateArtworks': {
-        if (!Array.isArray(command.drawings)) throw new Error('畫作資料格式不正確');
-        if (!legacyArtwork(progress)) break;
-        progress.drawings = indexedDrawings(command.drawings);
-        delete progress.drawingAlbum;
         break;
     }
     case 'resources': {

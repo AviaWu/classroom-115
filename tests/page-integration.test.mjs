@@ -27,8 +27,8 @@ function page(t){
             artworkPayloads.set(command.drawing.id,clone(command.drawing));
             const {id,savedAt}=command.drawing;command.drawing={id,savedAt};
         }
-        if(command.type==='restore' || command.type==='migrateArtworks'){
-            const source=command.type==='restore' ? command.value : command;
+        if(command.type==='restore'){
+            const source=command.value;
             source.drawings=source.drawings.map(drawing=>{
                 artworkPayloads.set(drawing.id,clone(drawing));
                 return {id:drawing.id,savedAt:drawing.savedAt};
@@ -266,11 +266,6 @@ test('a failed image does not block other thumbnails and retries on an unchanged
     assert.deepEqual(h.artworkReads,['drawing_2','drawing_1','drawing_1']);
     assert.equal(h.w.document.querySelectorAll('#drawingHistory img').length,2);
 });
-test('legacy drawings remain viewable without downloading or migrating artwork payloads',async t=>{
-    const h=page(t);const legacy={...drawingMeta(1),data:'data:image/jpeg;base64,legacy'};
-    h.cloud={...h.cloud,drawings:[legacy],drawingAlbum:[]};await h.start();await h.run('openDrawingBoard()');await settleArtwork();
-    assert.deepEqual(h.artworkReads,[]);assert.equal(h.w.document.querySelector('#drawingHistory img').getAttribute('src'),legacy.data);assert.equal(h.writes,0);
-});
 test('closing a board before its queued loader starts sends no artwork request',async t=>{
     const h=page(t);addArtworkFixture(h,[1]);await h.start();
     const opening=h.w.openDrawingBoard();h.w.closeModal();await opening;await settleArtwork();
@@ -347,28 +342,8 @@ test('new progress and teacher backend contain no album or legacy cleanup action
     assert.equal(h.w.document.getElementById('backend-album'),null);
     assert.doesNotMatch(h.w.document.getElementById('body').textContent,/畫冊/);
     assert.equal(h.w.document.getElementById('clearLegacyArtworks'),null);
+    assert.equal(typeof h.w.clearLegacyArtworks,'undefined');
     assert.equal(h.writes,0);assert.deepEqual(h.artworkReads,[]);
-});
-test('legacy artwork stays unchanged until the teacher confirms permanent cleanup',async t=>{
-    const h=page(t);h.cloud={...h.cloud,drawings:[completeDrawing(3)],drawingAlbum:[completeDrawing(2),completeDrawing(1)]};
-    const before=clone(h.cloud);await h.start();await h.login();
-    assert.deepEqual(h.cloud,before);assert.equal(h.writes,0);assert.deepEqual(h.artworkReads,[]);
-    assert.equal(h.w.document.getElementById('backend-album'),null);
-    assert.doesNotMatch(h.w.document.getElementById('body').textContent,/畫冊/);
-    assert.match(h.w.document.getElementById('clearLegacyArtworks').textContent,/清除舊畫作資料/);
-    let confirmation='';h.w.confirm=message=>{confirmation=message;return false;};await h.w.clearLegacyArtworks();
-    assert.match(confirmation,/永久/);assert.match(confirmation,/無法復原/);assert.deepEqual(h.cloud,before);assert.equal(h.writes,0);
-    h.w.confirm=()=>true;await h.w.clearLegacyArtworks();await h.sync.flush();
-    assert.deepEqual(h.cloud.drawings,[]);assert.equal('drawingAlbum' in h.cloud,false);
-    assert.deepEqual(h.cloud.students,before.students);assert.equal(h.writes,1);assert.equal(h.artworkPayloads.size,0);
-    assert.equal(h.w.document.getElementById('clearLegacyArtworks'),null);
-    await h.w.clearLegacyArtworks();assert.equal(h.writes,1);
-});
-for(const legacy of [{drawingAlbum:[]},{drawings:[completeDrawing(1)]}]) test(`legacy cleanup detects ${'drawingAlbum' in legacy ? 'an empty album' : 'embedded drawings without an album'}`,async t=>{
-    const h=page(t);h.cloud={...h.cloud,...legacy};await h.start();
-    await h.w.clearLegacyArtworks();assert.equal(h.writes,0);
-    await h.login();assert.ok(h.w.document.getElementById('clearLegacyArtworks'));
-    await h.w.clearLegacyArtworks();assert.equal(h.writes,1);assert.equal('drawingAlbum' in h.cloud,false);assert.deepEqual(h.cloud.drawings,[]);
 });
 test('backup downloads hydrate only the newest three server drawing indexes',async t=>{
     const h=page(t);addArtworkFixture(h,[1,2,3,4]);await h.start();await h.login();const download=captureBackupDownloads(h);
@@ -378,13 +353,6 @@ test('backup downloads hydrate only the newest three server drawing indexes',asy
     assert.deepEqual(backup.drawings,[4,3,2].map(completeDrawing));
     assert.equal(backup.globalBgImage,'server-backup');assert.equal('drawingAlbum' in backup,false);assert.equal('pendingArtworkDeletes' in backup,false);assert.equal(h.writes,0);
 });
-test('legacy backup excludes historical album images without uploading or clearing cloud data',async t=>{
-    const h=page(t);h.cloud={...h.cloud,drawings:[completeDrawing(2),completeDrawing(3),completeDrawing(1)],drawingAlbum:[completeDrawing(4)]};
-    const before=clone(h.cloud);await h.start();await h.login();const download=captureBackupDownloads(h);
-    h.w.readLatestProgress=async()=>clone(h.cloud);await h.w.exportData();const backup=await download.read();
-    assert.deepEqual(backup.drawings,[3,2,1].map(completeDrawing));assert.equal('drawingAlbum' in backup,false);assert.equal('pendingArtworkDeletes' in backup,false);
-    assert.deepEqual(h.artworkReads,[]);assert.equal(h.artworkPayloads.size,0);assert.equal(h.writes,0);assert.deepEqual(h.cloud,before);
-});
 test('backup download fails instead of producing an incomplete drawing when an artwork is missing',async t=>{
     const h=page(t);h.cloud={...h.cloud,drawings:[drawingMeta(1)]};await h.start();await h.login();const download=captureBackupDownloads(h);
     h.w.readLatestProgress=async()=>clone(h.cloud);await h.w.exportData();
@@ -392,22 +360,22 @@ test('backup download fails instead of producing an incomplete drawing when an a
 });
 test('restore imports only three complete drawings and assigns fresh IDs every time',async t=>{
     const h=page(t);await h.start();await h.login();
-    const backup={...h.cloud,students:[{...h.cloud.students[0],tokens:777}],drawings:[2,5,1,4,3].map(completeDrawing),drawingAlbum:[completeDrawing(9)],pendingArtworkDeletes:['drawing_injected']};
+    const backup={...h.cloud,students:[{...h.cloud.students[0],tokens:777}],drawings:[2,5,1,4,3].map(completeDrawing),pendingArtworkDeletes:['drawing_injected']};
     backup.drawings.push(drawingMeta(8),{...completeDrawing(7),data:'data:image/svg+xml;base64,AA=='},
         {...completeDrawing(6),data:'data:image/png;base64,'},
         {...completeDrawing(6),data:'data:image/png;base64,'+'A'.repeat(1500000)},
         {...completeDrawing(6),savedAt:'2026-09-31T00:00:00.000Z'});
     const before=clone(backup),input=backupInput(backup);await h.w.importData(input);
     assert.deepEqual(h.cloud.drawings.map(item=>item.savedAt),[5,4,3].map(number=>drawingMeta(number).savedAt));
-    const firstIds=h.cloud.drawings.map(item=>item.id),oldIds=new Set([...backup.drawings,...backup.drawingAlbum].map(item=>item.id));
+    const firstIds=h.cloud.drawings.map(item=>item.id),oldIds=new Set(backup.drawings.map(item=>item.id));
     assert.equal(new Set(firstIds).size,3);assert.ok(firstIds.every(id=>/^drawing_[0-9a-f-]{36}$/.test(id) && !oldIds.has(id)));
     assert.deepEqual(firstIds.map(id=>h.artworkPayloads.get(id).data),[5,4,3].map(number=>completeDrawing(number).data));
-    assert.ok(h.cloud.drawings.every(item=>!('data' in item)));assert.equal('drawingAlbum' in h.cloud,false);assert.ok(!h.cloud.pendingArtworkDeletes.includes('drawing_injected'));
+    assert.ok(h.cloud.drawings.every(item=>!('data' in item)));assert.ok(!h.cloud.pendingArtworkDeletes.includes('drawing_injected'));
     assert.equal(h.cloud.students[0].tokens,777);assert.equal(input.value,'');assert.deepEqual(h.artworkReads,[]);assert.deepEqual(backup,before);
     await h.w.importData(backupInput(backup));assert.ok(h.cloud.drawings.every(item=>!firstIds.includes(item.id)));
 });
-test('restore skips metadata without image data and never resurrects historical album images',async t=>{
+test('restore skips drawing metadata without image data',async t=>{
     const h=page(t);await h.start();await h.login();
-    await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)],drawingAlbum:[completeDrawing(3)]}));
-    assert.deepEqual(h.cloud.drawings,[]);assert.equal('drawingAlbum' in h.cloud,false);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
+    await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)]}));
+    assert.deepEqual(h.cloud.drawings,[]);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
 });

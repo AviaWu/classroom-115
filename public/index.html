@@ -594,8 +594,8 @@ function normalizeState(target){
     target.deletedTaskIds = [...new Set(target.deletedTaskIds.filter(id=>typeof id==="string"))];
     target.deletedCoopTaskIds = [...new Set(target.deletedCoopTaskIds.filter(id=>typeof id==="string"))];
     if(!Array.isArray(target.drawings)) target.drawings=[];
-    target.drawings = target.drawings.filter(item=>item && typeof item==="object");
-    // Preserve any legacy artwork fields until the teacher explicitly clears them.
+    target.drawings = target.drawings.filter(item=>item && typeof item==="object").map(({id,savedAt})=>({id,savedAt}));
+    delete target.drawingAlbum;
     if(!Array.isArray(target.tasks)) target.tasks=[];
     if(!Array.isArray(target.dailyTaskTemplates)) target.dailyTaskTemplates=[];
     target.dailyTaskTemplates = target.dailyTaskTemplates.filter(item=>item && typeof item==="object").map(item=>({
@@ -1093,7 +1093,7 @@ const artworkRequests = new Map();
 const artworkFailures = new Set();
 
 function drawingImage(item){
-    return typeof item.data==="string" ? item.data : artworkCache.get(item.id)?.data;
+    return artworkCache.get(item.id)?.data;
 }
 
 function drawingHistoryHtml(){
@@ -1953,7 +1953,7 @@ async function backend(){
     const used = getStorageUsage();
     const usedMb = (used/1024/1024).toFixed(2);
     const full = used > STORAGE_LIMIT * 0.9;
-    const pendingLabels={restore:"備份還原",initialize:"初始化",migrateArtworks:"清除舊畫作資料",saveDrawing:"畫板儲存",lottery:"樂透抽獎",purchase:"購買",edit:"後台設定",resources:"資源調整",equip:"裝備設定",completeTask:"完成任務",coopComplete:"協力任務",petMood:"寵物互動"};
+    const pendingLabels={restore:"備份還原",initialize:"初始化",saveDrawing:"畫板儲存",lottery:"樂透抽獎",purchase:"購買",edit:"後台設定",resources:"資源調整",equip:"裝備設定",completeTask:"完成任務",coopComplete:"協力任務",petMood:"寵物互動"};
     const pendingHtml=window.firebaseGameStore.pendingActions().map(job=>`<div class="row"><span class="grow">未確認：${esc(pendingLabels[job.command.type]||"操作")}（${esc(new Date(job.createdAt).toLocaleString())}）</span><button onclick="retryPendingAction('${esc(job.id)}')">確認上次操作</button></div>`).join("");
 
     //任務統計
@@ -2083,10 +2083,6 @@ async function backend(){
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
       </div>
       <p class="small">備份只保留最近 3 張完整畫作；還原時不包含歷史作品或缺少圖片的紀錄。</p>
-      ${hasLegacyArtworks(state)?`<div class="row">
-        <p class="grow warn">偵測到舊畫作資料。清除後會永久刪除全部舊畫作，無法復原。</p>
-        <button id="clearLegacyArtworks" class="danger" onclick="clearLegacyArtworks()">清除舊畫作資料</button>
-      </div>`:""}
     </div>
     <section id="backend-tasks" class="backend-page">
     <h3>任務管理</h3>
@@ -2863,9 +2859,6 @@ function deleteItem(listName,id){
 }
 
 //備份匯入匯出
-function hasLegacyArtworks(progress){
-    return !!progress && (Object.hasOwn(progress,"drawingAlbum") || (progress.drawings||[]).some(item=>item && Object.hasOwn(item,"data")));
-}
 function validArtworkDate(value){
     if(typeof value!=="string" || value.length<20 || value.length>40 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,19})?Z$/.test(value)) return false;
     const timestamp=Date.parse(value);
@@ -2882,27 +2875,21 @@ function newestArtworkRecords(drawings){
 async function buildCompleteBackup(progress){
     const backup=structuredClone(progress);
     backup.drawings=await Promise.all(newestArtworkRecords(backup.drawings).map(async item=>{
-        const artwork=Object.hasOwn(item,"data") ? item : await window.artworkStore.readArtwork(item.id);
+        const artwork=await window.artworkStore.readArtwork(item.id);
         if(!artwork || artwork.id!==item.id || !validArtworkData(artwork.data)) throw new Error("畫作圖片無法完整讀取，請稍後重試。");
         return {id:item.id,savedAt:item.savedAt,data:artwork.data};
     }));
-    delete backup.drawingAlbum;
     delete backup.pendingArtworkDeletes;
     return backup;
 }
 function prepareArtworkRestore(value){
     if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("檔案不是有效的遊戲備份。");
     const candidate=structuredClone(value);
-    candidate.drawings=newestArtworkRecords((Array.isArray(candidate.drawings)?candidate.drawings:[]).filter(item=>validArtworkData(item?.data)))
+    const drawings=newestArtworkRecords((Array.isArray(candidate.drawings)?candidate.drawings:[]).filter(item=>validArtworkData(item?.data)))
         .map(({savedAt,data})=>({id:"drawing_"+crypto.randomUUID(),savedAt,data}));
-    delete candidate.drawingAlbum;
+    candidate.drawings=[];
     delete candidate.pendingArtworkDeletes;
-    return window.GameOperations.normalizeProgress(candidate);
-}
-async function clearLegacyArtworks(){
-    if(!backendAuthenticated || !window.firebaseGameStore.canEdit() || !hasLegacyArtworks(state)) return;
-    if(!confirm("將永久清除全部舊畫作資料，無法復原。確定清除？")) return;
-    return runCommand({type:"migrateArtworks",drawings:[]},"clear-legacy-artworks");
+    return {...window.GameOperations.normalizeProgress(candidate),drawings};
 }
 async function exportData(){
     if(!backendAuthenticated) return;
@@ -2989,8 +2976,8 @@ document.addEventListener("input",event=>{
     const key=event.target.dataset?.field;
     if(key && draftFields.has(key)) draftFields.get(key).dirty=true;
 });
-// Teacher legacy handlers produce per-record/per-field commands. No delayed save.
-const teacherMutations=["dropItem","clearLegacyArtworks","publishCoopTask","updatePublishedTask","updatePublishedCoopTask","updateTaskTemplate","updateCoopTaskTemplate","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
+// Teacher handlers produce per-record/per-field commands. No delayed save.
+const teacherMutations=["dropItem","publishCoopTask","updatePublishedTask","updatePublishedCoopTask","updateTaskTemplate","updateCoopTaskTemplate","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
 for(const name of teacherMutations){
     const original=window[name];
     window[name]=function(...args){

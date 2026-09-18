@@ -76,9 +76,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(command.type==='restore'){
             const value=command.value;
             if(!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('畫作資料格式不正確');
-            return {type:'restore',drawings:newestArtworks([...(Array.isArray(value.drawings)?value.drawings:[]),...(Array.isArray(value.drawingAlbum)?value.drawingAlbum:[])])};
+            return {type:'restore',drawings:newestArtworks(Array.isArray(value.drawings)?value.drawings:[])};
         }
-        if(command.type==='migrateArtworks') return {type:'migrateArtworks',drawings:newestArtworks(command.drawings)};
         return null;
     }
     function indexCommand(command,artwork){
@@ -86,10 +85,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         const drawings=artwork.drawings.map(({id,savedAt})=>({id,savedAt}));
         if(artwork.type==='saveDrawing') return {...command,drawing:drawings[0]};
         if(artwork.type==='restore'){
-            const {drawingAlbum,...restored}=command.value;
-            return {...command,value:{...restored,drawings}};
+            return {...command,value:{...command.value,drawings}};
         }
-        if(artwork.type==='migrateArtworks') return {...command,drawings};
         return command;
     }
     async function prepareCommand(command,artwork){
@@ -97,11 +94,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(artwork.type==='saveDrawing') return {...command,drawing:await writeArtwork(artwork.drawings[0])};
         if(artwork.type==='restore'){
             const drawings=await Promise.all(artwork.drawings.map(writeArtwork));
-            const value=command.value;
-            const {drawingAlbum,...restored}=value;
-            return {...command,value:{...restored,drawings}};
+            return {...command,value:{...command.value,drawings}};
         }
-        if(artwork.type==='migrateArtworks') return {...command,drawings:await Promise.all(artwork.drawings.map(writeArtwork))};
         return command;
     }
     async function cleanupRejectedArtwork(artwork){

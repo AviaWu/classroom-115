@@ -52,20 +52,14 @@ test('saveDrawing uploads validated payload before committing metadata only',asy
     await assert.rejects(s.store.execute(job('bad-id',{type:'saveDrawing',drawing:{...drawing,id:'bad'}})),/畫作/);
     await assert.rejects(s.store.writeArtwork({...drawing,data:'not-a-data-url'}),/畫作/);
     await assert.rejects(s.store.execute(job('bad-restore',{type:'restore',value:{students:[{id:1}],drawings:[{...drawing,data:'not-a-data-url'}]}})),/畫作/);
-    await assert.rejects(s.store.execute(job('bad-migration',{type:'migrateArtworks',drawings:[{...drawing,data:'not-a-data-url'}]})),/畫作/);
     assert.equal(s.calls.length,calls);
 });
-test('restore and migration upload only the newest three artwork payloads',async()=>{
+test('restore uploads only the newest three artwork payloads',async()=>{
     const drawings=Array.from({length:4},(_,index)=>({id:`drawing_restore${index}`,savedAt:`2026-09-16T00:00:00.00${index}Z`,data:'data:image/png;base64,AA=='}));
     const s=server();
-    await s.store.execute(job('restore-artwork',{type:'restore',value:{students:[{id:1,tokens:0}],drawings,drawingAlbum:[]}}));
+    await s.store.execute(job('restore-artwork',{type:'restore',value:{students:[{id:1,tokens:0}],drawings}}));
     assert.deepEqual(Object.keys(s.artworks).sort(),drawings.slice(1).map(item=>item.id).sort());
     assert.deepEqual(s.room.progress.drawings.map(item=>item.id),drawings.slice(1).reverse().map(item=>item.id));
-    assert.equal('drawingAlbum' in s.room.progress,false);
-    s.room={...s.room,progress:{...s.room.progress,drawings:[drawings[0]],drawingAlbum:[]}};
-    await s.store.execute({id:'migrate-artwork',createdAt:100001,command:{type:'migrateArtworks',drawings}});
-    assert.deepEqual(s.room.progress.drawings.map(item=>item.id),drawings.slice(1).reverse().map(item=>item.id));
-    assert.equal('drawingAlbum' in s.room.progress,false);
 });
 test('a retried drawing save reuses its operation receipt after a lost acknowledgement',async()=>{
     const s=server(),drawing={id:'drawing_retry1',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='},request=job('save-retry',{type:'saveDrawing',drawing});
@@ -86,11 +80,8 @@ test('completed drawing receipts skip preprocessing and ETag retries upload once
     await retry.store.execute(job('conflict-drawing',{type:'saveDrawing',drawing}));
     assert.equal(retry.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,1);
 });
-test('drawing commands rejected by the latest room do not upload artwork',async()=>{
+test('drawing commands rejected by a restored room do not upload artwork',async()=>{
     const drawing={id:'drawing_rejected1',savedAt:'2026-09-16T00:00:00Z',data:'data:image/jpeg;base64,AA=='};
-    const legacy=server();legacy.room={...legacy.room,progress:{...legacy.room.progress,drawingAlbum:[]}};
-    await assert.rejects(legacy.store.execute(job('legacy-drawing',{type:'saveDrawing',drawing})),/畫作|遷移/);
-    assert.equal(legacy.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,0);
     const restored=server();restored.room={...restored.room,restoredAt:100000};
     await assert.rejects(restored.store.execute(job('stale-drawing',{type:'saveDrawing',drawing})),/還原/);
     assert.equal(restored.calls.filter(call=>call.options.method==='PUT' && call.url.includes('/artworks/')).length,0);
