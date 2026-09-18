@@ -20,6 +20,7 @@ function server(){
             return Response.json(artworks[id]||null);
         }
         if(options.method==='PUT'){
+            if(new URL(url).searchParams.get('print')==='silent' && options.headers['if-match']) return Response.json({error:'print=silent cannot be combined with if-match'},{status:400});
             if(conflict){conflict=false;room=conflictMutation?.(room)??room;etag++;return new Response('{}',{status:412});}
             if(options.headers['if-match']!==String(etag))return new Response('{}',{status:412});
             room=resolveServerValues(JSON.parse(options.body));writes++;etag++;
@@ -174,13 +175,16 @@ test('two transactions retry against latest server snapshot preserving both delt
     const s=server();await Promise.all([s.store.execute(job('a',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),s.store.execute(job('b',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:7}))]);
     assert.equal(s.room.progress.students[0].tokens,112);assert.equal(s.writes,2);assert.equal(s.room.progress.revision,undefined);
 });
-test('room PUT suppresses the full response body and returns the locally computed outcome',async()=>{
+test('conditional room PUT keeps ETag support while artwork PUT suppresses its response body',async()=>{
     const s=server();
     const outcome=await s.store.execute(job('silent-put',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
     const write=s.calls.find(call=>call.options.method==='PUT' && call.url.includes('/games/classroom-115.json'));
-    assert.equal(new URL(write.url).searchParams.get('print'),'silent');
+    assert.equal(new URL(write.url).searchParams.get('print'),null);
     assert.equal(outcome.progress.students[0].tokens,105);
     assert.equal(outcome.result.ok,true);
+    await s.store.writeArtwork({id:'drawing_silent',savedAt:'2026-09-16T00:00:00Z',data:'data:image/png;base64,AA=='});
+    const artworkWrite=s.calls.find(call=>call.options.method==='PUT' && call.url.includes('/artworks/classroom-115/'));
+    assert.equal(new URL(artworkWrite.url).searchParams.get('print'),'silent');
 });
 test('response lost after lottery commit is recovered with identical prize and no second ticket charge',async()=>{
     const s=server(),request=job('lottery',{type:'lottery',studentId:1,roll:.2,indexRoll:.1});s.dropNext();
