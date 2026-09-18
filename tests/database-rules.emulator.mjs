@@ -112,10 +112,11 @@ test('progress drawing indexes reject a fourth metadata record',async()=>{
 
 test('progress rejects retired embedded artwork and album fields',async()=>{
     const drawing={id:'drawing_current1',savedAt:'2026-09-16T00:00:00.000Z'};
+    const retiredAlbum=[{...drawing,id:'drawing_retired1',data:'data:image/png;base64,AA=='}];
     await seed({progress:cleanProgress});
     const current=await room();
     await denied(operation(current,{progress:{...cleanProgress,drawings:[{...drawing,data:'data:image/png;base64,AA=='}]}}));
-    await denied(operation(current,{progress:{...cleanProgress,drawingAlbum:[]}}));
+    await denied(operation(current,{progress:{...cleanProgress,drawingAlbum:retiredAlbum}}));
 });
 
 test('operation receipts reject the retired artwork migration type',async()=>{
