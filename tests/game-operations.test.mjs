@@ -7,8 +7,7 @@ const clone = value => structuredClone(value);
 function student(id, extra = {}) {
     return {id, gender:'M', tokens:100, lotteryTickets:2, doneTasks:[], petAffection:0,
         lastPetMoodDate:'', ownedClothes:[], equippedClothes:null, ownedLayout:[],
-        equippedLayout:[], ownedBg:[], equippedBg:null,
-        bossProgress:{bossId:null,answeredQuestionIds:[]}, ...extra};
+        equippedLayout:[], ownedBg:[], equippedBg:null,bossProgress:[],...extra};
 }
 function state(extra = {}) {
     return {students:[student(1), student(2)], tasks:[{id:'a',title:'作業',reward:20}, {id:'b',title:'數學',reward:30}],
@@ -17,7 +16,7 @@ function state(extra = {}) {
         backgrounds:[{id:'sky',name:'天空',level:'SSR',price:80,active:true}],
         coopTasks:[{id:'boss',monsterName:'怪獸',content:'一起完成',reward:10,rewardType:'token',completedBy:[],claimed:false}],
         coopTaskTemplates:[], dailyTaskTemplates:[], weeklyTaskTemplates:[], deletedTaskIds:[], deletedCoopTaskIds:[],
-        boss:null, drawings:[], globalBgImage:'', ...extra};
+        bosses:[], drawings:[], globalBgImage:'', ...extra};
 }
 const run = (value, type, payload = {}, now = NOW) => applyOperation(value, {type,...payload}, now);
 const edit = (before, after) => ({type:'edit',changes:createEditChanges(before,after)});
@@ -160,44 +159,41 @@ function activeBoss(extra = {}) {
         ],...extra};
 }
 
-test('boss attacks require the current boss, password, question, and correct answer', () => {
-    assert.throws(() => run(state(),'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1}),/和平|BOSS/);
-    const current = state({boss:activeBoss()});
-    assert.throws(() => run(current,'bossAttack',{studentId:1,bossId:'old',password:'1234',questionId:'q1',answerIndex:1}),/更新/);
-    assert.throws(() => run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'0000',questionId:'q1',answerIndex:1}),/密碼/);
-    assert.throws(() => run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'missing',answerIndex:1}),/題目/);
-    const wrong = run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:0});
-    assert.deepEqual(wrong.result,{correct:false,damage:0,hp:20,defeated:false,reward:0});
-    assert.equal(wrong.changed,false);
-    assert.deepEqual(wrong.progress.students[0].bossProgress,{bossId:null,answeredQuestionIds:[]});
+test('boss attacks require an active boss and only verify its password on the first attempt', () => {
+    assert.throws(() => run(state(),'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1}),/BOSS/);
+    const current=state({bosses:[activeBoss()]});
+    assert.throws(()=>run(current,'bossAttack',{studentId:1,bossId:'old',password:'1234',questionId:'q1',answerIndex:1}),/停用|不存在/);
+    assert.throws(()=>run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'0000',questionId:'q1',answerIndex:1}),/密碼/);
+    const wrong=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:0});
+    assert.deepEqual(wrong.result,{correct:false,damage:0,hp:20,defeated:false,reward:0,passwordVerified:true});
+    const retry=run(wrong.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q2',answerIndex:2});
+    assert.equal(retry.result.correct,true);
 });
 
-test('boss damage uses equipped pet rarity plus level and answered questions do not repeat', () => {
-    const current = state({boss:activeBoss(),students:[student(1,{ownedLayout:['cat'],equippedLayout:['cat'],petAffection:20}),student(2)]});
-    const hit = run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
-    assert.deepEqual(hit.result,{correct:true,damage:4,hp:16,defeated:false,reward:0});
-    assert.deepEqual(hit.progress.students[0].bossProgress,{bossId:'dragon',answeredQuestionIds:['q1']});
-    assert.throws(() => run(hit.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1}),/答對過/);
-    const other = run(hit.progress,'bossAttack',{studentId:2,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
-    assert.equal(other.result.damage,1);
-    assert.equal(other.progress.boss.hp,15);
+test('each student has independent boss HP, progress and question history', () => {
+    const current=state({bosses:[activeBoss()],students:[student(1,{ownedLayout:['cat'],equippedLayout:['cat'],petAffection:20}),student(2)]});
+    const hit=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
+    assert.deepEqual(hit.result,{correct:true,damage:4,hp:16,defeated:false,reward:0,passwordVerified:true});
+    assert.equal(hit.progress.students[0].bossProgress[0].hp,16);
+    const other=run(hit.progress,'bossAttack',{studentId:2,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
+    assert.equal(other.progress.students[1].bossProgress[0].hp,19);assert.equal(other.progress.students[0].bossProgress[0].hp,16);
+    assert.throws(()=>run(other.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q1',answerIndex:1}),/答對過/);
 });
 
-test('boss defeat clamps HP and grants its reward exactly once to the final attacker', () => {
-    const current = state({boss:activeBoss({maxHp:2,hp:2,reward:75}),
-        layouts:[{id:'ur',name:'神獸',level:'UR'}],students:[student(1,{ownedLayout:['ur'],equippedLayout:['ur'],petAffection:30})]});
-    const defeated = run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
-    assert.deepEqual(defeated.result,{correct:true,damage:7,hp:0,defeated:true,reward:75});
-    assert.equal(defeated.progress.students[0].tokens,175);
-    assert.equal(defeated.progress.boss.defeatedBy,1);
-    assert.throws(() => run(defeated.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q2',answerIndex:2}),/擊敗/);
-    assert.equal(defeated.progress.students[0].tokens,175);
+test('boss defeat clamps personal HP and grants each completing student once', () => {
+    const current=state({bosses:[activeBoss({maxHp:2,reward:75})],layouts:[{id:'ur',name:'神獸',level:'UR'}],students:[student(1,{ownedLayout:['ur'],equippedLayout:['ur'],petAffection:30}),student(2)]});
+    const defeated=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
+    assert.deepEqual(defeated.result,{correct:true,damage:7,hp:0,defeated:true,reward:75,passwordVerified:true});assert.equal(defeated.progress.students[0].tokens,175);
+    assert.throws(()=>run(defeated.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q2',answerIndex:2}),/擊敗/);
+    const other=run(defeated.progress,'bossAttack',{studentId:2,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});assert.equal(other.progress.students[1].bossProgress[0].hp,1);
 });
 
-test('a new boss resets per-student answered-question progress on the first attack', () => {
-    const current = state({boss:activeBoss({id:'new'}),students:[student(1,{bossProgress:{bossId:'old',answeredQuestionIds:['q1']}})]});
-    const hit = run(current,'bossAttack',{studentId:1,bossId:'new',password:'1234',questionId:'q1',answerIndex:1});
-    assert.deepEqual(hit.progress.students[0].bossProgress,{bossId:'new',answeredQuestionIds:['q1']});
+test('multiple bosses preserve separate progress and support true-false questions', () => {
+    const truth=activeBoss({id:'truth',questions:[{id:'tf',text:'地球是圓的',options:['是','否'],answerIndex:0}]});
+    const current=state({bosses:[activeBoss(),truth]});
+    const first=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
+    const second=run(first.progress,'bossAttack',{studentId:1,bossId:'truth',password:'1234',questionId:'tf',answerIndex:0});
+    assert.deepEqual(second.progress.students[0].bossProgress.map(item=>item.bossId),['dragon','truth']);
 });
 
 test('the final two coop members cumulatively complete and the class is paid once', () => {

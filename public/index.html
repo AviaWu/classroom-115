@@ -563,7 +563,7 @@ function initialProgress(){ return normalizeState({
             ownedClothes:[], equippedClothes:null,
             ownedLayout:[], equippedLayout:[],
             ownedBg:[], equippedBg:null,
-            bossProgress:{bossId:null,answeredQuestionIds:[]}
+            bossProgress:[]
         })),
         tasks: [
             {id:"t1", title:"完成今日作業", reward:20},
@@ -578,7 +578,7 @@ function initialProgress(){ return normalizeState({
         coopTaskTemplates:[],
         deletedTaskIds:[],
         deletedCoopTaskIds:[],
-        boss:null,
+        bosses:[],
         drawings:[],
         dailyTaskTemplates:[],
         weeklyTaskTemplates:[],
@@ -597,6 +597,7 @@ function normalizeState(target){
     if(!Array.isArray(target.layouts)) target.layouts=[];
     if(!Array.isArray(target.backgrounds)) target.backgrounds=[];
     if(!Array.isArray(target.coopTasks)) target.coopTasks=[];
+    if(!Array.isArray(target.bosses)) target.bosses=target.boss&&typeof target.boss==="object"?[target.boss]:[];
     if(!Array.isArray(target.coopTaskTemplates)) target.coopTaskTemplates=[];
     if(!Array.isArray(target.deletedTaskIds)) target.deletedTaskIds=[];
     if(!Array.isArray(target.deletedCoopTaskIds)) target.deletedCoopTaskIds=[];
@@ -643,17 +644,14 @@ function normalizeState(target){
         dueTime:/^\d{2}:\d{2}$/.test(item.dueTime||"") ? item.dueTime : "23:59"
     }));
     target.tasks = target.tasks.filter(task=>task && typeof task==="object");
-    if(target.boss && typeof target.boss==="object" && (typeof target.boss.id==="string" || Number.isFinite(target.boss.id))){
-        const maxHp=Math.max(1,Math.floor(Number(target.boss.maxHp)||Number(target.boss.hp)||1));
-        const hpValue=Number.isFinite(Number(target.boss.hp))?Number(target.boss.hp):maxHp;
-        target.boss={...target.boss,name:typeof target.boss.name==="string"?target.boss.name:"",
-            image:typeof target.boss.image==="string"?target.boss.image:"",maxHp,
-            hp:Math.min(maxHp,Math.max(0,Math.floor(hpValue))),
-            attackPassword:typeof target.boss.attackPassword==="string"?target.boss.attackPassword:"",
-            reward:Math.max(0,Math.floor(Number(target.boss.reward)||0)),defeated:target.boss.defeated===true||hpValue<=0,
-            defeatedBy:target.boss.defeatedBy??null,
-            questions:(Array.isArray(target.boss.questions)?target.boss.questions:[]).filter(q=>q&&typeof q==="object"&&Array.isArray(q.options)&&q.options.length===4)};
-    }else target.boss=null;
+    target.bosses=target.bosses.filter(boss=>boss&&typeof boss==="object"&&(typeof boss.id==="string"||Number.isFinite(boss.id))).map(boss=>{
+        const maxHp=Math.max(1,Math.floor(Number(boss.maxHp)||Number(boss.hp)||1));
+        return {...boss,name:typeof boss.name==="string"?boss.name:"",image:typeof boss.image==="string"?boss.image:"",maxHp,
+            attackPassword:typeof boss.attackPassword==="string"?boss.attackPassword:"",reward:Math.max(0,Math.floor(Number(boss.reward)||0)),
+            active:boss.active!==false,publishedAt:Number(boss.publishedAt)||0,
+            questions:(Array.isArray(boss.questions)?boss.questions:[]).filter(q=>q&&typeof q==="object"&&Array.isArray(q.options)&&[2,4].includes(q.options.length))};
+    });
+    delete target.boss;
     if(typeof target.globalBgImage!=="string") target.globalBgImage="";
     [...target.clothesM,...target.clothesF,...target.layouts,...target.backgrounds].forEach(item=>{
         if(!item.level) item.level = "R";
@@ -678,8 +676,12 @@ function normalizeState(target){
         if(!Array.isArray(s.doneTasks)) s.doneTasks = [];
         if(typeof s.equippedClothes==="undefined") s.equippedClothes=null;
         if(typeof s.equippedBg==="undefined") s.equippedBg=null;
-        if(!s.bossProgress || typeof s.bossProgress!=="object") s.bossProgress={bossId:null,answeredQuestionIds:[]};
-        if(!Array.isArray(s.bossProgress.answeredQuestionIds)) s.bossProgress.answeredQuestionIds=[];
+        if(!Array.isArray(s.bossProgress)) s.bossProgress=s.bossProgress?.bossId?[s.bossProgress]:[];
+        s.bossProgress=s.bossProgress.filter(progress=>progress&&progress.bossId!=null).map(progress=>{
+            const boss=target.bosses.find(item=>item.id===progress.bossId),maxHp=boss?.maxHp||Number.MAX_SAFE_INTEGER;
+            const hp=Math.min(maxHp,Math.max(0,Math.floor(Number.isFinite(Number(progress.hp))?Number(progress.hp):maxHp)));
+            return {...progress,hp,passwordVerified:progress.passwordVerified===true,answeredQuestionIds:Array.isArray(progress.answeredQuestionIds)?progress.answeredQuestionIds:[],defeated:progress.defeated===true||hp<=0,completedAt:progress.completedAt??null};
+        });
     });
     return target;
 }
@@ -1377,17 +1379,19 @@ function petLevelHtml(student){
     </div>`;
 }
 function bossStatusHtml(student){
-    const boss=state.boss;
-    if(!boss) return `<div class="boss-card"><h3>BOSS</h3><p>目前世界一片和平</p></div>`;
-    const percent=Math.max(0,Math.min(100,boss.hp/boss.maxHp*100));
-    const finished=boss.defeated||boss.hp<=0;
-    return `<div class="boss-card">
-        ${boss.image?`<img src="${esc(boss.image)}" alt="${esc(boss.name)}">`:""}
-        <h3>${esc(boss.name||"BOSS")}</h3>
-        <div class="boss-hp" role="progressbar" aria-label="BOSS 血量" aria-valuemin="0" aria-valuemax="${boss.maxHp}" aria-valuenow="${boss.hp}"><div class="boss-hp-fill" style="width:${percent}%"></div></div>
-        <p>HP ${boss.hp} / ${boss.maxHp}｜獎勵 ${boss.reward} 代幣</p>
-        ${finished?`<b>已被 ${esc(boss.defeatedBy??"")} 號擊敗</b>`:`<button class="danger" onclick="startBossBattle(${student.id})">攻打 BOSS</button>`}
-    </div>`;
+    const bosses=state.bosses.filter(boss=>boss.active!==false);
+    if(!bosses.length) return `<div class="boss-card"><h3>BOSS</h3><p>目前世界一片和平</p></div>`;
+    return bosses.map(boss=>{
+        const progress=student.bossProgress.find(item=>item.bossId===boss.id),hp=progress?.hp??boss.maxHp;
+        const percent=Math.max(0,Math.min(100,hp/boss.maxHp*100)),finished=progress?.defeated||hp<=0;
+        return `<div class="boss-card">
+            ${boss.image?`<img src="${esc(boss.image)}" alt="${esc(boss.name)}">`:""}
+            <h3>${esc(boss.name||"BOSS")}</h3>
+            <div class="boss-hp" role="progressbar" aria-label="${esc(boss.name)}血量" aria-valuemin="0" aria-valuemax="${boss.maxHp}" aria-valuenow="${hp}"><div class="boss-hp-fill" style="width:${percent}%"></div></div>
+            <p>個人 HP ${hp} / ${boss.maxHp}｜獎勵 ${boss.reward} 代幣</p>
+            ${finished?`<b>你已完成攻打</b>`:`<button class="danger" onclick="startBossBattle(${student.id},'${esc(boss.id)}')">攻打 BOSS</button>`}
+        </div>`;
+    }).join("");
 }
 function openPetMood(id){
     if(!canAccessStudent(id)) return;
@@ -1420,20 +1424,24 @@ function openPetMood(id){
         </div>`);
 }
 
-function startBossBattle(studentId){
+function startBossBattle(studentId,bossId){
     if(!canAccessStudent(studentId)) return;
-    const boss=state.boss,student=state.students.find(item=>item.id===studentId);
-    if(!boss || !student || boss.defeated || boss.hp<=0) return alert("目前沒有可攻打的 BOSS");
-    const password=prompt("請輸入 4 位數攻打密碼");
-    if(password===null) return;
-    if(!/^\d{4}$/.test(password)) return alert("攻打密碼必須是 4 位數字");
-    const answered=student.bossProgress?.bossId===boss.id ? student.bossProgress.answeredQuestionIds : [];
-    const remaining=boss.questions.filter(question=>!answered.includes(question.id));
-    if(!remaining.length) return alert("你已答完這隻 BOSS 的所有題目");
+    const boss=state.bosses.find(item=>item.id===bossId&&item.active!==false),student=state.students.find(item=>item.id===studentId);
+    if(!boss||!student) return alert("目前沒有可攻打的 BOSS");
+    const progress=student.bossProgress.find(item=>item.bossId===boss.id);
+    if(progress?.defeated||progress?.hp<=0) return alert("你已擊敗這隻 BOSS");
+    let password="";
+    if(!progress?.passwordVerified){
+        password=prompt("首次攻打請輸入 4 位數攻打密碼");
+        if(password===null) return;
+        if(!/^\d{4}$/.test(password)) return alert("攻打密碼必須是 4 位數字");
+    }
+    const answered=progress?.answeredQuestionIds||[],remaining=boss.questions.filter(question=>!answered.includes(question.id));
+    if(!remaining.length) return alert(boss.questions.length?"你已答完這隻 BOSS 的所有題目":"這隻 BOSS 尚未設定題目");
     const question=remaining[Math.floor(Math.random()*remaining.length)];
-    const holder=document.getElementById("bossBattleArea") || document.createElement("div");
+    const holder=document.getElementById("bossBattleArea")||document.createElement("div");
     holder.id="bossBattleArea";holder.className="boss-question";
-    holder.innerHTML=`<h3>挑戰 ${esc(boss.name)}</h3><p>${esc(question.text)}</p><div class="boss-options">${question.options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${index},'${esc(password)}')">${"ABCD"[index]}．${esc(option)}</button>`).join("")}</div>`;
+    holder.innerHTML=`<h3>挑戰 ${esc(boss.name)}</h3><p>${esc(question.text)}</p><div class="boss-options">${question.options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${index},'${esc(password)}')">${question.options.length===2?(index===0?"是":"否"):"ABCD"[index]}．${esc(option)}</button>`).join("")}</div>`;
     document.querySelector(".pet-interaction")?.after(holder);
 }
 async function answerBossQuestion(studentId,bossId,questionId,answerIndex,password){
@@ -2261,26 +2269,21 @@ async function backend(){
     }).join("") || `<div class="empty">尚無協力任務紀錄</div>`}
     </section>
     <section id="backend-boss" class="backend-page">
-    <h3>BOSS 設定</h3>
+    <h3>發布新 BOSS</h3>
     <div class="row" style="display:block">
-        <div class="edit-item-row">
-            <input id="bossName" placeholder="BOSS 名稱" value="${esc(state.boss?.name||"")}">
-            <label>血量：<input id="bossHp" type="number" min="1" step="1" value="${esc(state.boss?.maxHp||100)}"></label>
-            <label>4 位攻打密碼：<input id="bossPassword" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" value="${esc(state.boss?.attackPassword||"")}"></label>
-            <label>擊敗獎勵：<input id="bossReward" type="number" min="0" step="1" value="${esc(state.boss?.reward||0)}"></label>
-        </div>
+        <div class="edit-item-row"><input id="bossName" placeholder="BOSS 名稱"><label>血量：<input id="bossHp" type="number" min="1" step="1" value="100"></label><label>4 位攻打密碼：<input id="bossPassword" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"></label><label>擊敗獎勵：<input id="bossReward" type="number" min="0" step="1" value="0"></label></div>
         <label style="display:block;margin-top:12px">選擇 BOSS 圖片：</label>
-        <div class="boss-choice-grid">${BUILTIN_BOSSES.map(boss=>`<button type="button" class="boss-choice ${state.boss?.image===boss.image?"active":""}" onclick="selectBossImage(this,'${esc(boss.image)}')"><img src="${esc(boss.image)}" alt="${esc(boss.name)}"><span>${esc(boss.name)}</span></button>`).join("")}</div>
-        <input type="hidden" id="bossImage" value="${esc(state.boss?.image||BUILTIN_BOSSES[0].image)}">
-        <div class="edit-item-row"><button class="primary" onclick="saveBoss()">${state.boss?"更新並補滿血量":"發布 BOSS"}</button>${state.boss?`<button class="danger" onclick="removeBoss()">移除 BOSS</button>`:""}</div>
+        <div class="boss-choice-grid">${BUILTIN_BOSSES.map((boss,index)=>`<button type="button" class="boss-choice ${index===0?"active":""}" onclick="selectBossImage(this,'${esc(boss.image)}')"><img src="${esc(boss.image)}" alt="${esc(boss.name)}"><span>${esc(boss.name)}</span></button>`).join("")}</div>
+        <input type="hidden" id="bossImage" value="${esc(BUILTIN_BOSSES[0].image)}"><button class="primary" onclick="saveBoss()">發布 BOSS</button>
     </div>
-    <h3>選擇題題庫</h3>
-    <div class="row" style="display:block">
-        <input id="bossQuestionText" placeholder="題目" style="width:100%">
-        <div class="edit-item-row" style="margin-top:8px">${[0,1,2,3].map(index=>`<input id="bossOption${index}" placeholder="${"ABCD"[index]} 選項">`).join("")}<label>正確答案：<select id="bossAnswerIndex">${[0,1,2,3].map(index=>`<option value="${index}">${"ABCD"[index]}</option>`).join("")}</select></label><button class="primary" onclick="addBossQuestion()" ${state.boss?"":"disabled"}>新增題目</button></div>
-    </div>
-    ${(state.boss?.questions||[]).map((question,index)=>`<div class="row"><div class="grow"><b>${index+1}. ${esc(question.text)}</b><div class="small">${question.options.map((option,i)=>`${"ABCD"[i]}．${esc(option)}${i===question.answerIndex?"（正確）":""}`).join("　")}</div></div><button class="danger" onclick="deleteBossQuestion('${esc(question.id)}')">刪除題目</button></div>`).join("")||`<div class="empty">尚未新增題目</div>`}
-    <p class="small">獎勵發給擊敗 BOSS 的最後一擊成員；每位成員答對過的題目，在同一隻 BOSS 戰鬥中不再出現。</p>
+    <h3>已發布 BOSS 紀錄</h3>
+    ${state.bosses.map(boss=>{
+        const completed=state.students.filter(student=>student.bossProgress.some(progress=>progress.bossId===boss.id&&progress.defeated)).map(student=>student.id);
+        return `<div class="row" style="display:block"><div class="edit-item-row"><img src="${esc(boss.image)}" alt="${esc(boss.name)}" style="width:72px;height:72px;object-fit:contain"><div class="grow"><b>${esc(boss.name)}</b><div class="small">HP ${boss.maxHp}｜獎勵 ${boss.reward}｜${boss.active?"啟用中":"已停用"}</div><div class="small">完成成員：${completed.length?completed.join("、")+" 號":"尚無"}</div></div><button onclick="toggleBossActive('${esc(boss.id)}')">${boss.active?"停用":"啟用"}</button><button class="danger" onclick="deleteBoss('${esc(boss.id)}')">刪除</button></div>
+        <div class="row" style="display:block"><label>新增至此 BOSS 題庫：<input id="bossQuestionText-${esc(boss.id)}" placeholder="題目"></label><select id="bossQuestionType-${esc(boss.id)}"><option value="choice">ABCD 選擇題</option><option value="boolean">是非題</option></select><div class="edit-item-row">${[0,1,2,3].map(index=>`<input id="bossOption${index}-${esc(boss.id)}" placeholder="${"ABCD"[index]} 選項">`).join("")}<label>正確答案：<select id="bossAnswerIndex-${esc(boss.id)}">${[0,1,2,3].map(index=>`<option value="${index}">${"ABCD"[index]}</option>`).join("")}</select></label><label>是非答案：<select id="bossBooleanAnswer-${esc(boss.id)}"><option value="0">是</option><option value="1">否</option></select></label><button class="primary" onclick="addBossQuestion('${esc(boss.id)}')">新增題目</button></div></div>
+        ${boss.questions.map((question,index)=>`<div class="edit-item-row"><span class="grow">${index+1}. ${esc(question.text)}｜${question.options.map((option,i)=>`${esc(option)}${i===question.answerIndex?"（正確）":""}`).join("／")}</span><button class="danger" onclick="deleteBossQuestion('${esc(boss.id)}','${esc(question.id)}')">刪除題目</button></div>`).join("")||`<div class="empty">尚未新增題目</div>`}</div>`;
+    }).join("")||`<div class="empty">尚無已發布 BOSS</div>`}
+    <p class="small">每位成員擁有獨立血量與答題進度，完成後各自獲得獎勵；每隻 BOSS 使用獨立題庫。</p>
     </section>
     <section id="backend-tokens" class="backend-page">
     <h3>單號代幣調整｜給予 / 扣除</h3>
@@ -2511,26 +2514,30 @@ async function saveBoss(){
     if(!name||!Number.isInteger(maxHp)||maxHp<1||!Number.isInteger(reward)||reward<0) return alert("請完整填寫名稱、正整數血量與 0 以上整數獎勵");
     if(!/^\d{4}$/.test(attackPassword)) return alert("攻打密碼必須是 4 位數字");
     if(!BUILTIN_BOSSES.some(item=>item.image===image)) return alert("請選擇 BOSS 圖片");
-    const existing=state.boss;
-    state.boss={id:`boss_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,name,image,maxHp,hp:maxHp,attackPassword,reward,questions:existing?.questions||[],defeated:false,defeatedBy:null};
+    state.bosses.push({id:`boss_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,name,image,maxHp,attackPassword,reward,questions:[],active:true,publishedAt:Date.now()});
     markChanged();save();render();refreshBackendPage("backend-boss");
 }
-function removeBoss(){
-    if(!state.boss||!confirm("確定移除目前的 BOSS？")) return;
-    state.boss=null;markChanged();save();render();refreshBackendPage("backend-boss");
+function toggleBossActive(bossId){
+    const boss=state.bosses.find(item=>item.id===bossId);if(!boss)return;
+    boss.active=!boss.active;markChanged();save();render();refreshBackendPage("backend-boss");
 }
-function addBossQuestion(){
-    if(!state.boss) return alert("請先發布 BOSS");
-    const text=document.getElementById("bossQuestionText").value.trim();
-    const options=[0,1,2,3].map(index=>document.getElementById(`bossOption${index}`).value.trim()),answerIndex=Number(document.getElementById("bossAnswerIndex").value);
-    if(!text||options.some(option=>!option)||!Number.isInteger(answerIndex)||answerIndex<0||answerIndex>3) return alert("請完整填寫題目、ABCD 四個選項與正確答案");
-    state.boss.questions.push({id:`boss_question_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,text,options,answerIndex});
+function deleteBoss(bossId){
+    if(!confirm("確定永久刪除這隻 BOSS 與所有成員進度？"))return;
+    state.bosses=state.bosses.filter(item=>item.id!==bossId);state.students.forEach(student=>student.bossProgress=student.bossProgress.filter(progress=>progress.bossId!==bossId));
+    markChanged();save();render();refreshBackendPage("backend-boss");
+}
+function addBossQuestion(bossId){
+    const boss=state.bosses.find(item=>item.id===bossId);if(!boss)return;
+    const text=document.getElementById(`bossQuestionText-${bossId}`).value.trim(),type=document.getElementById(`bossQuestionType-${bossId}`).value;
+    const options=type==="boolean"?["是","否"]:[0,1,2,3].map(index=>document.getElementById(`bossOption${index}-${bossId}`).value.trim());
+    const answerIndex=Number(document.getElementById(type==="boolean"?`bossBooleanAnswer-${bossId}`:`bossAnswerIndex-${bossId}`).value);
+    if(!text||options.some(option=>!option))return alert("請完整填寫題目與選項");
+    boss.questions.push({id:`boss_question_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,text,options,answerIndex});
     markChanged();save();refreshBackendPage("backend-boss");
 }
-function deleteBossQuestion(questionId){
-    if(!state.boss||!confirm("確定刪除這道題目？")) return;
-    state.boss.questions=state.boss.questions.filter(question=>question.id!==questionId);
-    markChanged();save();refreshBackendPage("backend-boss");
+function deleteBossQuestion(bossId,questionId){
+    const boss=state.bosses.find(item=>item.id===bossId);if(!boss||!confirm("確定刪除這道題目？"))return;
+    boss.questions=boss.questions.filter(question=>question.id!==questionId);markChanged();save();refreshBackendPage("backend-boss");
 }
 
 async function publishCoopTask(){
@@ -3099,7 +3106,7 @@ document.addEventListener("input",event=>{
     if(key && draftFields.has(key)) draftFields.get(key).dirty=true;
 });
 // Teacher handlers produce per-record/per-field commands. No delayed save.
-const teacherMutations=["dropItem","saveBoss","removeBoss","addBossQuestion","deleteBossQuestion","publishCoopTask","updatePublishedTask","updatePublishedCoopTask","updateTaskTemplate","updateCoopTaskTemplate","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
+const teacherMutations=["dropItem","saveBoss","toggleBossActive","deleteBoss","addBossQuestion","deleteBossQuestion","publishCoopTask","updatePublishedTask","updatePublishedCoopTask","updateTaskTemplate","updateCoopTaskTemplate","toggleCoopTemplate","deleteCoopTemplate","deleteCoopTask","moveItem","updateItemName","updateItemLevel","updateItemActive","updateItemPrice","batchAddClothM","batchAddClothF","batchAddLayout","batchAddBg","addTask","deleteTask","addDailyTask","toggleDailyTask","deleteDailyTask","addWeeklyTask","toggleWeeklyTask","deleteWeeklyTask","setStudentGender","resetStudentCloset","resetAllStudentResources","resizeStudentList","addClothM","addClothF","addLayout","addBgItem","deleteItem"];
 for(const name of teacherMutations){
     const original=window[name];
     window[name]=function(...args){

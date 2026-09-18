@@ -386,25 +386,23 @@ test('restore skips drawing metadata without image data',async t=>{
     await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)]}));
     assert.deepEqual(h.cloud.drawings,[]);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
 });
-test('pet view shows peace without a boss and runs an ABCD boss battle',async t=>{
-    const h=page(t);await h.start();await h.run('openPetMood(1)');
-    assert.match(h.w.document.getElementById('modal').textContent,/目前世界一片和平/);
-    h.cloud={...h.cloud,boss:{id:'dragon',name:'巨龍',image:'/images/boss/boss%20(1).png',maxHp:8,hp:8,attackPassword:'1234',reward:30,defeated:false,defeatedBy:null,questions:[{id:'q1',text:'1 加 1 是多少？',options:['1','2','3','4'],answerIndex:1}]},students:[{...h.cloud.students[0],equippedLayout:['pet'],petAffection:20},h.cloud.students[1]]};
-    await h.sync.refresh();await h.run('openPetMood(1)');
-    assert.match(h.w.document.getElementById('modal').textContent,/巨龍/);assert.equal(h.w.document.querySelector('[aria-label="BOSS 血量"]').getAttribute('aria-valuenow'),'8');
-    h.setPrompt('1234');await h.run('startBossBattle(1)');
-    const choices=[...h.w.document.querySelectorAll('#bossBattleArea button')];assert.equal(choices.length,4);assert.deepEqual(choices.map(button=>button.textContent.trim()[0]),['A','B','C','D']);
-    await h.run("answerBossQuestion(1,'dragon','q1',0,'1234')");assert.equal(h.cloud.boss.hp,8);assert.ok(h.alerts.includes('答錯了，請重新挑戰！'));
-    await h.run("answerBossQuestion(1,'dragon','q1',1,'1234')");assert.equal(h.cloud.boss.hp,5);assert.deepEqual(h.cloud.students[0].bossProgress,{bossId:'dragon',answeredQuestionIds:['q1']});
-    await h.run('startBossBattle(1)');assert.ok(h.alerts.includes('你已答完這隻 BOSS 的所有題目'));
+test('pet view shows multiple bosses with independent HP and asks password only once',async t=>{
+    const h=page(t);await h.start();await h.run('openPetMood(1)');assert.match(h.w.document.getElementById('modal').textContent,/目前世界一片和平/);
+    const boss={id:'dragon',name:'巨龍',image:'/images/boss/boss%20(1).png',maxHp:8,attackPassword:'1234',reward:30,active:true,questions:[{id:'q1',text:'1 加 1 是多少？',options:['1','2','3','4'],answerIndex:1},{id:'q2',text:'天空是藍色',options:['是','否'],answerIndex:0}]};
+    h.cloud={...h.cloud,bosses:[boss,{...boss,id:'dragon2',name:'第二隻龍'}],students:[{...h.cloud.students[0],equippedLayout:['pet'],petAffection:20},h.cloud.students[1]]};await h.sync.refresh();await h.run('openPetMood(1)');
+    assert.equal(h.w.document.querySelectorAll('.boss-card').length,2);assert.equal(h.w.document.querySelector('[aria-label="巨龍血量"]').getAttribute('aria-valuenow'),'8');
+    h.setPrompt('1234');await h.run("startBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea button').length,4);
+    await h.run("answerBossQuestion(1,'dragon','q1',1,'1234')");assert.equal(h.cloud.students[0].bossProgress[0].hp,5);
+    h.setPrompt(null);await h.run("startBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea button').length,2);
+    await h.run("answerBossQuestion(1,'dragon','q2',0,'')");assert.equal(h.cloud.students[0].bossProgress[0].hp,2);assert.equal(h.cloud.students[1].bossProgress.length,0);
 });
-test('teacher backend creates a fresh boss battle and manages its question bank',async t=>{
+test('teacher publishes multiple bosses and manages separate choice and true-false banks',async t=>{
     const h=page(t);await h.start();await h.login();await h.run("activateBackendPage('backend-boss')");
-    h.w.document.getElementById('bossName').value='黑龍';h.w.document.getElementById('bossHp').value='20';h.w.document.getElementById('bossPassword').value='2468';h.w.document.getElementById('bossReward').value='50';h.w.document.getElementById('bossImage').value='/images/boss/boss%20(1).png';
-    await h.run('saveBoss()');const firstId=h.cloud.boss.id;assert.equal(h.cloud.boss.name,'黑龍');assert.equal(h.cloud.boss.hp,20);
-    h.w.document.getElementById('bossQuestionText').value='天空是什麼顏色？';['紅','藍','綠','黑'].forEach((value,index)=>h.w.document.getElementById(`bossOption${index}`).value=value);h.w.document.getElementById('bossAnswerIndex').value='1';
-    await h.run('addBossQuestion()');assert.equal(h.cloud.boss.questions.length,1);assert.equal(h.cloud.boss.questions[0].answerIndex,1);
-    const questionId=h.cloud.boss.questions[0].id;await h.run(`deleteBossQuestion('${questionId}')`);assert.deepEqual(h.cloud.boss.questions,[]);
-    h.w.document.getElementById('bossName').value='黑龍第二戰';await h.run('saveBoss()');assert.notEqual(h.cloud.boss.id,firstId);
-    await h.run('removeBoss()');assert.equal(h.cloud.boss,null);
+    for(const name of ['黑龍','白龍']){h.w.document.getElementById('bossName').value=name;h.w.document.getElementById('bossHp').value='20';h.w.document.getElementById('bossPassword').value='2468';h.w.document.getElementById('bossReward').value='50';h.w.document.getElementById('bossImage').value='/images/boss/boss%20(1).png';await h.run('saveBoss()');}
+    assert.equal(h.cloud.bosses.length,2);const firstId=h.cloud.bosses[0].id;
+    h.w.document.getElementById(`bossQuestionText-${firstId}`).value='地球是圓的';h.w.document.getElementById(`bossQuestionType-${firstId}`).value='boolean';h.w.document.getElementById(`bossBooleanAnswer-${firstId}`).value='0';await h.run(`addBossQuestion('${firstId}')`);
+    assert.deepEqual(h.cloud.bosses[0].questions[0].options,['是','否']);assert.equal(h.cloud.bosses[1].questions.length,0);
+    await h.run(`toggleBossActive('${firstId}')`);assert.equal(h.cloud.bosses[0].active,false);
+    const questionId=h.cloud.bosses[0].questions[0].id;await h.run(`deleteBossQuestion('${firstId}','${questionId}')`);assert.equal(h.cloud.bosses[0].questions.length,0);
+    await h.run(`deleteBoss('${firstId}')`);assert.equal(h.cloud.bosses.length,1);
 });
