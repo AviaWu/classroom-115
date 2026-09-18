@@ -41,7 +41,7 @@ function fixture() {
     clothesM:[{id:'shirt',name:'星星「上衣」\n第二行',image:null,level:'R',price:50,active:true}],
     clothesF:[],layouts:[{id:'cat',name:'小貓',level:'SR',price:60,active:true}],backgrounds:[],
     coopTasks:[{id:'boss',monsterName:'怪獸',content:'一起完成',reward:10,rewardType:'token',completedBy:[],claimed:false}],
-    drawings:[],drawingAlbum:[],globalBgImage:'',lastSaved:'2026-09-15T00:00:00Z',
+    drawings:[],globalBgImage:'',lastSaved:'2026-09-15T00:00:00Z',
     syncVersion:3,revision:99,baseCommitId:'old-base',commitId:'old-commit',updatedAt:1};
 }
 const job = (command,createdAt = Date.now()) => ({id:randomUUID(),createdAt,command});
@@ -106,7 +106,6 @@ test('real initialization and reads round-trip Firebase omissions without writin
 
 test('real artwork REST upload commits save metadata without embedding its Data URL',async()=>{
     const initial=fixture();
-    delete initial.drawingAlbum;
     await seed(initial);
     const client=store(),drawing={id:`drawing_${randomUUID()}`,savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/jpeg;base64,AA=='};
     await client.execute(job({type:'saveDrawing',drawing}));

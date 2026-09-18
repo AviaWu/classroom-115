@@ -110,25 +110,25 @@ test('progress drawing indexes reject a fourth metadata record',async()=>{
     await denied(operation(await room(),{progress:{...cleanProgress,drawings:{0:drawings[0],4:drawings[1]}}}));
 });
 
-test('ordinary operations preserve a legacy drawing list above the new limit',async()=>{
-    const drawings=Array.from({length:4},(_,index)=>({id:`drawing_legacy${index}`,savedAt:`2026-09-16T00:00:0${index}.000Z`,data:'data:image/png;base64,AA=='}));
-    const progress={...cleanProgress,drawings};
-    await seed({progress});
-    await allowed(operation(await room(),{progress}));
+test('progress rejects retired embedded artwork and album fields',async()=>{
+    const drawing={id:'drawing_current1',savedAt:'2026-09-16T00:00:00.000Z'};
+    await seed({progress:cleanProgress});
+    const current=await room();
+    await denied(operation(current,{progress:{...cleanProgress,drawings:[{...drawing,data:'data:image/png;base64,AA=='}]}}));
+    await denied(operation(current,{progress:{...cleanProgress,drawingAlbum:[]}}));
 });
 
-test('legacy embedded artwork stays byte-for-byte unchanged until migration',async()=>{
-    const legacyDrawing={id:'drawing_legacy1',savedAt:'2026-09-16T00:00:00.000Z',data:'data:image/png;base64,AA=='};
-    const legacyAlbum={id:'drawing_album1',savedAt:'2026-09-15T00:00:00.000Z',data:'data:image/png;base64,AQ=='};
-    const progress={...cleanProgress,drawings:[legacyDrawing],drawingAlbum:[legacyAlbum]};
-    await seed({progress});
-    await allowed(operation(await room(),{progress}));
-    const unchanged=await room();
-    await denied(operation(unchanged,{progress:{...progress,drawings:[{...legacyDrawing,data:'data:image/png;base64,Ag=='}]}}));
-    await denied(operation(unchanged,{progress:{...progress,drawingAlbum:[]}}));
-    const restored={...progress,drawings:[{id:legacyDrawing.id,savedAt:legacyDrawing.savedAt}]};
-    delete restored.drawingAlbum;
-    await allowed(operation(unchanged,{type:'restore',progress:restored}));
+test('operation receipts reject the retired artwork migration type',async()=>{
+    await seed({progress:cleanProgress});
+    await denied(operation(await room(),{type:'migrateArtworks'}));
+});
+
+test('normal operations retain an immutable historical artwork migration receipt',async()=>{
+    const id=randomUUID();
+    await seed({progress:cleanProgress,lastOperationId:id,operations:{[id]:{
+        id,uid:'test-user',type:'migrateArtworks',createdAt:Date.now()-1000,committedAt:Date.now()-500,result:{json:'{"ok":true}'}
+    }}});
+    await allowed(operation(await room()));
 });
 
 test('a conditional root transaction migrates progress and appends an authenticated receipt',async()=>{
