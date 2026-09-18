@@ -391,10 +391,11 @@ test('pet view shows multiple bosses with independent HP and asks password only 
     const boss={id:'dragon',name:'巨龍',image:'/images/boss/boss%20(1).png',maxHp:8,attackPassword:'1234',reward:30,active:true,questions:[{id:'q1',text:'1 加 1 是多少？',options:['1','2','3','4'],answerIndex:1},{id:'q2',text:'天空是藍色',options:['是','否'],answerIndex:0}]};
     h.cloud={...h.cloud,bosses:[boss,{...boss,id:'dragon2',name:'第二隻龍'}],students:[{...h.cloud.students[0],equippedLayout:['pet'],petAffection:20},h.cloud.students[1]]};await h.sync.refresh();await h.run('openPetMood(1)');
     assert.equal(h.w.document.querySelectorAll('.boss-card').length,2);assert.equal(h.w.document.querySelector('[aria-label="巨龍血量"]').getAttribute('aria-valuenow'),'8');
-    h.w.Math.random=()=>0;h.setPrompt('1234');await h.run("startBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea button').length,4);
-    await h.run("answerBossQuestion(1,'dragon','q1',1,'1234')");assert.equal(h.cloud.students[0].bossProgress[0].hp,5);
-    h.setPrompt(null);await h.run("startBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea button').length,2);
-    await h.run("answerBossQuestion(1,'dragon','q2',0,'')");assert.equal(h.cloud.students[0].bossProgress[0].hp,2);assert.equal(h.cloud.students[1].bossProgress.length,0);
+    h.w.Math.random=()=>0;h.setPrompt('1234');await h.run("startBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea .boss-options button').length,4);assert.equal(h.w.document.querySelector('.pet-interaction'),null);
+    await h.run("answerBossQuestion(1,'dragon','q1',1,'1234')");assert.equal(h.cloud.students[0].bossProgress[0].hp,1);assert.match(h.w.document.getElementById('bossBattleResult').textContent,/答對了/);assert.ok(h.w.document.querySelector('#bossBattleResult button.primary'));
+    h.setPrompt(null);await h.run("continueBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea .boss-options button').length,2);
+    await h.run("answerBossQuestion(1,'dragon','q2',0,'')");assert.equal(h.cloud.students[0].bossProgress[0].hp,0);assert.equal(h.cloud.students[1].bossProgress.length,0);assert.equal(h.w.document.querySelector('#bossBattleResult button.primary'),null);
+    await h.run('leaveBossBattle(1)');assert.ok(h.w.document.querySelector('.pet-interaction'));assert.match(h.w.document.getElementById('modal').textContent,/你已完成攻打/);
 });
 test('teacher publishes multiple bosses and manages separate choice and true-false banks',async t=>{
     const h=page(t);await h.start();await h.login();await h.run("activateBackendPage('backend-boss')");

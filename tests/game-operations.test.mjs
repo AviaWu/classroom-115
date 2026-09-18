@@ -173,19 +173,19 @@ test('boss attacks require an active boss and only verify its password on the fi
 test('each student has independent boss HP, progress and question history', () => {
     const current=state({bosses:[activeBoss()],students:[student(1,{ownedLayout:['cat'],equippedLayout:['cat'],petAffection:20}),student(2)]});
     const hit=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
-    assert.deepEqual(hit.result,{correct:true,damage:4,hp:16,defeated:false,reward:0,passwordVerified:true});
-    assert.equal(hit.progress.students[0].bossProgress[0].hp,16);
+    assert.deepEqual(hit.result,{correct:true,damage:8,hp:12,defeated:false,reward:0,passwordVerified:true});
+    assert.equal(hit.progress.students[0].bossProgress[0].hp,12);
     const other=run(hit.progress,'bossAttack',{studentId:2,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
-    assert.equal(other.progress.students[1].bossProgress[0].hp,19);assert.equal(other.progress.students[0].bossProgress[0].hp,16);
+    assert.equal(other.progress.students[1].bossProgress[0].hp,15);assert.equal(other.progress.students[0].bossProgress[0].hp,12);
     assert.throws(()=>run(other.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q1',answerIndex:1}),/答對過/);
 });
 
 test('boss defeat clamps personal HP and grants each completing student once', () => {
     const current=state({bosses:[activeBoss({maxHp:2,reward:75})],layouts:[{id:'ur',name:'神獸',level:'UR'}],students:[student(1,{ownedLayout:['ur'],equippedLayout:['ur'],petAffection:30}),student(2)]});
     const defeated=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});
-    assert.deepEqual(defeated.result,{correct:true,damage:7,hp:0,defeated:true,reward:75,passwordVerified:true});assert.equal(defeated.progress.students[0].tokens,175);
+    assert.deepEqual(defeated.result,{correct:true,damage:11,hp:0,defeated:true,reward:75,passwordVerified:true});assert.equal(defeated.progress.students[0].tokens,175);
     assert.throws(()=>run(defeated.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q2',answerIndex:2}),/擊敗/);
-    const other=run(defeated.progress,'bossAttack',{studentId:2,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});assert.equal(other.progress.students[1].bossProgress[0].hp,1);
+    const other=run(defeated.progress,'bossAttack',{studentId:2,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:1});assert.equal(other.progress.students[1].bossProgress[0].hp,0);
 });
 
 test('multiple bosses preserve separate progress and support true-false questions', () => {

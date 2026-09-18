@@ -4,7 +4,7 @@ const RECORD_COLLECTIONS = ['students','tasks','clothesM','clothesF','layouts','
 const TOMBSTONES = ['deletedTaskIds','deletedCoopTaskIds'];
 const ARTWORK_FIELDS = ['drawings','pendingArtworkDeletes'];
 const STUDENT_ARRAYS = ['doneTasks','ownedClothes','ownedLayout','equippedLayout','ownedBg'];
-const PET_ATTACK = {R:1,SR:2,SSR:3,UR:4};
+const PET_ATTACK = {R:5,SR:6,SSR:7,UR:8};
 const LEGACY_METADATA = ['syncVersion','revision','baseCommitId','commitId','updatedAt'];
 const IGNORED_DIFF_FIELDS = new Set([...LEGACY_METADATA,'lastSaved']);
 const LEVEL_PRICES = {R:50,SR:100,SSR:200,UR:300};
@@ -413,7 +413,7 @@ export function applyOperation(value,command,now = Date.now()) {
         }
         const equippedPet = progress.layouts.find(item=>student.equippedLayout.includes(item.id));
         const petLevel = Math.floor(student.petAffection/10)+1;
-        const damage = (PET_ATTACK[equippedPet?.level] ?? 1) + petLevel - 1;
+        const damage = (PET_ATTACK[equippedPet?.level] ?? 5) + petLevel - 1;
         bossProgress.answeredQuestionIds.push(question.id);
         bossProgress.hp = Math.max(0,bossProgress.hp-damage);
         let reward = 0;

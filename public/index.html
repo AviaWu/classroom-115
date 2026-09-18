@@ -169,7 +169,7 @@ input[type="number"]{width:85px}
 .boss-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:0;padding:10px;background:#ffe0dc;border:4px solid #20263a;box-shadow:4px 4px 0 #172033;text-align:center}
 .boss-card img{width:68px;height:58px;object-fit:contain}.boss-card h3{margin:0;font-size:16px}.boss-card p{margin:0;font-size:12px;font-weight:800}
 .boss-hp{width:100%;height:16px;overflow:hidden;background:#ead4d4;border:3px solid #20263a}.boss-hp-fill{height:100%;background:#d83d3d;transition:width .3s ease}
-.boss-question{margin-top:14px;padding:14px;background:#fff4d6;border:4px solid #20263a}.boss-options{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.boss-question{max-width:620px;margin:auto;padding:22px;background:#fff4d6;border:4px solid #20263a;box-shadow:6px 6px 0 #172033;text-align:center}.boss-question h2{margin-top:0}.boss-question-text{padding:16px;background:#fff;border:3px solid #20263a;font-size:20px;font-weight:800}.boss-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.boss-options button{min-height:58px}.boss-result{font-size:22px;font-weight:900}.boss-result.correct{color:#18743a}.boss-result.wrong{color:#b42318}.boss-battle-actions{display:flex;justify-content:center;gap:12px;margin-top:20px}
 .boss-choice-grid{display:grid;grid-template-columns:repeat(4,minmax(90px,1fr));gap:9px;margin:10px 0}.boss-choice img{display:block;width:100%;height:90px;object-fit:contain}.boss-choice.active{background:#f3d98b}
 .pet-level-heading{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px;font-weight:900;text-align:center}
 .pet-level-heading span:first-child{font-size:19px}
@@ -1439,19 +1439,34 @@ function startBossBattle(studentId,bossId){
     const answered=progress?.answeredQuestionIds||[],remaining=boss.questions.filter(question=>!answered.includes(question.id));
     if(!remaining.length) return alert(boss.questions.length?"你已答完這隻 BOSS 的所有題目":"這隻 BOSS 尚未設定題目");
     const question=remaining[Math.floor(Math.random()*remaining.length)];
-    const holder=document.getElementById("bossBattleArea")||document.createElement("div");
-    holder.id="bossBattleArea";holder.className="boss-question";
-    holder.innerHTML=`<h3>挑戰 ${esc(boss.name)}</h3><p>${esc(question.text)}</p><div class="boss-options">${question.options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${index},'${esc(password)}')">${question.options.length===2?(index===0?"是":"否"):"ABCD"[index]}．${esc(option)}</button>`).join("")}</div>`;
-    document.querySelector(".pet-interaction")?.after(holder);
+    currentView={type:"boss",id:studentId,bossId};
+    openModal(`<section id="bossBattleArea" class="boss-question" aria-label="BOSS 挑戰題目">
+        <h2>挑戰 ${esc(boss.name)}</h2>
+        <p class="boss-question-text">${esc(question.text)}</p>
+        <div class="boss-options">${question.options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${index},'${esc(password)}')">${question.options.length===2?(index===0?"是":"否"):"ABCD"[index]}．${esc(option)}</button>`).join("")}</div>
+        <div class="boss-battle-actions"><button onclick="leaveBossBattle(${studentId})">離開</button></div>
+    </section>`);
 }
 async function answerBossQuestion(studentId,bossId,questionId,answerIndex,password){
     if(!canAccessStudent(studentId)) return;
+    document.querySelectorAll("#bossBattleArea button").forEach(button=>button.disabled=true);
     const result=await runCommand({type:"bossAttack",studentId,bossId,questionId,answerIndex,password},`boss:${bossId}:${studentId}:${questionId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`);
-    if(!result) return;
-    if(!result.correct) return alert("答錯了，請重新挑戰！");
-    const message=result.defeated?`答對了！造成 ${result.damage} 點傷害並擊敗 BOSS，獲得 ${result.reward} 代幣！`:`答對了！造成 ${result.damage} 點傷害。`;
-    alert(message);openPetMood(studentId);
+    if(!result){document.querySelectorAll("#bossBattleArea button").forEach(button=>button.disabled=false);return;}
+    const boss=state.bosses.find(item=>item.id===bossId),message=result.correct
+        ? (result.defeated?`答對了！造成 ${result.damage} 點傷害並擊敗 BOSS，獲得 ${result.reward} 代幣！`:`答對了！造成 ${result.damage} 點傷害，剩餘 HP ${result.hp}。`)
+        : "答錯了，這次沒有造成傷害。";
+    currentView={type:"bossResult",id:studentId,bossId};
+    openModal(`<section id="bossBattleResult" class="boss-question" aria-live="polite">
+        <h2>${esc(boss?.name||"BOSS")} 挑戰結果</h2>
+        <p class="boss-result ${result.correct?"correct":"wrong"}">${esc(message)}</p>
+        <div class="boss-battle-actions">
+            ${result.defeated?"":`<button class="primary" onclick="continueBossBattle(${studentId},'${esc(bossId)}')">繼續</button>`}
+            <button onclick="leaveBossBattle(${studentId})">離開</button>
+        </div>
+    </section>`);
 }
+function continueBossBattle(studentId,bossId){startBossBattle(studentId,bossId);}
+function leaveBossBattle(studentId){openPetMood(studentId);}
 
 async function showPetMoodReply(studentId,mood,button){
     if(!canAccessStudent(studentId)) return;
