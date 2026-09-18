@@ -12,10 +12,10 @@ const clone=structuredClone;
 const fixture=()=>operations.normalizeProgress({students:[{id:1,gender:'M',tokens:200,lotteryTickets:2},{id:2,gender:'F',tokens:100}],tasks:[{id:'task',title:'測試任務',reward:20}],clothesM:[{id:'shirt',name:'藍色上衣',level:'R',price:50,active:true,image:'/images/boy/b0.png'}],layouts:[{id:'pet',name:'測試寵物',price:50,level:'R',active:true,image:'/images/Dec2/1000095494-removebg-preview.png'}],backgrounds:[{id:'bg',name:'天空背景',price:50,level:'R',active:true,image:'/images/bgm/bg%20(1).jpg'}],coopTasks:[{id:'coop',monsterName:'合作怪獸',content:'一起完成',reward:10,rewardType:'token',completedBy:[],claimed:false}]});
 function page(t){
     const dom=new JSDOM(html,{runScripts:'outside-only',pretendToBeVisual:true,url:'https://classroom.test'}),w=dom.window;
-    let cloud=fixture(),writes=0,id=0;
+    let cloud=fixture(),writes=0,id=0,promptValue=null;
     const alerts=[],artworkReads=[],artworkPayloads=new Map();
     let artworkReadHook;
-    w.structuredClone=clone;w.alert=m=>alerts.push(m);w.confirm=()=>true;
+    w.structuredClone=clone;w.alert=m=>alerts.push(m);w.confirm=()=>true;w.prompt=()=>promptValue;
     w.HTMLCanvasElement.prototype.getContext=function(){return {fillRect(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},closePath(){},drawImage(){},getImageData(){return {data:new Uint8ClampedArray(16)};},putImageData(){}};};
     w.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/jpeg;base64,test';
     w.eval(scripts[0][2]);
@@ -39,7 +39,7 @@ function page(t){
     w.firebaseGameStore=sync;
     t.after(()=>{sync.dispose();w.close();});
     const signIn=(account,password)=>{w.document.getElementById('loginAccount').value=account;w.document.getElementById('loginPassword').value=password;w.login(new w.Event('submit'));};
-    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="5905606";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
+    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,setPrompt:value=>promptValue=value,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="5905606";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
 }
 test('inline scripts and modules parse',()=>{
     for(const [,attributes,source] of scripts){
@@ -385,4 +385,26 @@ test('restore skips drawing metadata without image data',async t=>{
     const h=page(t);await h.start();await h.login();
     await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)]}));
     assert.deepEqual(h.cloud.drawings,[]);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
+});
+test('pet view shows peace without a boss and runs an ABCD boss battle',async t=>{
+    const h=page(t);await h.start();await h.run('openPetMood(1)');
+    assert.match(h.w.document.getElementById('modal').textContent,/目前世界一片和平/);
+    h.cloud={...h.cloud,boss:{id:'dragon',name:'巨龍',image:'/images/boss/boss%20(1).png',maxHp:8,hp:8,attackPassword:'1234',reward:30,defeated:false,defeatedBy:null,questions:[{id:'q1',text:'1 加 1 是多少？',options:['1','2','3','4'],answerIndex:1}]},students:[{...h.cloud.students[0],equippedLayout:['pet'],petAffection:20},h.cloud.students[1]]};
+    await h.sync.refresh();await h.run('openPetMood(1)');
+    assert.match(h.w.document.getElementById('modal').textContent,/巨龍/);assert.equal(h.w.document.querySelector('[aria-label="BOSS 血量"]').getAttribute('aria-valuenow'),'8');
+    h.setPrompt('1234');await h.run('startBossBattle(1)');
+    const choices=[...h.w.document.querySelectorAll('#bossBattleArea button')];assert.equal(choices.length,4);assert.deepEqual(choices.map(button=>button.textContent.trim()[0]),['A','B','C','D']);
+    await h.run("answerBossQuestion(1,'dragon','q1',0,'1234')");assert.equal(h.cloud.boss.hp,8);assert.ok(h.alerts.includes('答錯了，請重新挑戰！'));
+    await h.run("answerBossQuestion(1,'dragon','q1',1,'1234')");assert.equal(h.cloud.boss.hp,5);assert.deepEqual(h.cloud.students[0].bossProgress,{bossId:'dragon',answeredQuestionIds:['q1']});
+    await h.run('startBossBattle(1)');assert.ok(h.alerts.includes('你已答完這隻 BOSS 的所有題目'));
+});
+test('teacher backend creates a fresh boss battle and manages its question bank',async t=>{
+    const h=page(t);await h.start();await h.login();await h.run("activateBackendPage('backend-boss')");
+    h.w.document.getElementById('bossName').value='黑龍';h.w.document.getElementById('bossHp').value='20';h.w.document.getElementById('bossPassword').value='2468';h.w.document.getElementById('bossReward').value='50';h.w.document.getElementById('bossImage').value='/images/boss/boss%20(1).png';
+    await h.run('saveBoss()');const firstId=h.cloud.boss.id;assert.equal(h.cloud.boss.name,'黑龍');assert.equal(h.cloud.boss.hp,20);
+    h.w.document.getElementById('bossQuestionText').value='天空是什麼顏色？';['紅','藍','綠','黑'].forEach((value,index)=>h.w.document.getElementById(`bossOption${index}`).value=value);h.w.document.getElementById('bossAnswerIndex').value='1';
+    await h.run('addBossQuestion()');assert.equal(h.cloud.boss.questions.length,1);assert.equal(h.cloud.boss.questions[0].answerIndex,1);
+    const questionId=h.cloud.boss.questions[0].id;await h.run(`deleteBossQuestion('${questionId}')`);assert.deepEqual(h.cloud.boss.questions,[]);
+    h.w.document.getElementById('bossName').value='黑龍第二戰';await h.run('saveBoss()');assert.notEqual(h.cloud.boss.id,firstId);
+    await h.run('removeBoss()');assert.equal(h.cloud.boss,null);
 });
