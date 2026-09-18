@@ -348,6 +348,7 @@ input[type="number"]{width:85px}
 <script>
 document.documentElement.classList.add("cloud-starting");
 const STORAGE_KEY = "growth26_v18_full";
+const LOGIN_SESSION_KEY = "classroom-115-login-session";
 const CLOUD_SAVE_PATH = "games/classroom-115/progress";
 const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
@@ -484,9 +485,32 @@ function initializeLogin(){
         });
         form.dataset.loginBound="true";
     }
+    const savedUser=loadSavedLogin();
+    if(savedUser){
+        currentUser=savedUser;
+        backendAuthenticated=false;
+        document.getElementById("loginMessage").textContent="";
+        document.getElementById("loginScreen").hidden=true;
+        updateSessionUi();
+        return;
+    }
     document.getElementById("loginScreen").hidden=false;
     password.focus();
     updateSessionUi();
+}
+function loadSavedLogin(){
+    try {
+        const saved=JSON.parse(localStorage.getItem(LOGIN_SESSION_KEY)||"null");
+        if(saved?.role==="teacher" && saved.studentId===null) return {role:"teacher",studentId:null};
+        if(saved?.role==="student" && Number.isInteger(saved.studentId) && STUDENT_PASSWORDS[saved.studentId]) return {role:"student",studentId:saved.studentId};
+    } catch {}
+    return null;
+}
+function saveLogin(){
+    try { localStorage.setItem(LOGIN_SESSION_KEY,JSON.stringify(currentUser)); } catch {}
+}
+function clearSavedLogin(){
+    try { localStorage.removeItem(LOGIN_SESSION_KEY); } catch {}
 }
 function login(event){
     event?.preventDefault();
@@ -500,6 +524,7 @@ function login(event){
         return false;
     }
     currentUser=account==="teacher" ? {role:"teacher",studentId:null} : {role:"student",studentId:Number(studentMatch[1])};
+    saveLogin();
     backendAuthenticated=false;
     document.getElementById("loginPassword").value="";
     document.getElementById("loginMessage").textContent="";
@@ -509,6 +534,7 @@ function login(event){
 }
 function logout(){
     currentUser=null;
+    clearSavedLogin();
     backendAuthenticated=false;
     closeModal();
     initializeLogin();

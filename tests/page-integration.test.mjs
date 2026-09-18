@@ -63,6 +63,14 @@ test('login screen accepts configured teacher and student credentials and reject
     loginPassword.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
     assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');assert.equal(h.w.document.getElementById('backendButton').hidden,false);
 });
+test('login persists across page initialization until the user logs out',async t=>{
+    const h=page(t);h.signIn('student-1','3847');
+    h.w.eval('currentUser=null;initializeLogin()');
+    assert.equal(h.w.document.getElementById('loginScreen').hidden,true);
+    assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 1 號');
+    h.w.logout();h.w.eval('currentUser=null;initializeLogin()');
+    assert.equal(h.w.document.getElementById('loginScreen').hidden,false);
+});
 test('student can use own features and drawing but is blocked from every other student',async t=>{
     const h=page(t);await h.start();h.w.logout();h.signIn('student-1','3847');
     for(const action of ['tasks(1)','shop(1)','closet(1)','openPetMood(1)','openDrawingBoard()','openCoopTasks()']) await h.run(action);
