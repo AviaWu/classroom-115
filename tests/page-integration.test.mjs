@@ -386,24 +386,31 @@ test('restore skips drawing metadata without image data',async t=>{
     await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)]}));
     assert.deepEqual(h.cloud.drawings,[]);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
 });
-test('pet view shows multiple bosses with independent HP and asks password only once',async t=>{
+test('boss battle shows its image and HP, advances automatically, and hides a defeated boss',async t=>{
     const h=page(t);await h.start();await h.run('openPetMood(1)');assert.match(h.w.document.getElementById('modal').textContent,/目前世界一片和平/);
-    const boss={id:'dragon',name:'巨龍',image:'/images/boss/boss%20(1).png',maxHp:8,attackPassword:'1234',reward:30,active:true,questions:[{id:'q1',text:'1 加 1 是多少？',options:['1','2','3','4'],answerIndex:1},{id:'q2',text:'天空是藍色',options:['是','否'],answerIndex:0}]};
-    h.cloud={...h.cloud,bosses:[boss,{...boss,id:'dragon2',name:'第二隻龍'}],students:[{...h.cloud.students[0],equippedLayout:['pet'],petAffection:20},h.cloud.students[1]]};await h.sync.refresh();await h.run('openPetMood(1)');
+    const paper={id:'paper',name:'挑戰考卷',questions:[{id:'q1',text:'1 加 1 是多少？',options:['1','2','3','4'],answerIndex:1},{id:'q2',text:'天空是藍色',options:['是','否'],answerIndex:0}]};
+    const boss={id:'dragon',name:'巨龍',image:'/images/boss/boss%20(1).png',maxHp:8,attackPassword:'1234',reward:30,rewardTickets:2,paperId:'paper',active:true,questions:[]};
+    h.cloud={...h.cloud,questionPapers:[paper],bosses:[boss,{...boss,id:'dragon2',name:'第二隻龍'}],students:[{...h.cloud.students[0],equippedLayout:['pet'],petAffection:20},h.cloud.students[1]]};await h.sync.refresh();await h.run('openPetMood(1)');
     assert.equal(h.w.document.querySelectorAll('.boss-card').length,2);assert.equal(h.w.document.querySelector('[aria-label="巨龍血量"]').getAttribute('aria-valuenow'),'8');
-    h.w.Math.random=()=>0;h.setPrompt('1234');await h.run("startBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea .boss-options button').length,4);assert.equal(h.w.document.querySelector('.pet-interaction'),null);
-    await h.run("answerBossQuestion(1,'dragon','q1',1,'1234')");assert.equal(h.cloud.students[0].bossProgress[0].hp,1);assert.match(h.w.document.getElementById('bossBattleResult').textContent,/答對了/);assert.ok(h.w.document.querySelector('#bossBattleResult button.primary'));
-    h.setPrompt(null);await h.run("continueBossBattle(1,'dragon')");assert.equal(h.w.document.querySelectorAll('#bossBattleArea .boss-options button').length,2);
-    await h.run("answerBossQuestion(1,'dragon','q2',0,'')");assert.equal(h.cloud.students[0].bossProgress[0].hp,0);assert.equal(h.cloud.students[1].bossProgress.length,0);assert.equal(h.w.document.querySelector('#bossBattleResult button.primary'),null);
-    await h.run('leaveBossBattle(1)');assert.ok(h.w.document.querySelector('.pet-interaction'));assert.match(h.w.document.getElementById('modal').textContent,/你已完成攻打/);
+    h.w.Math.random=()=>0;h.setPrompt('1234');await h.run("startBossBattle(1,'dragon')");
+    assert.equal(h.w.document.querySelectorAll('#bossBattleArea .boss-options button').length,4);assert.match(h.w.document.querySelector('#bossBattleArea img').src,/boss%20\(1\)\.png/);assert.equal(h.w.document.querySelector('[aria-label="巨龍戰鬥血量"]').getAttribute('aria-valuenow'),'8');
+    await h.run("answerBossQuestion(1,'dragon','q1',1,'1234')");assert.equal(h.cloud.students[0].bossProgress[0].hp,1);assert.match(h.w.document.querySelector('.boss-battle-message').textContent,/答對了/);assert.equal(h.w.document.querySelectorAll('#bossBattleArea .boss-options button').length,2);assert.match(h.w.document.querySelector('.boss-question-text').textContent,/天空/);
+    h.setPrompt(null);await h.run("answerBossQuestion(1,'dragon','q2',0,'')");assert.equal(h.cloud.students[0].bossProgress[0].hp,0);assert.equal(h.cloud.students[0].lotteryTickets,4);assert.equal(h.cloud.students[1].bossProgress.length,0);
+    assert.ok(h.w.document.querySelector('.pet-interaction'));assert.equal(h.w.document.querySelectorAll('.boss-card').length,1);assert.doesNotMatch(h.w.document.getElementById('modal').textContent,/挑戰 巨龍/);
 });
-test('teacher publishes multiple bosses and manages separate choice and true-false banks',async t=>{
-    const h=page(t);await h.start();await h.login();await h.run("activateBackendPage('backend-boss')");
-    for(const name of ['黑龍','白龍']){h.w.document.getElementById('bossName').value=name;h.w.document.getElementById('bossHp').value='20';h.w.document.getElementById('bossPassword').value='2468';h.w.document.getElementById('bossReward').value='50';h.w.document.getElementById('bossImage').value='/images/boss/boss%20(1).png';await h.run('saveBoss()');}
+test('teacher manages reusable papers, publishes editable bosses, and resets every member',async t=>{
+    const h=page(t);await h.start();await h.login();await h.run("activateBackendPage('backend-question-papers')");
+    for(const name of ['自然考卷','數學考卷']){h.w.document.getElementById('paperName').value=name;await h.run('addQuestionPaper()');}
+    assert.equal(h.cloud.questionPapers.length,2);const [firstPaper,secondPaper]=h.cloud.questionPapers;
+    h.w.document.getElementById(`paperQuestionText-${firstPaper.id}`).value='地球是圓的';h.w.document.getElementById(`paperQuestionType-${firstPaper.id}`).value='boolean';h.w.document.getElementById(`paperBooleanAnswer-${firstPaper.id}`).value='0';await h.run(`addPaperQuestion('${firstPaper.id}')`);
+    h.w.document.getElementById(`paperQuestionText-${secondPaper.id}`).value='二加二';for(const [index,value] of ['2','3','4','5'].entries())h.w.document.getElementById(`paperOption${index}-${secondPaper.id}`).value=value;h.w.document.getElementById(`paperAnswerIndex-${secondPaper.id}`).value='2';await h.run(`addPaperQuestion('${secondPaper.id}')`);
+    assert.deepEqual(h.cloud.questionPapers[0].questions[0].options,['是','否']);assert.equal(h.cloud.questionPapers[1].questions[0].answerIndex,2);
+    await h.run("activateBackendPage('backend-boss')");
+    for(const [index,name] of ['黑龍','白龍'].entries()){h.w.document.getElementById('bossName').value=name;h.w.document.getElementById('bossHp').value='20';h.w.document.getElementById('bossPassword').value='2468';h.w.document.getElementById('bossReward').value='50';h.w.document.getElementById('bossRewardTickets').value=String(index+1);h.w.document.getElementById('bossPaperId').value=h.cloud.questionPapers[index].id;await h.run('saveBoss()');}
     assert.equal(h.cloud.bosses.length,2);const firstId=h.cloud.bosses[0].id;
-    h.w.document.getElementById(`bossQuestionText-${firstId}`).value='地球是圓的';h.w.document.getElementById(`bossQuestionType-${firstId}`).value='boolean';h.w.document.getElementById(`bossBooleanAnswer-${firstId}`).value='0';await h.run(`addBossQuestion('${firstId}')`);
-    assert.deepEqual(h.cloud.bosses[0].questions[0].options,['是','否']);assert.equal(h.cloud.bosses[1].questions.length,0);
-    await h.run(`toggleBossActive('${firstId}')`);assert.equal(h.cloud.bosses[0].active,false);
-    const questionId=h.cloud.bosses[0].questions[0].id;await h.run(`deleteBossQuestion('${firstId}','${questionId}')`);assert.equal(h.cloud.bosses[0].questions.length,0);
-    await h.run(`deleteBoss('${firstId}')`);assert.equal(h.cloud.bosses.length,1);
+    await h.run(`updateBoss('${firstId}','name','赤龍')`);await h.run(`updateBoss('${firstId}','maxHp','35')`);await h.run(`updateBoss('${firstId}','reward','80')`);await h.run(`updateBoss('${firstId}','rewardTickets','4')`);await h.run(`updateBoss('${firstId}','paperId','${secondPaper.id}')`);
+    assert.deepEqual({...h.cloud.bosses[0],questions:undefined},{...h.cloud.bosses[0],name:'赤龍',maxHp:35,reward:80,rewardTickets:4,paperId:secondPaper.id,questions:undefined});
+    h.cloud={...h.cloud,students:h.cloud.students.map(student=>({...student,bossProgress:[{bossId:firstId,hp:1,passwordVerified:true,answeredQuestionIds:['x'],defeated:student.id===1}]}))};await h.sync.refresh();await h.run(`resetAllBossHp('${firstId}')`);
+    assert.deepEqual(h.cloud.students.map(student=>student.bossProgress),[[],[]]);
+    await h.run(`toggleBossActive('${firstId}')`);assert.equal(h.cloud.bosses[0].active,false);await h.run(`deleteBoss('${firstId}')`);assert.equal(h.cloud.bosses.length,1);
 });

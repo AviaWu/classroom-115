@@ -1,5 +1,5 @@
 /** Pure domain operations. Call again with the latest transaction snapshot on every retry. */
-const RECORD_COLLECTIONS = ['students','tasks','clothesM','clothesF','layouts','backgrounds','bosses',
+const RECORD_COLLECTIONS = ['students','tasks','clothesM','clothesF','layouts','backgrounds','questionPapers','bosses',
     'coopTasks','coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates'];
 const TOMBSTONES = ['deletedTaskIds','deletedCoopTaskIds'];
 const ARTWORK_FIELDS = ['drawings','pendingArtworkDeletes'];
@@ -98,11 +98,9 @@ export function normalizeProgress(value) {
     progress.coopTaskTemplates = progress.coopTaskTemplates.map(item=>({...templateDefaults(item,true),scheduleType:item.scheduleType === 'weekly' ? 'weekly' : 'daily'}));
     progress.coopTasks = progress.coopTasks.map(task=>({...task,completedBy:unique(task.completedBy),claimed:task.claimed === true,
         startAt:task.startAt == null ? null : numeric(task.startAt,null),dueAt:task.dueAt == null ? null : numeric(task.dueAt,null)}));
-    if (!progress.bosses.length && object(progress.boss) && idValid(progress.boss.id)) progress.bosses = [progress.boss];
-    const seenBossIds = new Set();
-    progress.bosses = progress.bosses.filter(boss=>object(boss) && idValid(boss.id) && !seenBossIds.has(boss.id) && seenBossIds.add(boss.id)).map(boss=>{
+    const normalizeQuestions = value => {
         const seenQuestions = new Set();
-        const questions = array(boss.questions).filter(question=>{
+        return array(value).filter(question=>{
             if (!object(question) || !idValid(question.id) || seenQuestions.has(question.id)) return false;
             if (typeof question.text !== 'string' || ![2,4].includes(question.options?.length) ||
                 !question.options.every(option=>typeof option === 'string') || !Number.isInteger(question.answerIndex) ||
@@ -110,10 +108,24 @@ export function normalizeProgress(value) {
             seenQuestions.add(question.id);
             return true;
         }).map(question=>({id:question.id,text:question.text,options:[...question.options],answerIndex:question.answerIndex}));
+    };
+    const seenPaperIds = new Set();
+    progress.questionPapers = progress.questionPapers.filter(paper=>object(paper) && idValid(paper.id) && !seenPaperIds.has(paper.id) && seenPaperIds.add(paper.id))
+        .map(paper=>({...paper,name:typeof paper.name === 'string' ? paper.name : '',questions:normalizeQuestions(paper.questions)}));
+    if (!progress.bosses.length && object(progress.boss) && idValid(progress.boss.id)) progress.bosses = [progress.boss];
+    const seenBossIds = new Set();
+    progress.bosses = progress.bosses.filter(boss=>object(boss) && idValid(boss.id) && !seenBossIds.has(boss.id) && seenBossIds.add(boss.id)).map(boss=>{
+        let paperId = idValid(boss.paperId) ? boss.paperId : null;
+        const legacyQuestions = normalizeQuestions(boss.questions);
+        if (!paperId && legacyQuestions.length) {
+            paperId = `legacy_paper_${String(boss.id).replace(/[^A-Za-z0-9_-]/g,'_')}`;
+            if (!progress.questionPapers.some(paper=>paper.id === paperId)) progress.questionPapers.push({id:paperId,name:`${boss.name || 'BOSS'} 考卷`,questions:legacyQuestions});
+        }
         const maxHp = Math.max(1,Math.floor(numeric(boss.maxHp,boss.hp)));
+        const rewardTickets = Math.max(0,Math.floor(numeric(boss.rewardTickets)));
         return {...boss,name:typeof boss.name === 'string' ? boss.name : '',image:typeof boss.image === 'string' ? boss.image : '',maxHp,
             attackPassword:typeof boss.attackPassword === 'string' ? boss.attackPassword : '',reward:Math.max(0,Math.floor(numeric(boss.reward))),
-            questions,active:boss.active !== false,publishedAt:numeric(boss.publishedAt,0)};
+            rewardTickets,paperId,questions:legacyQuestions,active:boss.active !== false,publishedAt:numeric(boss.publishedAt,0)};
     });
     delete progress.boss;
     for (const student of progress.students) student.bossProgress = student.bossProgress.map(item=>{
@@ -393,6 +405,9 @@ export function applyOperation(value,command,now = Date.now()) {
     case 'bossAttack': {
         const student = member(progress,command.studentId), boss = progress.bosses.find(item=>item.id === command.bossId);
         if (!boss || !boss.active) throw new Error('BOSS 已停用或不存在');
+        const paper = progress.questionPapers.find(item=>item.id === boss.paperId);
+        const questions = paper?.questions?.length ? paper.questions : boss.questions;
+        if (!questions.length) throw new Error('這隻 BOSS 的考卷沒有題目');
         let bossProgress = student.bossProgress.find(item=>item.bossId === boss.id);
         if (!bossProgress) {
             bossProgress = {bossId:boss.id,hp:boss.maxHp,passwordVerified:false,answeredQuestionIds:[],defeated:false,completedAt:null};
@@ -403,27 +418,35 @@ export function applyOperation(value,command,now = Date.now()) {
             if (!/^\d{4}$/.test(boss.attackPassword) || command.password !== boss.attackPassword) throw new Error('攻打密碼錯誤');
             bossProgress.passwordVerified = true;
         }
-        const question = boss.questions.find(item=>item.id === command.questionId);
+        const question = questions.find(item=>item.id === command.questionId);
         if (!question) throw new Error('這道題目已不存在');
         if (!Number.isInteger(command.answerIndex) || command.answerIndex < 0 || command.answerIndex >= question.options.length) throw new Error('請選擇有效答案');
-        if (bossProgress.answeredQuestionIds.includes(question.id)) throw new Error('這道題目已經答對過了');
+        const alreadyCorrect = bossProgress.answeredQuestionIds.includes(question.id);
+        const allUsed = questions.every(item=>bossProgress.answeredQuestionIds.includes(item.id));
+        if (alreadyCorrect && !allUsed) throw new Error('這道題目已經答對過了');
         if (command.answerIndex !== question.answerIndex) {
-            result = {correct:false,damage:0,hp:bossProgress.hp,defeated:false,reward:0,passwordVerified:true};
+            result = {correct:false,damage:0,hp:bossProgress.hp,defeated:false,reward:0,rewardTickets:0,passwordVerified:true};
             break;
         }
         const equippedPet = progress.layouts.find(item=>student.equippedLayout.includes(item.id));
         const petLevel = Math.floor(student.petAffection/10)+1;
         const damage = (PET_ATTACK[equippedPet?.level] ?? 5) + petLevel - 1;
-        bossProgress.answeredQuestionIds.push(question.id);
+        if (!alreadyCorrect) bossProgress.answeredQuestionIds.push(question.id);
         bossProgress.hp = Math.max(0,bossProgress.hp-damage);
-        let reward = 0;
+        let reward = 0, rewardTickets = 0;
         if (bossProgress.hp === 0) {
             bossProgress.defeated = true;
             bossProgress.completedAt = now;
-            reward = boss.reward;
-            student.tokens += reward;
+            reward = boss.reward; rewardTickets = boss.rewardTickets;
+            student.tokens += reward; student.lotteryTickets += rewardTickets;
         }
-        result = {correct:true,damage,hp:bossProgress.hp,defeated:bossProgress.defeated,reward,passwordVerified:true};
+        result = {correct:true,damage,hp:bossProgress.hp,defeated:bossProgress.defeated,reward,rewardTickets,passwordVerified:true};
+        break;
+    }
+    case 'resetBossProgress': {
+        const boss = progress.bosses.find(item=>item.id === command.bossId);
+        if (!boss) throw new Error('BOSS 不存在');
+        for (const student of progress.students) student.bossProgress = student.bossProgress.filter(item=>item.bossId !== boss.id);
         break;
     }
     case 'coopComplete': {
