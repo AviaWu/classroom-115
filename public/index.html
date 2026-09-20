@@ -331,6 +331,7 @@ input[type="number"]{width:85px}
 <h1>Great teamwork makes the dream work</h1>
 <div>
 <span id="sessionBadge" class="session-badge"></span>
+<button id="petInteractionButton" onclick="openMyPetInteraction()" hidden>寵物互動</button>
 <button data-teacher-only onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
 <button data-teacher-only onclick="openDrawingBoard()">畫板</button>
 <button id="backendButton" onclick="openBackend()">老師後台</button>
@@ -556,8 +557,10 @@ function logout(){
 function updateSessionUi(){
     const badge=document.getElementById("sessionBadge");
     const backendButton=document.getElementById("backendButton");
+    const petInteractionButton=document.getElementById("petInteractionButton");
     if(badge) badge.textContent=!currentUser?"尚未登入":currentUser.role==="teacher"?"老師":"學生 "+currentUser.studentId+" 號";
     if(backendButton) backendButton.hidden=currentUser?.role!=="teacher";
+    if(petInteractionButton) petInteractionButton.hidden=currentUser?.role!=="student";
     const studentMode=currentUser?.role==="student";
     document.documentElement.classList.toggle("student-pet-mode",studentMode);
     document.querySelectorAll("[data-teacher-only]").forEach(button=>button.hidden=studentMode);
@@ -573,6 +576,11 @@ function canAccessStudent(studentId){
     alert("點錯啦!這不是你的人物喔!");
     return false;
 }
+function openMyPetInteraction(){
+    if(currentUser?.role!=="student") return;
+    openPetMood(currentUser.studentId);
+}
+window.openMyPetInteraction=openMyPetInteraction;
 function requireTeacherFeature(){
     if(currentUser?.role!=="student") return true;
     alert("學生模式僅開放寵物互動與 BOSS 挑戰。");

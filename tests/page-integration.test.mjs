@@ -192,6 +192,7 @@ test('login screen accepts configured teacher and student credentials and reject
     const loginPassword=h.w.document.getElementById('loginPassword');loginPassword.value='1127';
     loginPassword.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
     assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');assert.equal(h.w.document.getElementById('backendButton').hidden,false);
+    assert.equal(h.w.document.getElementById('petInteractionButton').hidden,true);
 });
 test('login persists across page initialization until the user logs out',async t=>{
     const h=page(t);h.signIn('student-1','3847');
@@ -206,6 +207,9 @@ test('student sees only their pet view on a blank page and cannot open teacher f
     assert.equal(h.w.document.getElementById('students').innerHTML,'');
     assert.ok(h.w.document.getElementById('modal').classList.contains('open'));
     assert.match(h.w.document.getElementById('body').textContent,/寵物互動/);
+    const petButton=h.w.document.getElementById('petInteractionButton');
+    assert.equal(petButton.hidden,false);h.w.closeModal();assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);
+    assert.equal(petButton.getAttribute('onclick'),'openMyPetInteraction()');await h.run('openMyPetInteraction()');assert.ok(h.w.document.getElementById('modal').classList.contains('open'));
     for(const action of ['tasks(1)','shop(1)','closet(1)','openDrawingBoard()','openCoopTasks()']) await h.run(action);
     assert.equal(h.alerts.filter(message=>/僅開放/.test(message)).length,5);assert.equal(h.writes,0);
     await h.run('openPetMood(2)');
