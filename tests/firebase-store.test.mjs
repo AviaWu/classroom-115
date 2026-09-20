@@ -60,7 +60,7 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         games:{'classroom-115':{progress:progress||{students:[defaultStudent],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]},operations:{}}},
         studentRoster:studentRoster||{'uid-one':{studentId:1,active:true}},
         studentStates:studentStates||{'uid-one':defaultState},studentPets:{},publicBosses:{},publicQuestionPapers:{},
-    },studentCalls=0,roomCalls=0,readCalls=0;
+    },studentCalls=0,roomCalls=0,readCalls=0,progressReads=0,metadataReads=0,catalogueReads=0,progressStudentCalls=0,progressStudentIds=[],roomReady=false,roomObservationStops=0;
     const setPath=(path,value)=>{
         const parts=path.split('/'),last=parts.pop();let target=root;
         for(const part of parts) target=target[part]??={};
@@ -70,16 +70,30 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
         fetch:async()=>{throw new Error('unexpected REST request');},
         readRoot:async()=>{readCalls++;await onReadRoot?.({root,call:readCalls});return clone(root);},
+        readProgress:async()=>{progressReads++;return clone(root.games['classroom-115'].progress);},
+        readRoomMetadata:async()=>{metadataReads++;return {restoredAt:root.games['classroom-115'].restoredAt??null};},
+        readEquipmentCatalogues:async()=>{catalogueReads++;const progress=root.games['classroom-115'].progress;return {
+            clothesM:clone(progress.clothesM||[]),clothesF:clone(progress.clothesF||[]),backgrounds:clone(progress.backgrounds||[]),
+        };},
+        observeRoom: coldRoomCalls.length ? ready=>{
+            let stopped=false;
+            queueMicrotask(()=>{if(!stopped){roomReady=true;ready();}});
+            return ()=>{stopped=true;roomReady=false;roomObservationStops++;};
+        } : undefined,
         transactRoom:async update=>{
             roomCalls++;
+            if(coldRoomCalls.includes(roomCalls)&&!roomReady) throw Object.assign(new Error('maxretry'),{code:'database/maxretry'});
             await onRoomTransaction?.({root,call:roomCalls});
-            if(coldRoomCalls.includes(roomCalls)){
-                const coldResult=update(null);
-                if(coldResult!==null) return {committed:false,value:null};
-            }
             const current=clone(root.games['classroom-115']),next=update(current);
             if(next===undefined) return {committed:false,value:current};
             root.games['classroom-115']=resolveServerValues(next);return {committed:true,value:clone(root.games['classroom-115'])};
+        },
+        transactProgressStudent:async(studentId,update)=>{
+            progressStudentCalls++;progressStudentIds.push(studentId);
+            const students=root.games['classroom-115'].progress.students;
+            const current=clone(students[studentId-1]??null),next=update(current);
+            if(next===undefined) return {committed:false,value:current};
+            students[studentId-1]=resolveServerValues(next);return {committed:true,value:clone(students[studentId-1])};
         },
         transactStudentState:async(uid,update)=>{
             studentCalls++;await onStudentTransaction?.({root,uid,call:studentCalls});
@@ -92,7 +106,8 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         writeRoot:async updates=>{for(const [path,value] of Object.entries(updates)) setPath(path,value);},
     };
     return {store:createFirebaseStore(dependencies),newStore:()=>createFirebaseStore(dependencies),
-        get root(){return root;},get roomCalls(){return roomCalls;},get studentCalls(){return studentCalls;}};
+        get root(){return root;},get roomCalls(){return roomCalls;},get studentCalls(){return studentCalls;},get readCalls(){return readCalls;},
+        get progressReads(){return progressReads;},get metadataReads(){return metadataReads;},get catalogueReads(){return catalogueReads;},get progressStudentCalls(){return progressStudentCalls;},get progressStudentIds(){return progressStudentIds;},get roomObservationStops(){return roomObservationStops;}};
 }
 const clone=value=>structuredClone(value);
 const job=(id,command)=>({id,createdAt:90000,command});
@@ -330,12 +345,12 @@ test('teacher resource delta merges a student reward that commits after the teac
     assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,115);
     assert.equal(outcome.progress.students[0].tokens,115);
 });
-test('teacher room-only equipment change refreshes concurrent student state before finalizing legacy progress',async()=>{
-    const progress={students:[{...studentsThrough28()[0],ownedClothes:['shirt'],equippedClothes:'shirt'}],
-        clothesM:[{id:'shirt',name:'衣服',price:40,level:'R',active:true}],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+test('teacher legacy-only gender change refreshes concurrent student state before finalizing legacy progress',async()=>{
+    const progress={students:[studentsThrough28()[0]],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
     const server=coordinatedServer({progress,onReadRoot:({root,call})=>{if(call===3) root.studentStates['uid-one'].tokens=110;}});
-    const outcome=await server.store.execute(job('equipment-race',{type:'equip',studentId:1,kind:'clothes',itemId:null}));
+    const outcome=await server.store.execute(job('gender-race',{type:'gender',studentId:1,gender:'F'}));
     assert.equal(outcome.progress.students[0].tokens,110);
+    assert.equal(outcome.progress.students[0].gender,'F');
     assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,110);
     assert.equal(server.root.studentStates['uid-one'].tokens,110);
 });
@@ -379,7 +394,7 @@ test('lost acknowledgement after student transaction resumes from marker without
     assert.equal(server.root.studentStates['uid-one'].tokens,105);
     assert.equal(server.root.studentStates['uid-one']._teacherOperation,undefined);
 });
-test('coordinated teacher flow covers student 28 equipment without a root transaction',async()=>{
+test('teacher clothing and background equipment transact only the selected legacy student',async()=>{
     const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt',ownedBg:['bg']}),
         clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],
         backgrounds:[{id:'bg',name:'背景',level:'R',price:20,active:true}],bosses:[],questionPapers:[]};
@@ -389,8 +404,34 @@ test('coordinated teacher flow covers student 28 equipment without a root transa
     await server.store.execute(job('coordinated-background-28',{type:'equip',studentId:28,kind:'background',itemId:'bg'}));
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedBg,'bg');
+    assert.deepEqual(server.progressStudentIds,[28,28]);
+    assert.equal(server.roomCalls,0);
+    assert.equal(server.studentCalls,0);
+    assert.equal(server.readCalls,0);
+    assert.equal(server.progressReads,2);
+    assert.equal(server.metadataReads,2);
+    assert.equal(server.catalogueReads,2);
+    assert.equal(server.root.games['classroom-115']._projectionSync,undefined);
+    assert.deepEqual(server.root.games['classroom-115'].operations,{});
 });
-test('student 28 equipment survives a cold room cache before the teacher transaction reads the server',async()=>{
+test('teacher direct equipment rejects a command created before a restore',async()=>{
+    const progress={students:[{...studentsThrough28()[0],ownedClothes:['shirt']}],
+        clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+    const server=coordinatedServer({progress});
+    server.root.games['classroom-115'].restoredAt=95000;
+    await assert.rejects(server.store.execute(job('stale-direct-equip',{type:'equip',studentId:1,kind:'clothes',itemId:'shirt'})),/老師已還原資料/);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].equippedClothes,null);
+    assert.equal(server.progressStudentCalls,0);
+});
+test('teacher direct equipment rejects an owned item removed from its catalogue',async()=>{
+    const progress={students:[{...studentsThrough28()[0],ownedClothes:['shirt']}],
+        clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+    const server=coordinatedServer({progress});
+    await assert.rejects(server.store.execute(job('removed-direct-equip',{type:'equip',studentId:1,kind:'clothes',itemId:'shirt'})),/這項商品已不存在/);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].equippedClothes,null);
+    assert.equal(server.progressStudentCalls,1);
+});
+test('student 28 equipment bypasses a cold room cache',async()=>{
     const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt'}),
         clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
     const server=coordinatedServer({progress,studentRoster:{'uid-28':{studentId:28,active:true}},
@@ -399,16 +440,20 @@ test('student 28 equipment survives a cold room cache before the teacher transac
     const outcome=await server.store.execute(job('cold-room-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
     assert.equal(outcome.progress.students[27].equippedClothes,null);
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
+    assert.equal(server.roomCalls,0);
+    assert.equal(server.roomObservationStops,0);
 });
 test('teacher projection finalization survives a cold room cache',async()=>{
-    const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt'}),
-        clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
-    const server=coordinatedServer({progress,studentRoster:{'uid-28':{studentId:28,active:true}},
-        studentStates:{'uid-28':{studentId:28,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}},
-        coldRoomCalls:[2]});
-    const outcome=await server.store.execute(job('cold-finalize-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
-    assert.equal(outcome.progress.students[27].equippedClothes,null);
-    assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
+    const server=coordinatedServer({coldRoomCalls:[2]});
+    const outcome=await server.store.execute(job('cold-finalize-resource',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(outcome.progress.students[0].tokens,105);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,105);
+    assert.equal(server.roomObservationStops,2);
+});
+test('cold room observation stops when the teacher transaction fails',async()=>{
+    const server=coordinatedServer({coldRoomCalls:[1],onRoomTransaction:()=>{throw new Error('transaction failed');}});
+    await assert.rejects(server.store.execute(job('failed-observed-room',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),/transaction failed/);
+    assert.equal(server.roomObservationStops,1);
 });
 test('coordinated teacher flow projects purchases, lottery, and task rewards',async()=>{
     const cases=[

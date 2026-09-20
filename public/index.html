@@ -3233,8 +3233,9 @@ setInterval(syncScheduledTasks,30000);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { getDatabase, get, onValue, ref, runTransaction, update } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { getDatabase, onValue, ref, update } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
+  import { createFirebaseRestClient } from "./firebase-rest-client.mjs";
   import { createFirebaseStore, createProgressSubscriber, createStudentProjectionSubscriber, createTeacherStudentStatesSubscriber } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
   import { accountForEmail, credentialsForLogin } from "./auth-accounts.mjs";
@@ -3266,7 +3267,6 @@ setInterval(syncScheduledTasks,30000);
   };
   window.firebaseLogout=()=>signOut(auth);
   let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,teacherStatesUnsubscribe=null,teacherRawProgress=null,teacherStudentStates={};
-  const transactValue=async(reference,update)=>{const result=await runTransaction(reference,update);return {committed:result.committed,value:result.snapshot.val()};};
   function applyTeacherCloudState(progress,latestStudentStates){
     if(latestStudentStates) teacherStudentStates=latestStudentStates;
     teacherRawProgress=progress;
@@ -3284,7 +3284,7 @@ setInterval(syncScheduledTasks,30000);
     sync?.setConnected(false);studentProjectionUnsubscribe?.();studentProjection=null;
     const subscribe=createStudentProjectionSubscriber({database,uid:user.uid,ref,onValue});
     studentStateStore=createStudentStateStore({uid:user.uid,
-      transactState:(update,path)=>transactValue(ref(database,path),update),
+      transactState:(update,path)=>restClient.transact(path,update),
       getPublicData:()=>studentProjection||{},now:()=>Date.now()+serverOffset});
     window.firebaseGameStore={available:true,canEdit:()=>Boolean(studentProjection?.studentState?.studentId),canManage:()=>Boolean(studentProjection?.studentState?.studentId),
       perform:command=>studentProjection?.studentState?.studentId ? studentStateStore.perform(command) : Promise.reject(new Error("學生資料尚未建立")),
@@ -3312,22 +3312,33 @@ setInterval(syncScheduledTasks,30000);
     if(!auth.currentUser) throw new Error("請先使用帳號與密碼登入");
     return auth.currentUser.getIdToken();
   };
+  const restClient=createFirebaseRestClient({databaseURL:firebaseConfig.databaseURL,getToken});
   const readTeacherRoot=async()=>{
     const [room,studentRoster,studentStates,studentPets,publicBosses,publicQuestionPapers]=await Promise.all([
-      get(ref(database,"games/classroom-115")),get(ref(database,"studentRoster")),get(ref(database,"studentStates")),
-      get(ref(database,"studentPets")),get(ref(database,"publicBosses")),get(ref(database,"publicQuestionPapers"))
+      restClient.read("games/classroom-115"),restClient.read("studentRoster"),restClient.read("studentStates"),
+      restClient.read("studentPets"),restClient.read("publicBosses"),restClient.read("publicQuestionPapers")
     ]);
-    return {games:{"classroom-115":room.val()},studentRoster:studentRoster.val()||{},studentStates:studentStates.val()||{},
-      studentPets:studentPets.val()||{},publicBosses:publicBosses.val()||{},publicQuestionPapers:publicQuestionPapers.val()||{}};
+    return {games:{"classroom-115":room},studentRoster:studentRoster||{},studentStates:studentStates||{},
+      studentPets:studentPets||{},publicBosses:publicBosses||{},publicQuestionPapers:publicQuestionPapers||{}};
   };
   const store=createFirebaseStore({
       databaseURL:firebaseConfig.databaseURL,
       getToken,getUid:()=>auth.currentUser.uid,
       now:()=>Date.now()+serverOffset,
       readRoot:readTeacherRoot,
+      readProgress:()=>restClient.read("games/classroom-115/progress"),
+      readRoomMetadata:async()=> ({restoredAt:await restClient.read("games/classroom-115/restoredAt")}),
+      readEquipmentCatalogues:async()=>{
+        const [clothesM,clothesF,backgrounds]=await Promise.all([
+          restClient.read("games/classroom-115/progress/clothesM"),restClient.read("games/classroom-115/progress/clothesF"),
+          restClient.read("games/classroom-115/progress/backgrounds")
+        ]);
+        return {clothesM:clothesM||[],clothesF:clothesF||[],backgrounds:backgrounds||[]};
+      },
       writeRoot:updates=>update(ref(database),updates),
-      transactRoom:updater=>transactValue(ref(database,"games/classroom-115"),updater),
-      transactStudentState:(uid,updater)=>transactValue(ref(database,`studentStates/${uid}`),updater)
+      transactRoom:updater=>restClient.transact("games/classroom-115",updater),
+      transactProgressStudent:(studentId,updater)=>restClient.transact(`games/classroom-115/progress/students/${studentId-1}`,updater),
+      transactStudentState:(uid,updater)=>restClient.transact(`studentStates/${uid}`,updater)
   });
   window.readLatestProgress=store.readRemote;
   window.artworkStore=store;

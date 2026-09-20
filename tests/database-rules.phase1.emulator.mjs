@@ -65,7 +65,16 @@ test('teacher can atomically update room data and increment one student projecti
     [`studentStates/${studentOne.uid}/tokens`]:{'.sv':{increment:5}},
   }});
   const after=await (await request(`studentStates/${studentOne.uid}/tokens`,teacher)).json();
-  assert.equal(after,before+5);
+    assert.equal(after,before+5);
+});
+
+test('teacher can update one legacy student without touching projections',async()=>{
+  const before=await (await request('games/classroom-115/progress/students/1',teacher)).json();
+  await allowed('games/classroom-115/progress/students/0',teacher,{method:'PATCH',body:{equippedClothes:'shirt'}});
+  const first=await (await request('games/classroom-115/progress/students/0',teacher)).json();
+  const second=await (await request('games/classroom-115/progress/students/1',teacher)).json();
+  assert.equal(first.equippedClothes,'shirt');
+  assert.deepEqual(second,before);
 });
 
 test('teacher sync marker is writable by teacher and immutable to the student',async()=>{

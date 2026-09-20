@@ -6,6 +6,8 @@ import {spawnSync} from 'node:child_process';
 import {JSDOM} from 'jsdom';
 import * as operations from '../public/game-operations.mjs';
 import {createCloudSync} from '../public/cloud-sync.mjs';
+import {createFirebaseStore,createProgressSubscriber} from '../public/firebase-store.mjs';
+import {createFirebaseRestClient} from '../public/firebase-rest-client.mjs';
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const scripts=[...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)];
 const clone=structuredClone;
@@ -47,17 +49,36 @@ test('inline scripts and modules parse',()=>{
         else new vm.Script(source);
     }
 });
-test('browser module wires room and per-student teacher transactions without a database-root transaction',()=>{
+test('browser wardrobe wiring commits only student 28 through the server ETag transport',async()=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
-    assert.match(moduleSource,/createProgressSubscriber\(\{database,getToken,ref,onValue\}\)/);
-    assert.match(moduleSource,/subscribeRemote:subscribeProgress/);
-    assert.match(moduleSource,/get\(ref\(database,"games\/classroom-115"\)\)/);
-    assert.match(moduleSource,/get\(ref\(database,"studentStates"\)\)/);
-    assert.doesNotMatch(moduleSource,/get\(ref\(database\)\)/);
-    assert.match(moduleSource,/writeRoot:updates=>update\(ref\(database\),updates\)/);
-    assert.match(moduleSource,/transactRoom:updater=>transactValue\(ref\(database,"games\/classroom-115"\),updater\)/);
-    assert.match(moduleSource,/transactStudentState:\(uid,updater\)=>transactValue\(ref\(database,`studentStates\/\$\{uid\}`\),updater\)/);
-    assert.doesNotMatch(moduleSource,/transactRoot:/);
+    const progress={...fixture(),students:Array.from({length:28},(_,index)=>({...fixture().students[0],id:index+1,ownedClothes:['shirt'],equippedClothes:'shirt'}))};
+    const root={games:{'classroom-115':{progress}}},writes=[],reads=[];
+    const request=async(input,options)=>{
+        const path=new URL(input).pathname.slice(1,-5),parts=path.split('/');
+        let parent=root;
+        for(const part of parts.slice(0,-1)) parent=parent[part];
+        const key=parts.at(-1);
+        if(options.method==='PUT'){
+            assert.equal(options.headers['if-match'],'"server-etag"');
+            writes.push(path);parent[key]=JSON.parse(options.body);
+        }else reads.push(path);
+        return Response.json(parent[key]??null,{headers:{ETag:'"server-etag"'}});
+    };
+    const context=vm.createContext({
+        initializeApp:()=>({}),getAuth:()=>({currentUser:{uid:'teacher',getIdToken:async()=>'token'}}),getDatabase:()=>({}),
+        onAuthStateChanged(){},ref:(database,path)=>path,onValue:()=>()=>{},update(){throw new Error('unexpected multi-path write');},
+        GameOperations:operations,createFirebaseStore,createProgressSubscriber,
+        createFirebaseRestClient:config=>createFirebaseRestClient({...config,fetch:request}),
+        createCloudSync:()=>({setConnected(){},setActive(){}}),
+        window:{addEventListener(){}},document:{addEventListener(){},hidden:false},navigator:{onLine:false},currentUser:null,
+        setSyncLocked(){},setSyncStatus(){},console,
+    });
+    vm.runInContext(moduleSource.replace(/^\s*import .*;$/gm,'')+'\nglobalThis.pageStore=store;',context);
+    const outcome=await context.pageStore.execute({id:'page-equip-28',createdAt:Date.now(),command:{type:'equip',studentId:28,kind:'clothes',itemId:null}});
+    assert.deepEqual(writes,['games/classroom-115/progress/students/27']);
+    assert.equal(outcome.progress.students[27].equippedClothes,null);
+    assert.equal(outcome.progress.students[26].equippedClothes,'shirt');
+    assert.ok(reads.every(path=>path.startsWith('games/classroom-115/progress/')||path==='games/classroom-115/progress'||path==='games/classroom-115/restoredAt'));
 });
 test('browser module selects personal projection subscriptions for student sessions',()=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];

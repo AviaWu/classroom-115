@@ -18,11 +18,11 @@
 
 `games/classroom-115/progress` 始終是唯一最新進度。`operations/{operationId}` 保存執行結果，不保存整份進度歷史；一般只保留最近一小時且位於最新 100 筆內的收據，本機尚待確認的操作例外保留。`lastOperationId` 指向最新操作收據。日常讀取只讀 `progress`。
 
-網頁上的即時操作使用 Firebase SDK `runTransaction()`，不再使用 REST ETag PUT，因此成功提交後不會再下載一份完整班級根節點回應。
+網頁上的交易使用 [REST ETag 傳輸層](../public/firebase-rest-client.mjs)：GET 取得伺服器 ETag，再用 `If-Match` 條件式 PUT 提交；遇到 412 才重讀並重算。即時訂閱仍使用 Firebase SDK。服裝／背景裝備只交易 `progress/students/{studentId-1}`；其餘教師操作沿用房間與學生投影的協調流程。
 
 畫作圖片獨立放在 `/artworks/classroom-115/{drawingId}`；`progress.drawings` 只保留最多三筆 `{id, savedAt}`。新增第四張時，最舊圖片透過可重試的刪除待辦移除，不建立歷史畫冊。
 
-[Firebase 存取模組](../public/firebase-store.mjs) 在網頁中使用 Firebase SDK `runTransaction()`：讀取最新班級節點、套用操作並原子提交；衝突時 SDK 以最新資料重算同一操作。頁面不儲存或比對進度版本，也不會以瀏覽器舊快照取代雲端。REST ETag 交易僅保留給未注入 SDK 的本機工具。
+[Firebase 存取模組](../public/firebase-store.mjs) 保留原有交易範圍與操作收據。交易前後的協調讀取直接向伺服器取得資料，避免 REST 寫入成功後讀到尚未更新的 SDK 訂閱快取。條件式 PUT 保留回應內容，不使用不相容的 `print=silent`。因此交易會下載其目標節點的讀取與提交回應；畫作本體不在房間交易內。數字指紋問題的根因與實測紀錄見 [maxretry 修正](maxretry-numeric-hash.md)。
 
 首次讀取舊存檔不改寫任何資料；下一筆真正改動進度的操作才移除 `syncVersion`、`revision`、`baseCommitId`、`commitId`、`updatedAt`。雲端空白只清空畫面，由老師明確初始化或還原。
 
@@ -47,7 +47,7 @@ npm test
 firebase emulators:exec --config firebase.emulator.json --project demo-classroom-sync --only database "npm run test:emulator"
 ```
 
-Node 測試涵蓋操作規則、60 秒備援輪詢、子路徑訂閱生命週期、SDK transaction、REST 回應遺失，以及真實 DOM 的草稿／視窗／畫板保留。模擬器測試使用真正資料庫規則與 REST 存取模組，強制兩台裝置讀取同一 ETag，驗證 412 衝突、重讀、扣款／領獎、收據裁切及還原；兩個測試檔共用測試資料庫，必須序列執行。
+Node 測試涵蓋操作規則、60 秒備援輪詢、子路徑訂閱生命週期、ETag 衝突／回應遺失，以及真實 DOM 的草稿／視窗／畫板保留。模擬器測試使用真正資料庫規則與 REST 存取模組，驗證 412 衝突、重讀、扣款／領獎、收據裁切及還原；並使用固定版本 Firebase SDK 重現大數值造成的 `maxretry`，再驗證新版能穿脫服裝及完成協調交易。測試檔共用測試資料庫，必須序列執行。
 
 ## 既有資料 migration
 

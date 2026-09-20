@@ -244,7 +244,7 @@ flowchart LR
 
 前景且連線中的頁面會分別訂閱 `progress` 的學生、任務、商品、協力任務、畫作索引與設定子路徑。首次開啟、切回頁面或恢復連線時取得各子路徑目前值，之後只接收實際變動的子路徑；不再每分鐘下載整份 `progress`。只有待確認操作需要另外查詢其收據，日常訂閱不下載操作收據集合。
 
-實際操作在 `/games/classroom-115` 班級根節點使用 Firebase SDK `runTransaction()`：先取得最新班級資料，在最新進度上計算操作，再原子寫入新進度、操作收據與最新操作 ID。若其他裝置先寫入，SDK 會用最新資料重新計算。交易結果由本機交易快照取得，不再使用會回傳完整 `room` 的 REST ETag PUT。
+實際交易透過伺服器 ETag 與 `If-Match` 條件式 PUT：先取得目標節點的最新資料，再原子提交；412 衝突時重讀並重算。服裝／背景裝備只交易 `progress/students/{studentId-1}`，不建立操作收據或同步鎖；其餘老師操作使用 `/games/classroom-115` 與 `studentStates/{uid}` 協調交易。學生只交易自己的 `studentStates/{uid}`。即時訂閱維持 Firebase SDK，但寫入避開其大數值 hash 造成的 `maxretry`，詳見 [根因與驗證](maxretry-numeric-hash.md)。
 
 每次成功交易會一併清除超過一小時或超出最新 100 筆範圍的舊收據。交易裝置 `sessionStorage` 中仍待確認的操作 ID 會優先保留，必要時可暫時超過一般上限。畫作訂閱只包含最多三筆 `{id, savedAt}` 索引，圖片仍依 ID 按需下載並使用頁面記憶體快取。
 

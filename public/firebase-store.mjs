@@ -61,7 +61,7 @@ export function createTeacherStudentStatesSubscriber({database,ref,onValue}){
 
 // REST handles direct reads and artwork payloads. The teacher page serializes commands
 // in a room transaction and projects personal changes through per-student transactions.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,writeRoot,transactStudentState}) {
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -175,6 +175,35 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(value!==null && !normalized?.students.length) throw new Error("雲端資料格式不正確：缺少成員，已停止操作。");
         return normalized;
     }
+    const legacyEquipmentInfo=command=>{
+        if(command?.type!=='equip') return null;
+        if(command.kind==='clothes') return {owned:'ownedClothes',equipped:'equippedClothes'};
+        if(command.kind==='background') return {owned:'ownedBg',equipped:'equippedBg'};
+        return null;
+    };
+    async function executeLegacyEquipment(job){
+        const command=job.command,info=legacyEquipmentInfo(command);
+        if(now()-job.createdAt>24*60*60*1000) throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
+        let settled;
+        try{
+            const [metadata,catalogues]=await Promise.all([readRoomMetadata(),readEquipmentCatalogues()]);
+            if(metadata?.restoredAt&&job.createdAt<=metadata.restoredAt) throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
+            const transaction=await transactProgressStudent(command.studentId,current=>{
+                if(!current || current.id!==command.studentId) throw new Error('這位學生已不存在，請重新整理成員名單');
+                if(command.itemId!==null && (typeof command.itemId!=='string' || !Array.isArray(current[info.owned]) || !current[info.owned].includes(command.itemId))) throw new Error('衣櫃尚未擁有這項商品');
+                const catalogue=command.kind==='clothes' ? (current.gender==='M'?catalogues?.clothesM:catalogues?.clothesF) : catalogues?.backgrounds;
+                if(command.itemId!==null&&(!Array.isArray(catalogue)||!catalogue.some(item=>item?.id===command.itemId))) throw new Error('這項商品已不存在');
+                settled={result:{ok:true}};
+                if(current[info.equipped]===command.itemId) return;
+                return {...current,[info.equipped]:command.itemId};
+            });
+            if(!transaction?.committed&&!settled) throw Object.assign(new Error('衣櫃裝備交易未完成，稍後會重試。'),{retryable:true});
+            const value=await readProgress();
+            const progress=normalizeProgress(value);
+            if(value!==null&&!progress?.students.length) throw new Error('雲端資料格式不正確：缺少成員，已停止操作。');
+            return {progress,result:settled?.result||{ok:true}};
+        }catch(error){throw markRetryable(error);}
+    }
     async function readReceipt(id){
         if(!/^[\w-]+$/.test(id)) throw new Error('操作識別碼無效');
         const {value:receipt}=await call(`/operations/${id}`);
@@ -263,6 +292,17 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     const uidMap=root=>Object.fromEntries(Object.entries(root.studentRoster||{})
         .filter(([,entry])=>entry?.active===true&&Number.isInteger(entry.studentId))
         .map(([uid,entry])=>[entry.studentId,uid]));
+    async function transactObservedRoom(update){
+        if(typeof observeRoom!=='function') return transactRoom(update);
+        let stop=()=>{};
+        try{
+            await new Promise((resolve,reject)=>{
+                try{stop=observeRoom(resolve,reject)||stop;}
+                catch(error){reject(error);}
+            });
+            return await transactRoom(update);
+        }finally{stop();}
+    }
     function projectionUpdates(root,plan,mapping){
         const updates={};
         for(const uid of Object.values(mapping)){
@@ -299,12 +339,13 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         try{if(Object.keys(updates).length) await writeRoot(updates);}catch(error){throw markRetryable(error);}
         const latestRoot=(await readRoot())||{};
         const latestStates=latestRoot.studentStates||states;
+        const fallbackRoom=latestRoot.games?.['classroom-115']||room;
         const conditionalResult=syncPlan.resultUid?applied.find(entry=>entry.uid===syncPlan.resultUid)?.result:null;
         const finalResult=conditionalResult||JSON.parse(room.operations?.[operationId]?.result?.json||'{"ok":true}');
         let settled;
         try{
-            const transaction=await transactRoom(current=>{
-                if(current===null) return null;
+            const transaction=await transactObservedRoom(current=>{
+                current=current??fallbackRoom;
                 if(current?._projectionSync?.operationId!==operationId) return;
                 const receipt=current.operations?.[operationId];
                 let progress=mergeStudentStatesIntoProgress(current.progress??null,latestStates);
@@ -345,9 +386,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             command??=await prepareCommand(job.command,artwork);
             const mapping=uidMap(root),clock=now();let settled,blocked=false;
             try{
-                const transaction=await transactRoom(current=>{
-                    if(current===null&&!['restore','initialize'].includes(command.type)) return null;
-                    current=current||{};
+                const transaction=await transactObservedRoom(current=>{
+                    current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];
                     if(receipt&&receipt.phase!=='projecting'){
@@ -381,6 +421,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     }
     async function execute(job,pendingIds=[]){
         const artwork=preflightArtwork(job.command);
+        if(legacyEquipmentInfo(job.command)&&typeof transactProgressStudent==='function'&&typeof readProgress==='function'&&typeof readRoomMetadata==='function'&&typeof readEquipmentCatalogues==='function') return executeLegacyEquipment(job);
         if(readRoot&&writeRoot&&transactRoom&&transactStudentState) return executeCoordinated(job,pendingIds,artwork);
         if(transactRoot||transactRoom) return executeSdkTransaction(job,pendingIds,artwork);
         let command;
