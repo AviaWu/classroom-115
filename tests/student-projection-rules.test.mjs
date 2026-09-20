@@ -9,6 +9,8 @@ test('phase one rules keep progress teacher-only and scope student projections t
   assert.match(rules.rules.studentStates.$uid['.read'],/auth\.uid === \$uid/);
   assert.match(rules.rules.studentPets.$uid['.write'],/teacher@classroom-115\.local/);
   assert.equal(rules.rules.studentStates.$uid.$other['.validate'],false);
+  assert.match(rules.rules.studentStates.$uid['.validate'],/newData\.child\('_teacherOperation'\)\.child\('resultJson'\)\.val\(\) === data\.child\('_teacherOperation'\)\.child\('resultJson'\)\.val\(\)/);
+  assert.match(rules.rules.studentStates.$uid._teacherOperation['.validate'],/resultJson/);
   assert.match(rules.rules.studentStates.$uid['.write'],/child\('active'\)\.val\(\) === true/);
   assert.equal(rules.rules.publicBosses['.read'],'auth != null');
   assert.equal(rules.rules.publicQuestionPapers['.write'],'auth != null && auth.token.email === "teacher@classroom-115.local"');

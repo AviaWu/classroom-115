@@ -64,3 +64,9 @@ test('student projection becomes an isolated pet and boss view state',()=>{
   assert.equal(state.questionPapers[0].id,'paper-a');
   assert.deepEqual(state.tasks,[]);
 });
+
+test('student view omits the temporary teacher synchronization marker',()=>{
+    const view=studentProjectionToProgress({studentState:{studentId:1,tokens:10,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',
+        equippedLayout:[],bossProgress:[],_teacherOperation:{id:'operation',createdAt:1,resultJson:'{"ok":true}'}}});
+    assert.equal(view.students[0]._teacherOperation,undefined);
+});

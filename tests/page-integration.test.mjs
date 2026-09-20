@@ -47,12 +47,17 @@ test('inline scripts and modules parse',()=>{
         else new vm.Script(source);
     }
 });
-test('browser module wires child subscriptions and teacher root SDK transactions',()=>{
+test('browser module wires room and per-student teacher transactions without a database-root transaction',()=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
     assert.match(moduleSource,/createProgressSubscriber\(\{database,getToken,ref,onValue\}\)/);
     assert.match(moduleSource,/subscribeRemote:subscribeProgress/);
-    assert.match(moduleSource,/transactRoot:update=>transactValue\(ref\(database\),update\)/);
-    assert.doesNotMatch(moduleSource,/selectTransactionRoom/);
+    assert.match(moduleSource,/get\(ref\(database,"games\/classroom-115"\)\)/);
+    assert.match(moduleSource,/get\(ref\(database,"studentStates"\)\)/);
+    assert.doesNotMatch(moduleSource,/get\(ref\(database\)\)/);
+    assert.match(moduleSource,/writeRoot:updates=>update\(ref\(database\),updates\)/);
+    assert.match(moduleSource,/transactRoom:updater=>transactValue\(ref\(database,"games\/classroom-115"\),updater\)/);
+    assert.match(moduleSource,/transactStudentState:\(uid,updater\)=>transactValue\(ref\(database,`studentStates\/\$\{uid\}`\),updater\)/);
+    assert.doesNotMatch(moduleSource,/transactRoot:/);
 });
 test('browser module selects personal projection subscriptions for student sessions',()=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];

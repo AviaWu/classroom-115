@@ -28,8 +28,9 @@ export function createStudentProjections(progress,uidByStudentId){
 
 export function studentProjectionToProgress({studentState,studentPets={},publicBosses={},publicQuestionPapers={}}){
     if(!studentState || !Number.isInteger(studentState.studentId)) return null;
+    const {_teacherOperation,...visibleState}=studentState;
     return {
-        students:[{...clone(studentState),id:studentState.studentId,ownedLayout:Object.keys(studentPets)}],layouts:Object.values(studentPets).map(clone),bosses:Object.values(publicBosses).map(clone),
+        students:[{...clone(visibleState),id:studentState.studentId,ownedLayout:Object.keys(studentPets)}],layouts:Object.values(studentPets).map(clone),bosses:Object.values(publicBosses).map(clone),
         questionPapers:Object.values(publicQuestionPapers).map(clone),tasks:[],clothesM:[],clothesF:[],backgrounds:[],
         coopTasks:[],coopTaskTemplates:[],dailyTaskTemplates:[],weeklyTaskTemplates:[],deletedTaskIds:[],deletedCoopTaskIds:[],
         drawings:[],pendingArtworkDeletes:[],globalBgImage:'',lastSaved:'',

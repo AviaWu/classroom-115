@@ -60,9 +60,11 @@ publicQuestionPapers/{paperId}       # 已啟用 BOSS 所需題庫
 
 ## 教師與學生資料一致性
 
-教師畫面會把最新 `studentStates` 覆蓋到舊 `progress.students[]` 的個人欄位。教師送出任何操作時，程式使用同一筆 RTDB 根節點 transaction，先合併 transaction 當下最新的學生狀態，再同時更新 `games/classroom-115`、`studentStates`、`studentPets`、`publicBosses` 與 `publicQuestionPapers`。若學生剛好同時互動，Firebase 會重跑教師 transaction，不會用教師先前看到的舊快照覆蓋學生結果。
+教師畫面會把最新 `studentStates` 覆蓋到舊 `progress.students[]` 的個人欄位。教師送出操作時，程式只在 `games/classroom-115` 執行短時間 transaction，依序處理不同老師分頁的操作；接著只對實際受影響的 `studentStates/{uid}` 執行個別 transaction，再更新 `studentPets`、`publicBosses` 與 `publicQuestionPapers`。不再 transaction 整個資料庫根節點，因此其他學生同時互動不會耗盡老師操作的 transaction 重試次數。
 
-根節點 transaction 僅開放老師 Email/Password 帳號；學生仍只能交易自己的 `studentStates/{uid}`。此機制已包含於 phase‑1 Rules，必須依上述順序先部署 Rules，再部署網頁。
+購買、樂透、任務獎勵及資源加減造成的代幣、樂透券或好感度變化，會在該生最新 transaction 值上運算；寵物心情與 BOSS 攻擊也會在同一個學生節點內重新判斷，不會重複發獎或覆蓋學生剛完成的攻擊。同步中的操作會暫存在班級 `_projectionSync`，並在該生留下單一 `_teacherOperation` marker；即使回應中斷，下一次連線也能接續而不重複套用，完成後 marker 立即移除。服裝與背景的持有及裝備狀態仍只保存在完整 `progress`，購買寵物則會一併更新該生的 `studentPets`。
+
+這項協調機制不需執行資料 migration，但新版網頁上線前必須先部署新版 phase‑1 Rules，讓老師可建立 marker、學生只能在自己的 transaction 中原樣保留 marker。
 
 ## 免費方案的安全邊界
 

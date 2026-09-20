@@ -3233,7 +3233,7 @@ setInterval(syncScheduledTasks,30000);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { getDatabase, onValue, ref, runTransaction } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { getDatabase, get, onValue, ref, runTransaction, update } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
   import { createFirebaseStore, createProgressSubscriber, createStudentProjectionSubscriber, createTeacherStudentStatesSubscriber } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
@@ -3312,11 +3312,22 @@ setInterval(syncScheduledTasks,30000);
     if(!auth.currentUser) throw new Error("請先使用帳號與密碼登入");
     return auth.currentUser.getIdToken();
   };
+  const readTeacherRoot=async()=>{
+    const [room,studentRoster,studentStates,studentPets,publicBosses,publicQuestionPapers]=await Promise.all([
+      get(ref(database,"games/classroom-115")),get(ref(database,"studentRoster")),get(ref(database,"studentStates")),
+      get(ref(database,"studentPets")),get(ref(database,"publicBosses")),get(ref(database,"publicQuestionPapers"))
+    ]);
+    return {games:{"classroom-115":room.val()},studentRoster:studentRoster.val()||{},studentStates:studentStates.val()||{},
+      studentPets:studentPets.val()||{},publicBosses:publicBosses.val()||{},publicQuestionPapers:publicQuestionPapers.val()||{}};
+  };
   const store=createFirebaseStore({
       databaseURL:firebaseConfig.databaseURL,
       getToken,getUid:()=>auth.currentUser.uid,
       now:()=>Date.now()+serverOffset,
-      transactRoot:update=>transactValue(ref(database),update)
+      readRoot:readTeacherRoot,
+      writeRoot:updates=>update(ref(database),updates),
+      transactRoom:updater=>transactValue(ref(database,"games/classroom-115"),updater),
+      transactStudentState:(uid,updater)=>transactValue(ref(database,`studentStates/${uid}`),updater)
   });
   window.readLatestProgress=store.readRemote;
   window.artworkStore=store;

@@ -1,6 +1,7 @@
 import {applyOperation,normalizeProgress} from './game-operations.mjs';
 import {createStudentProjections} from './student-projections.mjs';
 import {mergeStudentStatesIntoProgress} from './teacher-projections.mjs';
+import {applyTeacherStudentPlan,createTeacherSyncPlan,stripTeacherOperationMarker} from './teacher-sync-plan.mjs';
 
 const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','coopTasks',
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
@@ -58,9 +59,9 @@ export function createTeacherStudentStatesSubscriber({database,ref,onValue}){
     return (onStates,onError)=>onValue(ref(database,'studentStates'),snapshot=>onStates(snapshot.val()||{}),onError);
 }
 
-// REST handles direct reads and artwork payloads. The page injects the Firebase SDK
-// transaction transport; the REST ETag path remains available to non-browser tools.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot}) {
+// REST handles direct reads and artwork payloads. The teacher page serializes commands
+// in a room transaction and projects personal changes through per-student transactions.
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,writeRoot,transactStudentState}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -177,7 +178,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     async function readReceipt(id){
         if(!/^[\w-]+$/.test(id)) throw new Error('操作識別碼無效');
         const {value:receipt}=await call(`/operations/${id}`);
-        return receipt ? {...receipt,result:JSON.parse(receipt.result.json)} : null;
+        return receipt && receipt.phase!=='projecting' ? {...receipt,result:JSON.parse(receipt.result.json)} : null;
     }
     function retainedOperations(operations,pendingIds,clock){
         const pending=new Set(Array.isArray(pendingIds)?pendingIds:[]);
@@ -255,8 +256,130 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             throw error;
         }
     }
+    const markRetryable=error=>{
+        if(error?.code?.includes('network') || error?.code==='database/disconnected') error.retryable=true;
+        return error;
+    };
+    const uidMap=root=>Object.fromEntries(Object.entries(root.studentRoster||{})
+        .filter(([,entry])=>entry?.active===true&&Number.isInteger(entry.studentId))
+        .map(([uid,entry])=>[entry.studentId,uid]));
+    function projectionUpdates(root,plan,mapping){
+        const updates={};
+        for(const uid of Object.values(mapping)){
+            const desired=plan.studentPets?.[uid]||{},current=root.studentPets?.[uid]||{};
+            if(JSON.stringify(current)!==JSON.stringify(desired)) updates[`studentPets/${uid}`]=Object.keys(desired).length?desired:null;
+        }
+        for(const key of ['publicBosses','publicQuestionPapers']){
+            const desired=plan[key]||{};
+            if(JSON.stringify(root[key]||{})!==JSON.stringify(desired)) updates[key]=desired;
+        }
+        return updates;
+    }
+    async function applyStudentProjection(operationId,studentPlan){
+        let applied;
+        try{
+            const transaction=await transactStudentState(studentPlan.uid,current=>{
+                applied=applyTeacherStudentPlan(current,studentPlan,operationId);
+                return applied.state;
+            });
+            if(!transaction?.committed && !studentPlan.delete) throw new Error('學生資料同步交易未完成');
+            return {uid:studentPlan.uid,state:transaction?.value??null,result:applied?.result??studentPlan.result??{ok:true}};
+        }catch(error){throw markRetryable(error);}
+    }
+    async function cleanupStudentMarkers(operationId,uids){
+        await Promise.allSettled((uids||[]).map(uid=>transactStudentState(uid,current=>stripTeacherOperationMarker(current,operationId))));
+    }
+    async function resumeProjection(root){
+        const room=root.games?.['classroom-115']||{},syncPlan=room._projectionSync;
+        if(!syncPlan?.operationId||!syncPlan.plan) return null;
+        const operationId=syncPlan.operationId,plan=syncPlan.plan;
+        const applied=await Promise.all(Object.values(plan.studentPlans||{}).map(studentPlan=>applyStudentProjection(operationId,studentPlan)));
+        const states=Object.fromEntries(applied.map(entry=>[entry.uid,entry.state]).filter(([,state])=>state));
+        const updates=projectionUpdates(root,plan,syncPlan.uidByStudentId||{});
+        try{if(Object.keys(updates).length) await writeRoot(updates);}catch(error){throw markRetryable(error);}
+        const latestRoot=(await readRoot())||{};
+        const latestStates=latestRoot.studentStates||states;
+        const conditionalResult=syncPlan.resultUid?applied.find(entry=>entry.uid===syncPlan.resultUid)?.result:null;
+        const finalResult=conditionalResult||JSON.parse(room.operations?.[operationId]?.result?.json||'{"ok":true}');
+        let settled;
+        try{
+            const transaction=await transactRoom(current=>{
+                if(current?._projectionSync?.operationId!==operationId) return;
+                const receipt=current.operations?.[operationId];
+                let progress=mergeStudentStatesIntoProgress(current.progress??null,latestStates);
+                const {_projectionSync,...withoutLock}=current;
+                const committed={...receipt,phase:null,committedAt:{'.sv':'timestamp'},result:{json:JSON.stringify(finalResult)},
+                    projectionUids:Object.keys(plan.studentPlans||{})};
+                settled={progress:normalizeProgress(progress),result:finalResult};
+                return {...withoutLock,progress:{...progress,lastSaved:new Date(now()).toISOString()},
+                    operations:{...(current.operations||{}),[operationId]:committed},lastOperationId:operationId};
+            });
+            if(!transaction?.committed){
+                const current=transaction?.value||{};
+                const receipt=current.operations?.[operationId];
+                if(receipt&&receipt.phase!=='projecting') settled={progress:normalizeProgress(current.progress),result:JSON.parse(receipt.result.json)};
+                else throw Object.assign(new Error('老師同步鎖已變更，稍後會重試。'),{retryable:true});
+            }
+        }catch(error){throw markRetryable(error);}
+        await cleanupStudentMarkers(operationId,Object.keys(plan.studentPlans||{}));
+        return {...settled,studentStates:latestStates};
+    }
+    async function executeCoordinated(job,pendingIds,artwork){
+        if(now()-job.createdAt>24*60*60*1000){
+            await cleanupRejectedArtwork(artwork);
+            throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
+        }
+        let command;
+        for(let attempt=0;attempt<20;attempt++){
+            let root=(await readRoot())||{},room=root.games?.['classroom-115']||{};
+            const existing=room.operations?.[job.id];
+            if(existing&&existing.phase!=='projecting'){
+                await cleanupStudentMarkers(job.id,existing.projectionUids||[]);
+                return {progress:normalizeProgress(room.progress??null),result:JSON.parse(existing.result.json),studentStates:root.studentStates||{}};
+            }
+            if(room._projectionSync){
+                await resumeProjection(root);
+                continue;
+            }
+            command??=await prepareCommand(job.command,artwork);
+            const mapping=uidMap(root),clock=now();let settled,blocked=false;
+            try{
+                const transaction=await transactRoom(current=>{
+                    current=current||{};
+                    if(current._projectionSync){blocked=true;return;}
+                    const receipt=current.operations?.[job.id];
+                    if(receipt&&receipt.phase!=='projecting'){
+                        settled={progress:normalizeProgress(current.progress??null),result:JSON.parse(receipt.result.json)};return;
+                    }
+                    if(current.restoredAt&&job.createdAt<=current.restoredAt&&!['restore','initialize'].includes(command.type)){
+                        settled={error:new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。')};return;
+                    }
+                    const before=mergeStudentStatesIntoProgress(current.progress??null,root.studentStates||{});
+                    const outcome=applyOperation(before,command,clock);
+                    if(!outcome.changed){settled={progress:outcome.progress,result:outcome.result||{ok:true}};return;}
+                    const result={ok:true,...outcome.result};
+                    const plan=createTeacherSyncPlan({beforeProgress:before,afterProgress:outcome.progress,command,result,
+                        uidByStudentId:mapping,clock});
+                    const receiptValue={id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,phase:'projecting',result:{json:JSON.stringify(result)}};
+                    const next={...current,progress:{...outcome.progress,lastSaved:new Date(clock).toISOString()},
+                        operations:{...retainedOperations(current.operations,pendingIds,clock),[job.id]:receiptValue},lastOperationId:job.id,
+                        _projectionSync:{operationId:job.id,createdAt:clock,uidByStudentId:mapping,
+                            resultUid:['petMood','bossAttack'].includes(command.type)?mapping[command.studentId]||null:null,plan}};
+                    if(['restore','initialize'].includes(command.type)) next.restoredAt={'.sv':'timestamp'};
+                    return next;
+                });
+                if(settled?.error){await cleanupRejectedArtwork(artwork);throw settled.error;}
+                if(settled) return settled;
+                if(!transaction?.committed){if(blocked) continue;throw Object.assign(new Error('老師操作交易未完成，稍後會重試。'),{retryable:true});}
+                root=(await readRoot())||{};
+                return await resumeProjection(root);
+            }catch(error){throw markRetryable(error);}
+        }
+        throw Object.assign(new Error('另一筆老師操作仍在同步，稍後會重試。'),{retryable:true});
+    }
     async function execute(job,pendingIds=[]){
         const artwork=preflightArtwork(job.command);
+        if(readRoot&&writeRoot&&transactRoom&&transactStudentState) return executeCoordinated(job,pendingIds,artwork);
         if(transactRoot||transactRoom) return executeSdkTransaction(job,pendingIds,artwork);
         let command;
         // Same command, ID and lottery samples survive every retry.

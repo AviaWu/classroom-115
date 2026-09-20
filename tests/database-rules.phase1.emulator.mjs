@@ -58,6 +58,26 @@ test('teacher can create roster and student state in one phase-one migration pat
   }});
 });
 
+test('teacher can atomically update room data and increment one student projection',async()=>{
+  const before=await (await request(`studentStates/${studentOne.uid}/tokens`,teacher)).json();
+  await allowed('',teacher,{method:'PATCH',body:{
+    'games/classroom-115/progress/students/0/equippedClothes':null,
+    [`studentStates/${studentOne.uid}/tokens`]:{'.sv':{increment:5}},
+  }});
+  const after=await (await request(`studentStates/${studentOne.uid}/tokens`,teacher)).json();
+  assert.equal(after,before+5);
+});
+
+test('teacher sync marker is writable by teacher and immutable to the student',async()=>{
+  const marker={id:'operation',createdAt:100000,resultJson:'{"ok":true}'};
+  await allowed(`studentStates/${studentOne.uid}`,teacher,{method:'PUT',body:{...state(1),_teacherOperation:marker}});
+  await allowed(`studentStates/${studentOne.uid}`,studentOne,{method:'PUT',body:{...state(1),tokens:12,_teacherOperation:marker}});
+  await denied(`studentStates/${studentOne.uid}`,studentOne,{method:'PUT',body:{...state(1),tokens:13}});
+  await denied(`studentStates/${studentOne.uid}`,studentOne,{method:'PUT',body:{...state(1),tokens:13,
+    _teacherOperation:{...marker,resultJson:'{"ok":false}'}}});
+  await allowed(`studentStates/${studentOne.uid}`,teacher,{method:'PUT',body:state(1)});
+});
+
 test('student is limited to their own state and public battle data',async()=>{
   await allowed(`studentStates/${studentOne.uid}`,studentOne);
   await allowed(`studentStates/${studentOne.uid}`,studentOne,{method:'PUT',body:{...state(1),tokens:11}});

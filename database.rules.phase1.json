@@ -19,7 +19,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.email === \"teacher@classroom-115.local\")",
         ".write": "auth != null && (auth.token.email === \"teacher@classroom-115.local\" || (auth.uid === $uid && data.exists() && root.child('studentRoster').child($uid).child('active').val() === true && newData.child('studentId').val() === data.child('studentId').val()))",
-        ".validate": "newData.hasChildren(['studentId', 'tokens', 'lotteryTickets', 'petAffection', 'lastPetMoodDate']) && newData.child('studentId').isNumber() && newData.child('studentId').val() === newData.parent().parent().child('studentRoster').child($uid).child('studentId').val() && newData.child('tokens').isNumber() && newData.child('lotteryTickets').isNumber() && newData.child('lotteryTickets').val() >= 0 && newData.child('lotteryTickets').val() % 1 === 0 && newData.child('petAffection').isNumber() && newData.child('petAffection').val() >= 0 && newData.child('lastPetMoodDate').isString()",
+        ".validate": "newData.hasChildren(['studentId', 'tokens', 'lotteryTickets', 'petAffection', 'lastPetMoodDate']) && newData.child('studentId').isNumber() && newData.child('studentId').val() === newData.parent().parent().child('studentRoster').child($uid).child('studentId').val() && newData.child('tokens').isNumber() && newData.child('lotteryTickets').isNumber() && newData.child('lotteryTickets').val() >= 0 && newData.child('lotteryTickets').val() % 1 === 0 && newData.child('petAffection').isNumber() && newData.child('petAffection').val() >= 0 && newData.child('lastPetMoodDate').isString() && (auth.token.email === 'teacher@classroom-115.local' || (newData.child('_teacherOperation').child('id').val() === data.child('_teacherOperation').child('id').val() && newData.child('_teacherOperation').child('createdAt').val() === data.child('_teacherOperation').child('createdAt').val() && newData.child('_teacherOperation').child('resultJson').val() === data.child('_teacherOperation').child('resultJson').val()))",
         "studentId": { ".validate": true },
         "tokens": { ".validate": true },
         "lotteryTickets": { ".validate": true },
@@ -48,6 +48,13 @@
               ".validate": false
             }
           }
+        },
+        "_teacherOperation": {
+          ".validate": "newData.hasChildren(['id', 'createdAt', 'resultJson']) && newData.child('id').isString() && newData.child('id').val().length >= 1 && newData.child('id').val().length <= 128 && newData.child('id').val().matches(/^[A-Za-z0-9_-]+$/) && newData.child('createdAt').isNumber() && newData.child('resultJson').isString() && newData.child('resultJson').val().length <= 5000",
+          "id": { ".validate": true },
+          "createdAt": { ".validate": true },
+          "resultJson": { ".validate": true },
+          "$other": { ".validate": false }
         },
         "$other": {
           ".validate": false

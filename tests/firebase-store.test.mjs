@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createFirebaseStore,createProgressSubscriber,createStudentProjectionSubscriber} from '../public/firebase-store.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
+const studentsThrough28=(student28={})=>Array.from({length:28},(_,index)=>({
+    id:index+1,gender:'M',tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',doneTasks:[],
+    ownedClothes:[],equippedClothes:null,ownedLayout:[],equippedLayout:[],ownedBg:[],equippedBg:null,bossProgress:[],
+    ...(index===27?student28:{}),
+}));
 const resolveServerValues=(value,clock=100000)=>{
     if(value && typeof value==='object'){
         if(value['.sv']==='timestamp') return clock;
@@ -46,6 +51,44 @@ function sdkServer(options={}) {
     const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'fake-token',getUid:()=> 'test-user',
         now:options.now||(()=>100000),fetch:async(...args)=>{fetchCalls.push(args);throw new Error('unexpected REST request');},transactRoom});
     return {store,get room(){return room;},set room(value){room=clone(value);},get transactions(){return transactions;},fetchCalls};
+}
+function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRoomTransaction,onStudentTransaction,afterStudentTransaction}={}){
+    const defaultStudent={id:1,gender:'M',tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',doneTasks:[],
+        ownedClothes:[],equippedClothes:null,ownedLayout:[],equippedLayout:[],ownedBg:[],equippedBg:null,bossProgress:[]};
+    const defaultState={studentId:1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]};
+    let root={
+        games:{'classroom-115':{progress:progress||{students:[defaultStudent],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]},operations:{}}},
+        studentRoster:studentRoster||{'uid-one':{studentId:1,active:true}},
+        studentStates:studentStates||{'uid-one':defaultState},studentPets:{},publicBosses:{},publicQuestionPapers:{},
+    },studentCalls=0,roomCalls=0,readCalls=0;
+    const setPath=(path,value)=>{
+        const parts=path.split('/'),last=parts.pop();let target=root;
+        for(const part of parts) target=target[part]??={};
+        if(value===null) delete target[last];else target[last]=resolveServerValues(clone(value));
+    };
+    const dependencies={
+        databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
+        fetch:async()=>{throw new Error('unexpected REST request');},
+        readRoot:async()=>{readCalls++;await onReadRoot?.({root,call:readCalls});return clone(root);},
+        transactRoom:async update=>{
+            roomCalls++;
+            await onRoomTransaction?.({root,call:roomCalls});
+            const current=clone(root.games['classroom-115']),next=update(current);
+            if(next===undefined) return {committed:false,value:current};
+            root.games['classroom-115']=resolveServerValues(next);return {committed:true,value:clone(root.games['classroom-115'])};
+        },
+        transactStudentState:async(uid,update)=>{
+            studentCalls++;await onStudentTransaction?.({root,uid,call:studentCalls});
+            const current=clone(root.studentStates[uid]??null),next=update(current);
+            if(next===undefined) return {committed:false,value:current};
+            if(next===null) delete root.studentStates[uid];else root.studentStates[uid]=resolveServerValues(next);
+            await afterStudentTransaction?.({root,uid,call:studentCalls});
+            return {committed:true,value:clone(root.studentStates[uid]??null)};
+        },
+        writeRoot:async updates=>{for(const [path,value] of Object.entries(updates)) setPath(path,value);},
+    };
+    return {store:createFirebaseStore(dependencies),newStore:()=>createFirebaseStore(dependencies),
+        get root(){return root;},get roomCalls(){return roomCalls;},get studentCalls(){return studentCalls;}};
 }
 const clone=value=>structuredClone(value);
 const job=(id,command)=>({id,createdAt:90000,command});
@@ -258,6 +301,123 @@ test('teacher root transaction merges latest student state and atomically rebuil
     assert.equal(root.studentPets['uid-one'].cat.id,'cat');
     assert.equal(root.publicBosses.boss.attackPassword,'1234');
     assert.equal(root.publicQuestionPapers.paper.questions[0].id,'q');
+});
+test('unfinished teacher projection is recovered before another teacher command commits',async()=>{
+    let unavailable=true;
+    const server=coordinatedServer({onStudentTransaction:()=>{if(unavailable) throw Object.assign(new Error('offline'),{code:'database/disconnected'});}});
+    await assert.rejects(server.store.execute(job('teacher-a',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),/offline/);
+    assert.equal(server.root.games['classroom-115']._projectionSync.operationId,'teacher-a');
+    unavailable=false;
+    const outcome=await server.newStore().execute(job('teacher-b',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:7}));
+    assert.equal(outcome.progress.students[0].tokens,112);
+    assert.equal(server.root.studentStates['uid-one'].tokens,112);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,112);
+    assert.equal(server.root.games['classroom-115']._projectionSync,undefined);
+    assert.ok(server.root.games['classroom-115'].operations['teacher-a']);
+    assert.ok(server.root.games['classroom-115'].operations['teacher-b']);
+});
+test('teacher resource delta merges a student reward that commits after the teacher read',async()=>{
+    let raced=false;
+    const server=coordinatedServer({onStudentTransaction:({root})=>{
+        if(raced) return;raced=true;root.studentStates['uid-one'].tokens+=10;
+    }});
+    const outcome=await server.store.execute(job('teacher-add-race',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(server.root.studentStates['uid-one'].tokens,115);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,115);
+    assert.equal(outcome.progress.students[0].tokens,115);
+});
+test('teacher room-only equipment change refreshes concurrent student state before finalizing legacy progress',async()=>{
+    const progress={students:[{...studentsThrough28()[0],ownedClothes:['shirt'],equippedClothes:'shirt'}],
+        clothesM:[{id:'shirt',name:'衣服',price:40,level:'R',active:true}],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+    const server=coordinatedServer({progress,onReadRoot:({root,call})=>{if(call===3) root.studentStates['uid-one'].tokens=110;}});
+    const outcome=await server.store.execute(job('equipment-race',{type:'equip',studentId:1,kind:'clothes',itemId:null}));
+    assert.equal(outcome.progress.students[0].tokens,110);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,110);
+    assert.equal(server.root.studentStates['uid-one'].tokens,110);
+});
+test('teacher pet mood does not award twice when the student wins the transaction race',async()=>{
+    const currentStudent=studentsThrough28()[0];
+    currentStudent.petAffection=9;
+    const progress={students:[currentStudent],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+    let raced=false;
+    const server=coordinatedServer({progress,studentStates:{'uid-one':{studentId:1,tokens:100,lotteryTickets:1,petAffection:9,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}},
+        onStudentTransaction:({root})=>{if(raced)return;raced=true;Object.assign(root.studentStates['uid-one'],{tokens:110,petAffection:10,lastPetMoodDate:'1970-01-01'});}});
+    const outcome=await server.store.execute(job('teacher-mood-race',{type:'petMood',studentId:1}));
+    assert.equal(server.root.studentStates['uid-one'].tokens,110);
+    assert.equal(server.root.studentStates['uid-one'].petAffection,10);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,110);
+    assert.deepEqual(outcome.result,{awarded:false,bonus:0,level:2});
+});
+test('teacher final BOSS attack cannot duplicate a concurrent student defeat reward',async()=>{
+    const boss={id:'boss',name:'王',maxHp:5,reward:20,rewardTickets:1,attackPassword:'1234',paperId:'paper',active:true};
+    const paper={id:'paper',questions:[{id:'q',text:'?',options:['對','錯'],answerIndex:0}]};
+    const bossProgress=[{bossId:'boss',hp:5,passwordVerified:true,answeredQuestionIds:[],defeated:false,completedAt:null}];
+    const progress={students:[studentsThrough28({bossProgress})[27]],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[boss],questionPapers:[paper]};
+    progress.students[0].id=1;
+    let raced=false;
+    const server=coordinatedServer({progress,studentStates:{'uid-one':{studentId:1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress}},
+        onStudentTransaction:({root})=>{if(raced)return;raced=true;Object.assign(root.studentStates['uid-one'],{tokens:120,lotteryTickets:2,
+            bossProgress:[{bossId:'boss',hp:0,passwordVerified:true,answeredQuestionIds:['q'],defeated:true,completedAt:99999}]});}});
+    const outcome=await server.store.execute(job('teacher-boss-race',{type:'bossAttack',studentId:1,bossId:'boss',questionId:'q',answerIndex:0,password:'1234'}));
+    assert.equal(server.root.studentStates['uid-one'].tokens,120);
+    assert.equal(server.root.studentStates['uid-one'].lotteryTickets,2);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].bossProgress[0].hp,0);
+    assert.equal(outcome.result.reward,0);
+});
+test('lost acknowledgement after student transaction resumes from marker without double applying',async()=>{
+    let drop=true;
+    const server=coordinatedServer({afterStudentTransaction:()=>{if(drop){drop=false;throw Object.assign(new Error('ack lost'),{code:'database/disconnected'});}}});
+    const request=job('teacher-lost-ack',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5});
+    await assert.rejects(server.store.execute(request),/ack lost/);
+    assert.equal(server.root.studentStates['uid-one'].tokens,105);
+    const outcome=await server.newStore().execute(request);
+    assert.equal(outcome.progress.students[0].tokens,105);
+    assert.equal(server.root.studentStates['uid-one'].tokens,105);
+    assert.equal(server.root.studentStates['uid-one']._teacherOperation,undefined);
+});
+test('coordinated teacher flow covers student 28 equipment without a root transaction',async()=>{
+    const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt',ownedBg:['bg']}),
+        clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],
+        backgrounds:[{id:'bg',name:'背景',level:'R',price:20,active:true}],bosses:[],questionPapers:[]};
+    const server=coordinatedServer({progress,studentRoster:{'uid-28':{studentId:28,active:true}},
+        studentStates:{'uid-28':{studentId:28,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}}});
+    await server.store.execute(job('coordinated-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
+    await server.store.execute(job('coordinated-background-28',{type:'equip',studentId:28,kind:'background',itemId:'bg'}));
+    assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
+    assert.equal(server.root.games['classroom-115'].progress.students[27].equippedBg,'bg');
+});
+test('coordinated teacher flow projects purchases, lottery, and task rewards',async()=>{
+    const cases=[
+        {id:'clothes',command:{type:'purchase',studentId:1,kind:'clothes',itemId:'shirt'},extra:{clothesM:[{id:'shirt',name:'衣服',price:40,level:'R',active:true}]},tokens:60,verify:root=>assert.deepEqual(root.games['classroom-115'].progress.students[0].ownedClothes,['shirt'])},
+        {id:'pet',command:{type:'purchase',studentId:1,kind:'layout',itemId:'pet'},extra:{layouts:[{id:'pet',name:'寵物',image:'/pet.png',price:30,level:'R',active:true}]},tokens:70,verify:root=>assert.equal(root.studentPets['uid-one'].pet.id,'pet')},
+        {id:'background',command:{type:'purchase',studentId:1,kind:'background',itemId:'bg'},extra:{backgrounds:[{id:'bg',name:'背景',price:20,level:'R',active:true}]},tokens:80,verify:root=>assert.deepEqual(root.games['classroom-115'].progress.students[0].ownedBg,['bg'])},
+        {id:'task',command:{type:'completeTask',studentId:1,taskId:'task'},extra:{tasks:[{id:'task',title:'任務',reward:15}]},tokens:115,verify:root=>assert.deepEqual(root.games['classroom-115'].progress.students[0].doneTasks,['task'])},
+        {id:'lottery',command:{type:'lottery',studentId:1,roll:0,indexRoll:0},student:{lotteryTickets:2},extra:{layouts:[{id:'pet',name:'寵物',image:'/pet.png',price:30,level:'R',active:true}]},tokens:100,tickets:1,verify:root=>assert.equal(root.studentPets['uid-one'].pet.id,'pet')},
+    ];
+    for(const entry of cases){
+        const member={...studentsThrough28()[0],...entry.student};
+        const progress={students:[member],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[],...entry.extra};
+        const server=coordinatedServer({progress,studentStates:{'uid-one':{studentId:1,tokens:100,lotteryTickets:entry.student?.lotteryTickets??1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}}});
+        await server.store.execute(job(`coordinated-${entry.id}`,entry.command));
+        assert.equal(server.root.studentStates['uid-one'].tokens,entry.tokens,entry.id);
+        if(entry.tickets!==undefined) assert.equal(server.root.studentStates['uid-one'].lotteryTickets,entry.tickets,entry.id);
+        assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,entry.tokens,entry.id);
+        entry.verify(server.root);
+    }
+});
+test('coordinated resize deletes removed projections and preserves roster mappings',async()=>{
+    const progress={students:studentsThrough28().slice(0,2),clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+    const studentRoster={'uid-one':{studentId:1,active:true},'uid-two':{studentId:2,active:true}};
+    const studentStates={
+        'uid-one':{studentId:1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]},
+        'uid-two':{studentId:2,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]},
+    };
+    const server=coordinatedServer({progress,studentRoster,studentStates});
+    server.root.studentPets={'uid-one':{cat:{id:'cat'}},'uid-two':{cat:{id:'cat'}}};
+    await server.store.execute(job('coordinated-resize',{type:'resizeStudents',count:1}));
+    assert.equal(server.root.studentStates['uid-two'],undefined);
+    assert.equal(server.root.studentPets['uid-two'],undefined);
+    assert.deepEqual(server.root.studentRoster,studentRoster);
 });
 test('teacher root transaction tolerates an initial null SDK cache snapshot',async()=>{
     let root={
