@@ -163,7 +163,8 @@ input[type="number"]{width:85px}
 .pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:12px;line-height:1;white-space:nowrap;letter-spacing:-1px}
 .pet-mood-button b{font-size:11px}
 .pet-stage{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;margin:auto}
-.pet-display-row{display:grid;grid-template-columns:minmax(170px,220px) minmax(160px,.7fr) minmax(240px,1.2fr) minmax(190px,.8fr);gap:14px;width:100%;min-height:230px;align-items:stretch}
+.pet-display-row{display:grid;grid-template-columns:minmax(170px,220px) minmax(300px,1.5fr) minmax(190px,.8fr);gap:14px;width:100%;min-height:230px;align-items:stretch}
+.pet-dialog-level-column{display:grid;grid-template-rows:minmax(110px,1fr) auto;gap:12px;min-width:0}
 .pet-image-button{display:block;width:100%;min-width:0;padding:0;background:transparent;border:0;box-shadow:none;color:inherit}
 .pet-image-button:hover{background:transparent;transform:none;box-shadow:none}
 .pet-image-button:focus-visible{outline:4px solid #efb1a5;outline-offset:4px}
@@ -185,7 +186,7 @@ input[type="number"]{width:85px}
 .pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
 .pet-mood-reply p{margin:8px 0 0}
 .pet-interaction-image{display:block;width:100%;height:190px;box-sizing:border-box;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
-@media(max-width:700px){.pet-display-row{grid-template-columns:1fr 1fr;min-height:0}.pet-mood-reply{grid-column:1/-1;min-height:120px}.pet-mood-reply::before{display:none}.pet-mood-side{grid-column:1/-1}.pet-mood-grid{grid-template-columns:repeat(6,minmax(42px,1fr))}.pet-interaction-image{height:170px}.pet-level-card{padding:8px}.pet-level-heading{gap:4px;margin-bottom:8px}.pet-level-heading span:first-child{font-size:14px}.pet-affection-status{margin-top:6px;font-size:10px}.boss-card{padding:7px}.boss-card img{width:54px;height:44px}.boss-card h3{font-size:13px}.boss-card p{font-size:10px}.boss-choice-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.pet-display-row{grid-template-columns:1fr 1fr;min-height:0}.pet-dialog-level-column{grid-column:2;grid-row:1}.pet-mood-reply{min-height:120px}.pet-mood-reply::before{display:none}.pet-mood-side{grid-column:1/-1}.pet-mood-grid{grid-template-columns:repeat(6,minmax(42px,1fr))}.pet-interaction-image{height:170px}.pet-level-card{padding:8px}.pet-level-heading{gap:4px;margin-bottom:8px}.pet-level-heading span:first-child{font-size:14px}.pet-affection-status{margin-top:6px;font-size:10px}.boss-card{padding:7px}.boss-card img{width:54px;height:44px}.boss-card h3{font-size:13px}.boss-card p{font-size:10px}.boss-choice-grid{grid-template-columns:repeat(2,1fr)}}
 .drawing-board-layout{display:grid;grid-template-columns:150px minmax(0,1fr) 190px;gap:18px;align-items:start;clear:both}
 .drawing-history{display:flex;flex-direction:column;gap:10px;max-height:650px;overflow:auto;padding:3px}
 .drawing-thumb{width:100%;padding:5px;background:#fff8e8;text-align:left}
@@ -1453,8 +1454,10 @@ function openPetMood(id){
             <section class="pet-stage" aria-label="寵物狀態與對話">
                 <div class="pet-display-row">
                     <button class="pet-image-button" onclick="openPetSelector(${id})" aria-label="更換寵物"><img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}"><span class="pet-image-hint">點擊圖片更換寵物</span></button>
-                    ${petLevelHtml(student)}
-                    <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
+                    <div class="pet-dialog-level-column">
+                        <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
+                        ${petLevelHtml(student)}
+                    </div>
                     <section class="pet-mood-side" aria-label="選擇心情">
                         <h3>選擇現在的心情</h3>
                         <div class="pet-mood-grid">${moodButtons}</div>
