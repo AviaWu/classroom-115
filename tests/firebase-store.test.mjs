@@ -285,22 +285,21 @@ test('progress subscription waits for every child once then publishes merged chi
     assert.deepEqual(errors,[]);stop();assert.deepEqual(s.unsubscribed,[...s.listeners.keys()]);
 });
 
-test('student projection subscription reads only one student state, pets, public bosses and papers',async()=>{
+test('student projection subscription reads only one student state, pets, and public bosses',async()=>{
     const listeners=new Map(),published=[];
     const subscribe=createStudentProjectionSubscriber({database:{},uid:'student-uid',ref:(_database,path)=>path,onValue:(path,next)=>{
         listeners.set(path,next);return ()=>listeners.delete(path);
     }});
     const stop=subscribe(value=>published.push(value),error=>{throw error;});
     assert.deepEqual([...listeners.keys()].sort(),[
-        'publicBosses','publicQuestionPapers','studentPets/student-uid','studentStates/student-uid'
+        'publicBosses','studentPets/student-uid','studentStates/student-uid'
     ]);
     for(const [path,value] of Object.entries({
         'studentStates/student-uid':{studentId:1,tokens:3},
         'studentPets/student-uid':{pet:{id:'pet'}},
         publicBosses:{boss:{id:'boss'}},
-        publicQuestionPapers:{paper:{id:'paper'}},
     })) listeners.get(path)({val:()=>value});
-    assert.deepEqual(published,[{studentState:{studentId:1,tokens:3},studentPets:{pet:{id:'pet'}},publicBosses:{boss:{id:'boss'}},publicQuestionPapers:{paper:{id:'paper'}}}]);
+    assert.deepEqual(published,[{studentState:{studentId:1,tokens:3},studentPets:{pet:{id:'pet'}},publicBosses:{boss:{id:'boss'}}}]);
     listeners.get('studentStates/student-uid')({val:()=>({studentId:1,tokens:4})});
     assert.equal(published[1].studentState.tokens,4);
     stop();assert.equal(listeners.size,0);

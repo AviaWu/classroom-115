@@ -41,7 +41,6 @@ export function createStudentProjectionSubscriber({database,uid,ref,onValue}){
             studentState:`studentStates/${uid}`,
             studentPets:`studentPets/${uid}`,
             publicBosses:'publicBosses',
-            publicQuestionPapers:'publicQuestionPapers',
         };
         const publish=()=>{
             if(stopped || loaded.size!==Object.keys(paths).length) return;

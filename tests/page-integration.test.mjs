@@ -152,7 +152,7 @@ test('student projection subscriptions pause while hidden or offline and resume 
         createFirebaseRestClient:()=>({transact(){}}),createTeacherProgressSubscriber:()=>()=>()=>{},mergeStudentStatesIntoProgress:value=>value,
         createCloudSync:()=>({setConnected(){},setActive(){}}),
         createStudentProjectionSubscriber:({uid})=>(onProjection,onError)=>[
-            `studentStates/${uid}`,`studentPets/${uid}`,'publicBosses','publicQuestionPapers'
+            `studentStates/${uid}`,`studentPets/${uid}`,'publicBosses'
         ].map(path=>register(path,onProjection,onError)).reduce((unsubscribe,next)=>()=>{unsubscribe();next();}),
         createStudentStateStore:()=>({perform(){}}),
         window:{addEventListener:(name,handler)=>windowEvents[name]=handler},document:{addEventListener:(name,handler)=>documentEvents[name]=handler,hidden:false},navigator:{onLine:true},
@@ -160,16 +160,16 @@ test('student projection subscriptions pause while hidden or offline and resume 
     });
     vm.runInContext(moduleSource.replace(/^\s*import .*;$/gm,''),context);
     authCallback({}, {uid:'uid-28',email:'student-28@classroom-115.local'});
-    const projectionPaths=()=>[...active.values()].filter(path=>path==='publicBosses'||path==='publicQuestionPapers'||path.startsWith('student'));
-    assert.equal(projectionPaths().length,4);
+    const projectionPaths=()=>[...active.values()].filter(path=>path==='publicBosses'||path.startsWith('student'));
+    assert.equal(projectionPaths().length,3);
     context.document.hidden=true;documentEvents.visibilitychange();
-    assert.equal(projectionPaths().length,0);assert.equal(unsubscribed,4);
+    assert.equal(projectionPaths().length,0);assert.equal(unsubscribed,3);
     context.document.hidden=false;documentEvents.visibilitychange();
-    assert.equal(projectionPaths().length,4);
+    assert.equal(projectionPaths().length,3);
     context.navigator.onLine=false;windowEvents.offline();
     assert.equal(projectionPaths().length,0);
     context.navigator.onLine=true;windowEvents.online();
-    assert.equal(projectionPaths().length,4);
+    assert.equal(projectionPaths().length,3);
     t.after(()=>{for(const token of [...active.keys()]) active.delete(token);});
 });
 test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{

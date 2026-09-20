@@ -1510,10 +1510,16 @@ function renderBossBattle(studentId,bossId,password="",message=""){
         <div class="boss-options">${question.options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${index},'${esc(password)}')">${question.options.length===2?(index===0?"是":"否"):"ABCD"[index]}．${esc(option)}</button>`).join("")}</div>
     </section>`);
 }
-function startBossBattle(studentId,bossId){
+async function startBossBattle(studentId,bossId){
     if(!canAccessStudent(studentId)) return;
-    const boss=state.bosses.find(item=>item.id===bossId&&item.active!==false),student=state.students.find(item=>item.id===studentId);
+    let boss=state.bosses.find(item=>item.id===bossId&&item.active!==false),student=state.students.find(item=>item.id===studentId);
     if(!boss||!student) return alert("目前沒有可攻打的 BOSS");
+    if(currentUser?.role==="student"&&!bossQuestions(boss).length){
+        try{await window.firebaseGameStore.loadBossQuestionPaper(bossId);}
+        catch(error){alert(error.message||"BOSS 題庫讀取失敗，請稍後重試。");return;}
+        boss=state.bosses.find(item=>item.id===bossId&&item.active!==false);student=state.students.find(item=>item.id===studentId);
+        if(!boss||!student||!bossQuestions(boss).length) return alert("這隻 BOSS 的考卷尚未設定題目");
+    }
     const progress=student.bossProgress.find(item=>item.bossId===boss.id);
     if(progress?.defeated||progress?.hp<=0) return alert("你已擊敗這隻 BOSS");
     let password="";
@@ -3264,7 +3270,7 @@ setInterval(syncScheduledTasks,30000);
     finally{authTransition=false;}
   };
   window.firebaseLogout=()=>signOut(auth);
-  let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,studentUser=null,teacherProgress=null;
+  let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,studentUser=null,studentQuestionPapers={},teacherProgress=null;
   function applyTeacherCloudState(progress,latestStudentStates){
     teacherProgress=latestStudentStates ? mergeStudentStatesIntoProgress(progress,latestStudentStates) : progress;
     return applyCloudState(teacherProgress);
@@ -3275,12 +3281,26 @@ setInterval(syncScheduledTasks,30000);
     setSyncLocked(true);
   }
   function canSubscribeStudentProjection(){return Boolean(studentUser&&!document.hidden&&navigator.onLine);}
+  async function loadStudentBossQuestionPaper(bossId){
+    const boss=studentProjection?.publicBosses?.[bossId];
+    if(!boss?.paperId) throw new Error("這隻 BOSS 的考卷尚未設定題目");
+    if(studentQuestionPapers[boss.paperId]) return studentQuestionPapers[boss.paperId];
+    const paper=await restClient.read(`publicQuestionPapers/${encodeURIComponent(boss.paperId)}`);
+    if(!paper||paper.id!==boss.paperId||!Array.isArray(paper.questions)||!paper.questions.length) throw new Error("這隻 BOSS 的考卷尚未設定題目");
+    studentQuestionPapers={...studentQuestionPapers,[boss.paperId]:paper};
+    if(studentProjection){
+      studentProjection={...studentProjection,publicQuestionPapers:studentQuestionPapers};
+      const view=studentProjectionToProgress(studentProjection);
+      if(view) applyCloudState(view);
+    }
+    return paper;
+  }
   function updateStudentProjectionSubscription(){
     if(!canSubscribeStudentProjection()){stopStudentProjection();return;}
     if(studentProjectionUnsubscribe) return;
     const subscribe=createStudentProjectionSubscriber({database,uid:studentUser.uid,ref,onValue});
     studentProjectionUnsubscribe=subscribe(projection=>{
-      studentProjection=projection;
+      studentProjection={...projection,publicQuestionPapers:studentQuestionPapers};
       const view=studentProjectionToProgress(projection);
       if(view) applyCloudState(view);else {state=normalizeState({students:[]});render();}
       setSyncLocked(!view);
@@ -3288,16 +3308,17 @@ setInterval(syncScheduledTasks,30000);
   }
   function startStudentMode(user){
     stopTeacherProjectionMode();
-    sync?.setConnected(false);stopStudentProjection();studentUser=user;
+    sync?.setConnected(false);stopStudentProjection();studentUser=user;studentQuestionPapers={};
     studentStateStore=createStudentStateStore({uid:user.uid,
       transactState:(update,path)=>restClient.transact(path,update),
       getPublicData:()=>studentProjection||{},now:()=>Date.now()+serverOffset});
     window.firebaseGameStore={available:true,canEdit:()=>Boolean(studentProjection?.studentState?.studentId),canManage:()=>Boolean(studentProjection?.studentState?.studentId),
       perform:command=>studentProjection?.studentState?.studentId ? studentStateStore.perform(command) : Promise.reject(new Error("學生資料尚未建立")),
+      loadBossQuestionPaper:bossId=>loadStudentBossQuestionPaper(bossId),
       refresh:()=>Promise.resolve(Boolean(studentProjection?.studentState?.studentId)),hasPendingSave:()=>false,flush:()=>Promise.resolve(true),pendingActions:()=>[]};
     updateStudentProjectionSubscription();
   }
-  function stopStudentMode(){studentUser=null;stopStudentProjection();studentStateStore=null;}
+  function stopStudentMode(){studentUser=null;studentQuestionPapers={};stopStudentProjection();studentStateStore=null;}
   onAuthStateChanged(auth,user=>{
     const account=accountForEmail(user?.email);
     if(account){
