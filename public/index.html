@@ -331,8 +331,8 @@ input[type="number"]{width:85px}
 <h1>Great teamwork makes the dream work</h1>
 <div>
 <span id="sessionBadge" class="session-badge"></span>
-<button onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
-<button onclick="openDrawingBoard()">畫板</button>
+<button data-teacher-only onclick="openCoopTasks()" style="position:relative"><span id="coopIng" class="coop-ing" hidden>ing</span>協力</button>
+<button data-teacher-only onclick="openDrawingBoard()">畫板</button>
 <button id="backendButton" onclick="openBackend()">老師後台</button>
 <button onclick="logout()">登出</button>
 <span class="small" id="saveStatus" role="status"></span>
@@ -480,7 +480,7 @@ function initializeLogin(){
     const account=document.getElementById("loginAccount");
     const form=document.getElementById("loginForm");
     const password=document.getElementById("loginPassword");
-    account.innerHTML='<option value="teacher">老師</option>'+Array.from({length:30},(_,index)=>`<option value="student-${index+1}">學生 ${index+1} 號</option>`).join("");
+    account.innerHTML='<option value="teacher">老師</option>'+Array.from({length:26},(_,index)=>`<option value="student-${index+1}">學生 ${index+1} 號</option>`).join("")+'<option value="test">測試帳號</option>';
     if(!form.dataset.loginBound){
         form.addEventListener("submit",login);
         password.addEventListener("keydown",event=>{
@@ -497,6 +497,7 @@ function initializeLogin(){
         document.getElementById("loginMessage").textContent="";
         document.getElementById("loginScreen").hidden=true;
         updateSessionUi();
+        if(currentUser.role==="student" && state) {render();openPetMood(currentUser.studentId);}
         return;
     }
     document.getElementById("loginScreen").hidden=false;
@@ -522,19 +523,27 @@ function login(event){
     const account=document.getElementById("loginAccount").value;
     const password=document.getElementById("loginPassword").value;
     const studentMatch=account.match(/^student-(\d+)$/);
-    const valid=account==="teacher" ? password===TEACHER_PASSWORD : studentMatch && STUDENT_PASSWORDS[Number(studentMatch[1])]===password;
+    const valid=account==="teacher" ? password===TEACHER_PASSWORD : account==="test" ? password===STUDENT_PASSWORDS[28] : studentMatch && STUDENT_PASSWORDS[Number(studentMatch[1])]===password;
     if(!valid){
         document.getElementById("loginMessage").textContent="帳號或密碼錯誤，請再試一次。";
         document.getElementById("loginPassword").select();
         return false;
     }
-    currentUser=account==="teacher" ? {role:"teacher",studentId:null} : {role:"student",studentId:Number(studentMatch[1])};
-    saveLogin();
-    backendAuthenticated=false;
-    document.getElementById("loginPassword").value="";
-    document.getElementById("loginMessage").textContent="";
-    document.getElementById("loginScreen").hidden=true;
-    updateSessionUi();
+    const finish=()=>{
+        currentUser=account==="teacher" ? {role:"teacher",studentId:null} : {role:"student",studentId:account==="test"?28:Number(studentMatch[1])};
+        saveLogin();backendAuthenticated=false;
+        document.getElementById("loginPassword").value="";
+        document.getElementById("loginMessage").textContent="";
+        document.getElementById("loginScreen").hidden=true;
+        updateSessionUi();
+        if(currentUser.role==="student" && state) {render();openPetMood(currentUser.studentId);}
+    };
+    if(typeof window.firebaseLogin!=="function"){finish();return false;}
+    document.getElementById("loginMessage").textContent="登入中…";
+    window.firebaseLogin(account,password).then(finish).catch(()=>{
+        document.getElementById("loginMessage").textContent="帳號或密碼錯誤，請再試一次。";
+        document.getElementById("loginPassword").select();
+    });
     return false;
 }
 function logout(){
@@ -542,6 +551,7 @@ function logout(){
     clearSavedLogin();
     backendAuthenticated=false;
     closeModal();
+    void window.firebaseLogout?.();
     initializeLogin();
 }
 function updateSessionUi(){
@@ -549,6 +559,9 @@ function updateSessionUi(){
     const backendButton=document.getElementById("backendButton");
     if(badge) badge.textContent=!currentUser?"尚未登入":currentUser.role==="teacher"?"老師":"學生 "+currentUser.studentId+" 號";
     if(backendButton) backendButton.hidden=currentUser?.role!=="teacher";
+    const studentMode=currentUser?.role==="student";
+    document.documentElement.classList.toggle("student-pet-mode",studentMode);
+    document.querySelectorAll("[data-teacher-only]").forEach(button=>button.hidden=studentMode);
 }
 function requireLogin(){
     if(currentUser) return true;
@@ -559,6 +572,11 @@ function canAccessStudent(studentId){
     if(!requireLogin()) return false;
     if(currentUser.role==="teacher" || currentUser.studentId===Number(studentId)) return true;
     alert("點錯啦!這不是你的人物喔!");
+    return false;
+}
+function requireTeacherFeature(){
+    if(currentUser?.role!=="student") return true;
+    alert("學生模式僅開放寵物互動與 BOSS 挑戰。");
     return false;
 }
 function setSyncLocked(locked){
@@ -1056,6 +1074,11 @@ function applyGlobalBg(){
 }
 
 function render(){
+    if(currentUser?.role==="student"){
+        document.getElementById("students").innerHTML="";
+        applyGlobalBg();updateCloudControls();
+        return;
+    }
     const now = Date.now();
     const html = state.students.map(s=>{
         const eqBg = state.backgrounds.find(x=>x.id===s.equippedBg);
@@ -1208,6 +1231,7 @@ async function refreshDrawingImages(){
 }
 
 function openDrawingBoard(){
+    if(!requireTeacherFeature()) return;
     if(!requireLogin()) return;
     currentView={type:"drawing"};
     const palette = DRAWING_COLORS.map((color,index)=>`<button class="drawing-color ${index===0?"selected":""}" style="--paint-color:${color}" onclick="selectDrawingColor('${color}',this)" aria-label="選擇顏色 ${color}" title="${color}"></button>`).join("");
@@ -1653,6 +1677,7 @@ function syncDailyTasks(){
 
 //學生端任務
 function tasks(id){
+    if(!requireTeacherFeature()) return;
     if(!canAccessStudent(id)) return;
     currentView={type:"tasks",id};
     const s = state.students[id-1];
@@ -1677,6 +1702,7 @@ function activeCoopTasks(now=Date.now()){
     return state.coopTasks.filter(task=>!task.claimed && (!task.startAt || now>=task.startAt) && (!task.dueAt || now<=task.dueAt));
 }
 function openCoopTasks(selectedId){
+    if(!requireTeacherFeature()) return;
     if(!requireLogin()) return;
     currentView={type:"coop",id:selectedId};
     const active = activeCoopTasks();
@@ -1806,6 +1832,7 @@ function bgCard(id,p){
 }
 
 function shop(id){
+    if(!requireTeacherFeature()) return;
     if(!canAccessStudent(id)) return;
     currentView={type:"shop",id,tab:"clothes"};
     lastShopTab = "clothes";
@@ -1889,6 +1916,7 @@ async function buyBg(id,pid){
 
 //衣櫃
 function closet(id,initialTab="clothes"){
+    if(!requireTeacherFeature()) return;
     if(!canAccessStudent(id)) return;
     if(initialTab==="layouts") return openPetSelector(id);
     currentView={type:"closet",id,tab:initialTab};
@@ -3195,11 +3223,12 @@ setInterval(syncScheduledTasks,30000);
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
   import { getDatabase, onValue, ref } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
-  import { createFirebaseStore, createProgressSubscriber, createTokenProvider } from "./firebase-store.mjs";
+  import { createFirebaseStore, createProgressSubscriber } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
+  import { accountForEmail, credentialsForLogin } from "./auth-accounts.mjs";
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
     authDomain: "classroom-115.firebaseapp.com",
@@ -3215,7 +3244,31 @@ setInterval(syncScheduledTasks,30000);
   const app=initializeApp(firebaseConfig),auth=getAuth(app),database=getDatabase(app);
   let serverOffset=0;
   const pendingKey="classroom-pending-operations";
-  const getToken=createTokenProvider(auth,signInAnonymously);
+  let authTransition=false;
+  window.firebaseLogin=async(account,pin)=>{
+    const credentials=credentialsForLogin(account,pin);
+    if(!credentials) throw new Error("帳號或密碼錯誤");
+    authTransition=true;
+    try{return await signInWithEmailAndPassword(auth,credentials.email,credentials.password);}
+    finally{authTransition=false;}
+  };
+  window.firebaseLogout=()=>signOut(auth);
+  let sync;
+  onAuthStateChanged(auth,user=>{
+    const account=accountForEmail(user?.email);
+    if(account){
+      currentUser=account;saveLogin();backendAuthenticated=false;
+      document.getElementById("loginScreen").hidden=true;updateSessionUi();
+      sync?.setConnected(false);sync?.setConnected(navigator.onLine);
+      return;
+    }
+    if(authTransition) return;
+    currentUser=null;clearSavedLogin();backendAuthenticated=false;sync?.setConnected(false);initializeLogin();
+  });
+  const getToken=async()=>{
+    if(!auth.currentUser) throw new Error("請先使用帳號與密碼登入");
+    return auth.currentUser.getIdToken();
+  };
   const store=createFirebaseStore({
       databaseURL:firebaseConfig.databaseURL,
       getToken,getUid:()=>auth.currentUser.uid,
@@ -3224,7 +3277,7 @@ setInterval(syncScheduledTasks,30000);
   window.readLatestProgress=store.readRemote;
   window.artworkStore=store;
   const subscribeProgress=createProgressSubscriber({database,getToken,ref,onValue});
-  const sync=createCloudSync({
+  sync=createCloudSync({
       ...store,applyState:applyCloudState,lock:setSyncLocked,status:setSyncStatus,
       subscribeRemote:subscribeProgress,
       error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},

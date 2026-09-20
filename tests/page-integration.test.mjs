@@ -55,7 +55,7 @@ test('browser module wires child subscriptions and avoids root SDK transactions'
 });
 test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{
     const h=page(t);h.sync.setConnected(true);await h.sync.refresh();
-    assert.equal(h.w.document.getElementById('loginAccount').options.length,31);
+    assert.equal(h.w.document.getElementById('loginAccount').options.length,28);
     h.signIn('student-1','0000');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);assert.match(h.w.document.getElementById('loginMessage').textContent,/錯誤/);
     h.signIn('student-1','3847');assert.equal(h.w.document.getElementById('loginScreen').hidden,true);assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 1 號');
     h.w.logout();h.signIn('teacher','5905606');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);
@@ -71,12 +71,15 @@ test('login persists across page initialization until the user logs out',async t
     h.w.logout();h.w.eval('currentUser=null;initializeLogin()');
     assert.equal(h.w.document.getElementById('loginScreen').hidden,false);
 });
-test('student can use own features and drawing but is blocked from every other student',async t=>{
+test('student sees only their pet view on a blank page and cannot open teacher features',async t=>{
     const h=page(t);await h.start();h.w.logout();h.signIn('student-1','3847');
-    for(const action of ['tasks(1)','shop(1)','closet(1)','openPetMood(1)','openDrawingBoard()','openCoopTasks()']) await h.run(action);
+    assert.equal(h.w.document.getElementById('students').innerHTML,'');
     assert.ok(h.w.document.getElementById('modal').classList.contains('open'));
-    for(const action of ['tasks(2)','shop(2)','closet(2)','openPetMood(2)',"completeCoopMember('coop',2)"]) await h.run(action);
-    assert.equal(h.alerts.filter(message=>message==='點錯啦!這不是你的人物喔!').length,5);assert.equal(h.writes,0);
+    assert.match(h.w.document.getElementById('body').textContent,/寵物互動/);
+    for(const action of ['tasks(1)','shop(1)','closet(1)','openDrawingBoard()','openCoopTasks()']) await h.run(action);
+    assert.equal(h.alerts.filter(message=>/僅開放/.test(message)).length,5);assert.equal(h.writes,0);
+    await h.run('openPetMood(2)');
+    assert.equal(h.alerts.filter(message=>message==='點錯啦!這不是你的人物喔!').length,1);
     h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
 });
 test('Escape closes an open shared modal',async t=>{
