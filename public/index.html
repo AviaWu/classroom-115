@@ -518,6 +518,14 @@ function saveLogin(){
 function clearSavedLogin(){
     try { localStorage.removeItem(LOGIN_SESSION_KEY); } catch {}
 }
+function applyAuthenticatedSession(account){
+    currentUser=account;saveLogin();backendAuthenticated=false;
+    document.getElementById("loginScreen").hidden=true;
+    updateSessionUi();
+    if(!state) return;
+    render();
+    if(currentUser.role==="student") openPetMood(currentUser.studentId);
+}
 function login(event){
     event?.preventDefault();
     const account=document.getElementById("loginAccount").value;
@@ -530,13 +538,9 @@ function login(event){
         return false;
     }
     const finish=()=>{
-        currentUser=account==="teacher" ? {role:"teacher",studentId:null} : {role:"student",studentId:Number(studentMatch[1])};
-        saveLogin();backendAuthenticated=false;
+        applyAuthenticatedSession(account==="teacher" ? {role:"teacher",studentId:null} : {role:"student",studentId:Number(studentMatch[1])});
         document.getElementById("loginPassword").value="";
         document.getElementById("loginMessage").textContent="";
-        document.getElementById("loginScreen").hidden=true;
-        updateSessionUi();
-        if(currentUser.role==="student" && state) {render();openPetMood(currentUser.studentId);}
     };
     if(typeof window.firebaseLogin!=="function"){finish();return false;}
     document.getElementById("loginMessage").textContent="登入中…";
@@ -3257,8 +3261,7 @@ setInterval(syncScheduledTasks,30000);
   onAuthStateChanged(auth,user=>{
     const account=accountForEmail(user?.email);
     if(account){
-      currentUser=account;saveLogin();backendAuthenticated=false;
-      document.getElementById("loginScreen").hidden=true;updateSessionUi();
+      applyAuthenticatedSession(account);
       sync?.setConnected(false);sync?.setConnected(navigator.onLine);
       return;
     }

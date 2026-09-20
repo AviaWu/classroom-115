@@ -90,6 +90,13 @@ test('unassigned legacy account signs in to an otherwise blank page',async t=>{
     assert.equal(h.w.document.getElementById('students').innerHTML,'');
     assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);
 });
+test('Firebase teacher session confirmation redraws a page left blank by an unassigned account',async t=>{
+    const h=page(t);await h.start();h.w.logout();h.signIn('student-29','5487');
+    assert.equal(h.w.document.getElementById('students').innerHTML,'');
+    h.w.applyAuthenticatedSession({role:'teacher',studentId:null});
+    assert.equal(h.w.document.getElementById('sessionBadge').textContent,'老師');
+    assert.equal(h.w.document.querySelectorAll('#students .card').length,2);
+});
 test('Escape closes an open shared modal',async t=>{
     const h=page(t);await h.start();await h.run('shop(1)');
     const modal=h.w.document.getElementById('modal');
