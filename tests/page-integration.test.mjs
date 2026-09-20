@@ -55,7 +55,8 @@ test('browser module wires room and per-student teacher transactions without a d
     assert.match(moduleSource,/get\(ref\(database,"studentStates"\)\)/);
     assert.doesNotMatch(moduleSource,/get\(ref\(database\)\)/);
     assert.match(moduleSource,/writeRoot:updates=>update\(ref\(database\),updates\)/);
-    assert.match(moduleSource,/transactRoom:updater=>transactValue\(ref\(database,"games\/classroom-115"\),updater\)/);
+    assert.match(moduleSource,/observeRoom:\(ready,error\)=>onValue\(ref\(database,"games\/classroom-115"\),ready,error\)/);
+    assert.match(moduleSource,/transactRoom:updater=>transactValue\(ref\(database,"games\/classroom-115"\),updater,\{applyLocally:false\}\)/);
     assert.match(moduleSource,/transactStudentState:\(uid,updater\)=>transactValue\(ref\(database,`studentStates\/\$\{uid\}`\),updater\)/);
     assert.doesNotMatch(moduleSource,/transactRoot:/);
 });

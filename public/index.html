@@ -3266,7 +3266,7 @@ setInterval(syncScheduledTasks,30000);
   };
   window.firebaseLogout=()=>signOut(auth);
   let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,teacherStatesUnsubscribe=null,teacherRawProgress=null,teacherStudentStates={};
-  const transactValue=async(reference,update)=>{const result=await runTransaction(reference,update);return {committed:result.committed,value:result.snapshot.val()};};
+  const transactValue=async(reference,update,options)=>{const result=await runTransaction(reference,update,options);return {committed:result.committed,value:result.snapshot.val()};};
   function applyTeacherCloudState(progress,latestStudentStates){
     if(latestStudentStates) teacherStudentStates=latestStudentStates;
     teacherRawProgress=progress;
@@ -3326,7 +3326,8 @@ setInterval(syncScheduledTasks,30000);
       now:()=>Date.now()+serverOffset,
       readRoot:readTeacherRoot,
       writeRoot:updates=>update(ref(database),updates),
-      transactRoom:updater=>transactValue(ref(database,"games/classroom-115"),updater),
+      observeRoom:(ready,error)=>onValue(ref(database,"games/classroom-115"),ready,error),
+      transactRoom:updater=>transactValue(ref(database,"games/classroom-115"),updater,{applyLocally:false}),
       transactStudentState:(uid,updater)=>transactValue(ref(database,`studentStates/${uid}`),updater)
   });
   window.readLatestProgress=store.readRemote;

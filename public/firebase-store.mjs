@@ -61,7 +61,7 @@ export function createTeacherStudentStatesSubscriber({database,ref,onValue}){
 
 // REST handles direct reads and artwork payloads. The teacher page serializes commands
 // in a room transaction and projects personal changes through per-student transactions.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,writeRoot,transactStudentState}) {
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,writeRoot,transactStudentState,observeRoom}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -263,6 +263,17 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     const uidMap=root=>Object.fromEntries(Object.entries(root.studentRoster||{})
         .filter(([,entry])=>entry?.active===true&&Number.isInteger(entry.studentId))
         .map(([uid,entry])=>[entry.studentId,uid]));
+    async function transactObservedRoom(update){
+        if(typeof observeRoom!=='function') return transactRoom(update);
+        let stop=()=>{};
+        try{
+            await new Promise((resolve,reject)=>{
+                try{stop=observeRoom(resolve,reject)||stop;}
+                catch(error){reject(error);}
+            });
+            return await transactRoom(update);
+        }finally{stop();}
+    }
     function projectionUpdates(root,plan,mapping){
         const updates={};
         for(const uid of Object.values(mapping)){
@@ -304,7 +315,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         const finalResult=conditionalResult||JSON.parse(room.operations?.[operationId]?.result?.json||'{"ok":true}');
         let settled;
         try{
-            const transaction=await transactRoom(current=>{
+            const transaction=await transactObservedRoom(current=>{
                 current=current??fallbackRoom;
                 if(current?._projectionSync?.operationId!==operationId) return;
                 const receipt=current.operations?.[operationId];
@@ -346,7 +357,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             command??=await prepareCommand(job.command,artwork);
             const mapping=uidMap(root),clock=now();let settled,blocked=false;
             try{
-                const transaction=await transactRoom(current=>{
+                const transaction=await transactObservedRoom(current=>{
                     current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];

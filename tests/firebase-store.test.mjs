@@ -60,7 +60,7 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         games:{'classroom-115':{progress:progress||{students:[defaultStudent],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]},operations:{}}},
         studentRoster:studentRoster||{'uid-one':{studentId:1,active:true}},
         studentStates:studentStates||{'uid-one':defaultState},studentPets:{},publicBosses:{},publicQuestionPapers:{},
-    },studentCalls=0,roomCalls=0,readCalls=0;
+    },studentCalls=0,roomCalls=0,readCalls=0,roomReady=false,roomObservationStops=0;
     const setPath=(path,value)=>{
         const parts=path.split('/'),last=parts.pop();let target=root;
         for(const part of parts) target=target[part]??={};
@@ -70,14 +70,15 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
         fetch:async()=>{throw new Error('unexpected REST request');},
         readRoot:async()=>{readCalls++;await onReadRoot?.({root,call:readCalls});return clone(root);},
+        observeRoom: coldRoomCalls.length ? ready=>{
+            let stopped=false;
+            queueMicrotask(()=>{if(!stopped){roomReady=true;ready();}});
+            return ()=>{stopped=true;roomReady=false;roomObservationStops++;};
+        } : undefined,
         transactRoom:async update=>{
             roomCalls++;
+            if(coldRoomCalls.includes(roomCalls)&&!roomReady) throw Object.assign(new Error('maxretry'),{code:'database/maxretry'});
             await onRoomTransaction?.({root,call:roomCalls});
-            if(coldRoomCalls.includes(roomCalls)){
-                const coldResult=update(null);
-                if(coldResult===null) throw Object.assign(new Error('maxretry'),{code:'database/maxretry'});
-                if(coldResult===undefined) return {committed:false,value:null};
-            }
             const current=clone(root.games['classroom-115']),next=update(current);
             if(next===undefined) return {committed:false,value:current};
             root.games['classroom-115']=resolveServerValues(next);return {committed:true,value:clone(root.games['classroom-115'])};
@@ -93,7 +94,7 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         writeRoot:async updates=>{for(const [path,value] of Object.entries(updates)) setPath(path,value);},
     };
     return {store:createFirebaseStore(dependencies),newStore:()=>createFirebaseStore(dependencies),
-        get root(){return root;},get roomCalls(){return roomCalls;},get studentCalls(){return studentCalls;}};
+        get root(){return root;},get roomCalls(){return roomCalls;},get studentCalls(){return studentCalls;},get roomObservationStops(){return roomObservationStops;}};
 }
 const clone=value=>structuredClone(value);
 const job=(id,command)=>({id,createdAt:90000,command});
@@ -400,6 +401,7 @@ test('student 28 equipment survives a cold room cache before the teacher transac
     const outcome=await server.store.execute(job('cold-room-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
     assert.equal(outcome.progress.students[27].equippedClothes,null);
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
+    assert.equal(server.roomObservationStops,2);
 });
 test('teacher projection finalization survives a cold room cache',async()=>{
     const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt'}),
@@ -410,6 +412,12 @@ test('teacher projection finalization survives a cold room cache',async()=>{
     const outcome=await server.store.execute(job('cold-finalize-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
     assert.equal(outcome.progress.students[27].equippedClothes,null);
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
+    assert.equal(server.roomObservationStops,2);
+});
+test('cold room observation stops when the teacher transaction fails',async()=>{
+    const server=coordinatedServer({coldRoomCalls:[1],onRoomTransaction:()=>{throw new Error('transaction failed');}});
+    await assert.rejects(server.store.execute(job('failed-observed-room',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),/transaction failed/);
+    assert.equal(server.roomObservationStops,1);
 });
 test('coordinated teacher flow projects purchases, lottery, and task rewards',async()=>{
     const cases=[
