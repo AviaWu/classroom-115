@@ -22,6 +22,11 @@ function page(t){
     w.HTMLCanvasElement.prototype.getContext=function(){return {fillRect(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},closePath(){},drawImage(){},getImageData(){return {data:new Uint8ClampedArray(16)};},putImageData(){}};};
     w.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/jpeg;base64,test';
     w.eval(scripts[0][2]);
+    const testPins={teacher:'1127','student-1':'3847','student-28':'9316','student-29':'5487'};
+    w.firebaseLogin=(account,pin)=>({then(resolve){
+        if(testPins[account]===pin){resolve();return {catch(){}};}
+        return {catch(reject){reject(new Error('invalid credentials'));}};
+    }});
     w.GameOperations=operations;
     w.artworkStore={readArtwork:async id=>{artworkReads.push(id);return artworkReadHook ? artworkReadHook(id) : clone(artworkPayloads.get(id)||null);}};
     const sync=createCloudSync({readRemote:async()=>clone(cloud),execute:async job=>{
@@ -42,8 +47,12 @@ function page(t){
     w.firebaseGameStore=sync;
     t.after(()=>{sync.dispose();w.close();});
     const signIn=(account,password)=>{w.document.getElementById('loginAccount').value=account;w.document.getElementById('loginPassword').value=password;w.login(new w.Event('submit'));};
-    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,setPrompt:value=>promptValue=value,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){w.openBackend();w.document.getElementById("backendPw").value="5905606";await w.checkBackendPw();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
+    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,setPrompt:value=>promptValue=value,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){await w.openBackend();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
 }
+test('page source delegates password verification to Firebase without embedded account secrets',()=>{
+    assert.doesNotMatch(html,/STUDENT_PASSWORDS|TEACHER_PASSWORD|BACKEND_PASSWORD/);
+    assert.doesNotMatch(html,/3847|5905606/);
+});
 test('inline scripts and modules parse',()=>{
     for(const [,attributes,source] of scripts){
         if(attributes.includes('module')){const r=spawnSync(process.execPath,['--input-type=module','--check'],{input:source,encoding:'utf8'});assert.equal(r.status,0,r.stderr);}
@@ -236,13 +245,10 @@ test('Escape closes an open shared modal',async t=>{
     assert.equal(modal.classList.contains('open'),false);
     assert.equal(h.w.document.getElementById('body').innerHTML,'');
 });
-test('teacher has all student access but must enter the password again for backend',async t=>{
+test('teacher Firebase session opens the backend without a second client-side password',async t=>{
     const h=page(t);await h.start();await h.run('tasks(2)');assert.deepEqual(h.alerts,[]);
-    h.w.openBackend();assert.ok(h.w.document.getElementById('backendPw'));assert.match(h.w.document.getElementById('body').textContent,/登入後台/);
-    h.w.document.getElementById('backendPw').value='0000';await h.w.checkBackendPw();assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);assert.ok(h.alerts.includes('密碼錯誤！'));
-    h.w.openBackend();const backendPassword=h.w.document.getElementById('backendPw');backendPassword.value='5905606';
-    backendPassword.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
-    await new Promise(resolve=>setTimeout(resolve,0));assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
+    await h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
+    assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
 });
 test('event gifts remain free and omit the level wording in shop and closet',async t=>{
     const h=page(t);h.cloud={...h.cloud,clothesM:[...h.cloud.clothesM,{id:'event',name:'活動服裝',level:'活動贈送',price:0,active:true,image:'/images/boy/ba1.png'}]};

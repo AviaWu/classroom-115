@@ -358,13 +358,6 @@ const MAX_IMG_SIZE = 800;
 const IMG_QUALITY = 0.7;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
-const TEACHER_PASSWORD = "1127";
-const BACKEND_PASSWORD = "5905606";
-const STUDENT_PASSWORDS = Object.freeze({
-    1:"3847",2:"1926",3:"5063",4:"7412",5:"2895",6:"6031",7:"4758",8:"9203",9:"1567",10:"8340",
-    11:"2691",12:"5127",13:"9482",14:"3056",15:"7719",16:"4283",17:"6905",18:"1348",19:"8672",20:"2510",
-    21:"9137",22:"4826",23:"3095",24:"7264",25:"1483",26:"6759",27:"2048",28:"9316",29:"5487",30:"3621"
-});
 const DEFAULT_PET_IMAGE = "/images/Dec2/1000095494-removebg-preview.png";
 const DEFAULT_PET_NAME = "小嗶";
 const LEVEL_PRICES = {"活動贈送":0, R:50, SR:100, SSR:200, UR:300};
@@ -507,7 +500,7 @@ function loadSavedLogin(){
     try {
         const saved=JSON.parse(localStorage.getItem(LOGIN_SESSION_KEY)||"null");
         if(saved?.role==="teacher" && saved.studentId===null) return {role:"teacher",studentId:null};
-        if(saved?.role==="student" && Number.isInteger(saved.studentId) && STUDENT_PASSWORDS[saved.studentId]) return {role:"student",studentId:saved.studentId};
+        if(saved?.role==="student" && Number.isInteger(saved.studentId) && saved.studentId>=1 && saved.studentId<=30) return {role:"student",studentId:saved.studentId};
     } catch {}
     return null;
 }
@@ -530,8 +523,8 @@ function login(event){
     const account=document.getElementById("loginAccount").value;
     const password=document.getElementById("loginPassword").value;
     const studentMatch=account.match(/^student-(\d+)$/);
-    const valid=account==="teacher" ? password===TEACHER_PASSWORD : studentMatch && STUDENT_PASSWORDS[Number(studentMatch[1])]===password;
-    if(!valid){
+    const validAccount=account==="teacher" || (studentMatch && Number(studentMatch[1])>=1 && Number(studentMatch[1])<=30);
+    if(!validAccount){
         document.getElementById("loginMessage").textContent="帳號或密碼錯誤，請再試一次。";
         document.getElementById("loginPassword").select();
         return false;
@@ -541,7 +534,10 @@ function login(event){
         document.getElementById("loginPassword").value="";
         document.getElementById("loginMessage").textContent="";
     };
-    if(typeof window.firebaseLogin!=="function"){finish();return false;}
+    if(typeof window.firebaseLogin!=="function"){
+        document.getElementById("loginMessage").textContent="登入服務尚未就緒，請稍後重試。";
+        return false;
+    }
     document.getElementById("loginMessage").textContent="登入中…";
     window.firebaseLogin(account,password).then(finish).catch(()=>{
         document.getElementById("loginMessage").textContent="帳號或密碼錯誤，請再試一次。";
@@ -2039,44 +2035,10 @@ async function equipBg(id,pid){
 }
 
 //後台
-openBackend = function(){
+openBackend = async function(){
     if(!requireLogin() || currentUser.role!=="teacher") return;
-    backendAuthenticated=false;
-    currentView={type:"login"};
-    openModal(`
-    <form id="backendLoginForm">
-        <h2>登入後台</h2>
-        <div class="row">
-            <label>管理密碼：</label>
-            <input type="password" id="backendPw" autofocus>
-        </div>
-        <div class="row">
-            <button class="primary" type="submit">登入</button>
-            <button type="button" onclick="closeModal()">取消</button>
-        </div>
-    </form>
-    `);
-    const form=document.getElementById("backendLoginForm");
-    const password=document.getElementById("backendPw");
-    form.addEventListener("submit",checkBackendPw);
-    password.addEventListener("keydown",event=>{
-        if(event.key!=="Enter") return;
-        event.preventDefault();
-        checkBackendPw(event);
-    });
-    password.focus();
-}
-async function checkBackendPw(event){
-    event?.preventDefault();
-    const pw = document.getElementById("backendPw").value;
-    if(currentUser?.role==="teacher" && pw === BACKEND_PASSWORD){
-        backendAuthenticated=true;
-        closeModal();
-        await backend();
-    }else{
-        alert("密碼錯誤！");
-        closeModal();
-    }
+    backendAuthenticated=true;
+    await backend();
 }
 
 function missingBuiltinEventClothingChanges(){
@@ -3301,7 +3263,7 @@ setInterval(syncScheduledTasks,30000);
     const subscribe=createStudentProjectionSubscriber({database,uid:studentUser.uid,ref,onValue});
     studentProjectionUnsubscribe=subscribe(projection=>{
       studentProjection={...projection,publicQuestionPapers:studentQuestionPapers};
-      const view=studentProjectionToProgress(projection);
+      const view=studentProjectionToProgress(studentProjection);
       if(view) applyCloudState(view);else {state=normalizeState({students:[]});render();}
       setSyncLocked(!view);
     },error=>{console.error("學生資料同步失敗",error);setSyncLocked(true);setSyncStatus(error.message||"學生資料同步失敗");});
