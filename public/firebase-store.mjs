@@ -299,12 +299,13 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         try{if(Object.keys(updates).length) await writeRoot(updates);}catch(error){throw markRetryable(error);}
         const latestRoot=(await readRoot())||{};
         const latestStates=latestRoot.studentStates||states;
+        const fallbackRoom=latestRoot.games?.['classroom-115']||room;
         const conditionalResult=syncPlan.resultUid?applied.find(entry=>entry.uid===syncPlan.resultUid)?.result:null;
         const finalResult=conditionalResult||JSON.parse(room.operations?.[operationId]?.result?.json||'{"ok":true}');
         let settled;
         try{
             const transaction=await transactRoom(current=>{
-                if(current===null) return null;
+                current=current??fallbackRoom;
                 if(current?._projectionSync?.operationId!==operationId) return;
                 const receipt=current.operations?.[operationId];
                 let progress=mergeStudentStatesIntoProgress(current.progress??null,latestStates);
@@ -346,8 +347,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             const mapping=uidMap(root),clock=now();let settled,blocked=false;
             try{
                 const transaction=await transactRoom(current=>{
-                    if(current===null&&!['restore','initialize'].includes(command.type)) return null;
-                    current=current||{};
+                    current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];
                     if(receipt&&receipt.phase!=='projecting'){

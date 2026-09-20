@@ -75,7 +75,8 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
             await onRoomTransaction?.({root,call:roomCalls});
             if(coldRoomCalls.includes(roomCalls)){
                 const coldResult=update(null);
-                if(coldResult!==null) return {committed:false,value:null};
+                if(coldResult===null) throw Object.assign(new Error('maxretry'),{code:'database/maxretry'});
+                if(coldResult===undefined) return {committed:false,value:null};
             }
             const current=clone(root.games['classroom-115']),next=update(current);
             if(next===undefined) return {committed:false,value:current};
