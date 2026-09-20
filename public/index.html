@@ -3264,22 +3264,21 @@ setInterval(syncScheduledTasks,30000);
     finally{authTransition=false;}
   };
   window.firebaseLogout=()=>signOut(auth);
-  let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,teacherProgress=null;
+  let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,studentUser=null,teacherProgress=null;
   function applyTeacherCloudState(progress,latestStudentStates){
     teacherProgress=latestStudentStates ? mergeStudentStatesIntoProgress(progress,latestStudentStates) : progress;
     return applyCloudState(teacherProgress);
   }
   function stopTeacherProjectionMode(){teacherProgress=null;}
-  function startStudentMode(user){
-    stopTeacherProjectionMode();
-    sync?.setConnected(false);studentProjectionUnsubscribe?.();studentProjection=null;
-    const subscribe=createStudentProjectionSubscriber({database,uid:user.uid,ref,onValue});
-    studentStateStore=createStudentStateStore({uid:user.uid,
-      transactState:(update,path)=>restClient.transact(path,update),
-      getPublicData:()=>studentProjection||{},now:()=>Date.now()+serverOffset});
-    window.firebaseGameStore={available:true,canEdit:()=>Boolean(studentProjection?.studentState?.studentId),canManage:()=>Boolean(studentProjection?.studentState?.studentId),
-      perform:command=>studentProjection?.studentState?.studentId ? studentStateStore.perform(command) : Promise.reject(new Error("學生資料尚未建立")),
-      refresh:()=>Promise.resolve(Boolean(studentProjection?.studentState?.studentId)),hasPendingSave:()=>false,flush:()=>Promise.resolve(true),pendingActions:()=>[]};
+  function stopStudentProjection(){
+    studentProjectionUnsubscribe?.();studentProjectionUnsubscribe=null;studentProjection=null;
+    setSyncLocked(true);
+  }
+  function canSubscribeStudentProjection(){return Boolean(studentUser&&!document.hidden&&navigator.onLine);}
+  function updateStudentProjectionSubscription(){
+    if(!canSubscribeStudentProjection()){stopStudentProjection();return;}
+    if(studentProjectionUnsubscribe) return;
+    const subscribe=createStudentProjectionSubscriber({database,uid:studentUser.uid,ref,onValue});
     studentProjectionUnsubscribe=subscribe(projection=>{
       studentProjection=projection;
       const view=studentProjectionToProgress(projection);
@@ -3287,7 +3286,18 @@ setInterval(syncScheduledTasks,30000);
       setSyncLocked(!view);
     },error=>{console.error("學生資料同步失敗",error);setSyncLocked(true);setSyncStatus(error.message||"學生資料同步失敗");});
   }
-  function stopStudentMode(){studentProjectionUnsubscribe?.();studentProjectionUnsubscribe=null;studentProjection=null;studentStateStore=null;}
+  function startStudentMode(user){
+    stopTeacherProjectionMode();
+    sync?.setConnected(false);stopStudentProjection();studentUser=user;
+    studentStateStore=createStudentStateStore({uid:user.uid,
+      transactState:(update,path)=>restClient.transact(path,update),
+      getPublicData:()=>studentProjection||{},now:()=>Date.now()+serverOffset});
+    window.firebaseGameStore={available:true,canEdit:()=>Boolean(studentProjection?.studentState?.studentId),canManage:()=>Boolean(studentProjection?.studentState?.studentId),
+      perform:command=>studentProjection?.studentState?.studentId ? studentStateStore.perform(command) : Promise.reject(new Error("學生資料尚未建立")),
+      refresh:()=>Promise.resolve(Boolean(studentProjection?.studentState?.studentId)),hasPendingSave:()=>false,flush:()=>Promise.resolve(true),pendingActions:()=>[]};
+    updateStudentProjectionSubscription();
+  }
+  function stopStudentMode(){studentUser=null;stopStudentProjection();studentStateStore=null;}
   onAuthStateChanged(auth,user=>{
     const account=accountForEmail(user?.email);
     if(account){
@@ -3356,12 +3366,22 @@ setInterval(syncScheduledTasks,30000);
       }
   });
   window.firebaseGameStore=sync;
-  document.addEventListener("visibilitychange",()=>sync.setActive(!document.hidden));
-  window.addEventListener("pagehide",()=>sync.setActive(false));
-  window.addEventListener("pageshow",()=>sync.setActive(!document.hidden));
-  window.addEventListener("focus",()=>sync.setActive(!document.hidden));
-  window.addEventListener("offline",()=>sync.setConnected(false));
-  window.addEventListener("online",()=>sync.setConnected(true));
+  const updatePageSyncActivity=()=>{
+    if(currentUser?.role==="student"){updateStudentProjectionSubscription();return;}
+    sync.setActive(!document.hidden);
+  };
+  document.addEventListener("visibilitychange",updatePageSyncActivity);
+  window.addEventListener("pagehide",()=>{
+    if(currentUser?.role==="student") stopStudentProjection();else sync.setActive(false);
+  });
+  window.addEventListener("pageshow",updatePageSyncActivity);
+  window.addEventListener("focus",updatePageSyncActivity);
+  window.addEventListener("offline",()=>{
+    if(currentUser?.role==="student") updateStudentProjectionSubscription();else sync.setConnected(false);
+  });
+  window.addEventListener("online",()=>{
+    if(currentUser?.role==="student") updateStudentProjectionSubscription();else sync.setConnected(true);
+  });
   onValue(ref(database,".info/serverTimeOffset"),snapshot=>{serverOffset=snapshot.val()||0;});
   if(currentUser?.role==="student" && auth.currentUser) startStudentMode(auth.currentUser);
   else if(navigator.onLine) sync.setConnected(true);

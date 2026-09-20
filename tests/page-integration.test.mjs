@@ -139,6 +139,39 @@ test('browser module selects personal projection subscriptions for student sessi
     assert.match(moduleSource,/startStudentMode/);
     assert.match(moduleSource,/studentProjectionToProgress/);
 });
+test('student projection subscriptions pause while hidden or offline and resume when usable',async t=>{
+    const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
+    const documentEvents={},windowEvents={},active=new Map();let authCallback,subscribed=0,unsubscribed=0;
+    const register=(path,callback)=>{const token=++subscribed;active.set(token,path);return ()=>{if(active.delete(token))unsubscribed++;};};
+    const context=vm.createContext({
+        initializeApp:()=>({}),getAuth:()=>({}),getDatabase:()=>({}),onAuthStateChanged:(_,callback)=>authCallback=callback,
+        signInWithEmailAndPassword(){},signOut(){},accountForEmail:()=>({role:'student',studentId:28}),
+        applyAuthenticatedSession:account=>context.currentUser=account,
+        ref:(_,path)=>path,onValue:register,
+        update(){},GameOperations:operations,createFirebaseStore:()=>({readCompleteProgress:async()=>null}),
+        createFirebaseRestClient:()=>({transact(){}}),createTeacherProgressSubscriber:()=>()=>()=>{},mergeStudentStatesIntoProgress:value=>value,
+        createCloudSync:()=>({setConnected(){},setActive(){}}),
+        createStudentProjectionSubscriber:({uid})=>(onProjection,onError)=>[
+            `studentStates/${uid}`,`studentPets/${uid}`,'publicBosses','publicQuestionPapers'
+        ].map(path=>register(path,onProjection,onError)).reduce((unsubscribe,next)=>()=>{unsubscribe();next();}),
+        createStudentStateStore:()=>({perform(){}}),
+        window:{addEventListener:(name,handler)=>windowEvents[name]=handler},document:{addEventListener:(name,handler)=>documentEvents[name]=handler,hidden:false},navigator:{onLine:true},
+        currentUser:null,sessionStorage:{getItem:()=>null,setItem(){}},crypto:{randomUUID:()=> 'student-lifecycle'},applyCloudState(){},setSyncLocked(){},setSyncStatus(){},console,
+    });
+    vm.runInContext(moduleSource.replace(/^\s*import .*;$/gm,''),context);
+    authCallback({}, {uid:'uid-28',email:'student-28@classroom-115.local'});
+    const projectionPaths=()=>[...active.values()].filter(path=>path==='publicBosses'||path==='publicQuestionPapers'||path.startsWith('student'));
+    assert.equal(projectionPaths().length,4);
+    context.document.hidden=true;documentEvents.visibilitychange();
+    assert.equal(projectionPaths().length,0);assert.equal(unsubscribed,4);
+    context.document.hidden=false;documentEvents.visibilitychange();
+    assert.equal(projectionPaths().length,4);
+    context.navigator.onLine=false;windowEvents.offline();
+    assert.equal(projectionPaths().length,0);
+    context.navigator.onLine=true;windowEvents.online();
+    assert.equal(projectionPaths().length,4);
+    t.after(()=>{for(const token of [...active.keys()]) active.delete(token);});
+});
 test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{
     const h=page(t);h.sync.setConnected(true);await h.sync.refresh();
     assert.equal(h.w.document.getElementById('loginAccount').options.length,31);
