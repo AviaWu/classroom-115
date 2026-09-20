@@ -1672,7 +1672,7 @@ function generateScheduledCoopTasks(now=new Date()){
     return changed;
 }
 function syncScheduledTasks(){
-    if(!window.firebaseGameStore.canEdit()) return Promise.resolve(false);
+    if(currentUser?.role!=="teacher" || !window.firebaseGameStore.canEdit()) return Promise.resolve(false);
     return runCommand({type:"schedule"},"schedule");
 }
 function syncDailyTasks(){
