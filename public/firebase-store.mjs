@@ -250,7 +250,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         const protectedSet=new Set(protectedEntries.map(([id])=>id));
         const recent=entries.filter(([id,receipt])=>!protectedSet.has(id) && Number.isFinite(receipt?.committedAt) && receipt.committedAt>=clock-3_600_000)
             .sort(([idA,a],[idB,b])=>b.committedAt-a.committedAt || (b.createdAt||0)-(a.createdAt||0) || idA.localeCompare(idB));
-        const slots=Math.max(0,99-protectedEntries.length);
+        const slots=Math.max(0,49-protectedEntries.length);
         return Object.fromEntries([...protectedEntries,...recent.slice(0,slots)]);
     }
     async function executeSdkTransaction(job,pendingIds,artwork){

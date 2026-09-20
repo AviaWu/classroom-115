@@ -229,7 +229,7 @@ test('a real transaction prunes expired and excess receipts while retaining its 
     const request=job({type:'resources',studentId:1,field:'tokens',mode:'add',amount:1});
     await store().execute(request,[pendingId]);
     const raw=await rawRoom(),ids=Object.keys(raw.operations);
-    assert.equal(ids.length,100);assert.ok(raw.operations[pendingId]);assert.ok(raw.operations[request.id]);
+    assert.equal(ids.length,50);assert.ok(raw.operations[pendingId]);assert.ok(raw.operations[request.id]);
     assert.equal(raw.operations[expiredId],undefined);assert.ok(raw.operations.receipt_recent_000);assert.equal(raw.operations.receipt_recent_104,undefined);
 });
 

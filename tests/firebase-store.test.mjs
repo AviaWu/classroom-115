@@ -710,7 +710,7 @@ test('SDK transaction pruning keeps local pending receipts and the newest receip
     operations.sdk_expired={id:'sdk_expired',uid:'test-user',type:'resources',createdAt:2,committedAt:2,result:{json:'{"ok":true}'}};
     s.room={...s.room,operations,lastOperationId:'sdk-recent-104'};
     await s.store.execute(job('sdk-new-operation',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:1}),['sdk_old_pending']);
-    assert.equal(Object.keys(s.room.operations).length,100);assert.ok(s.room.operations.sdk_old_pending);
+    assert.equal(Object.keys(s.room.operations).length,50);assert.ok(s.room.operations.sdk_old_pending);
     assert.equal(s.room.operations.sdk_expired,undefined);assert.ok(s.room.operations['sdk-recent-000']);assert.equal(s.room.operations['sdk-recent-104'],undefined);
 });
 test('SDK transactions enforce the restore barrier and mark database network errors retryable',async()=>{
@@ -721,7 +721,7 @@ test('SDK transactions enforce the restore barrier and mark database network err
     const offline=sdkServer({transactRoom:async()=>{throw failure;}});
     await assert.rejects(offline.store.execute(job('sdk-offline-operation',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),error=>error===failure&&error.retryable===true);
 });
-test('transactions retain at most one hour and 100 receipts while protecting pending ids',async()=>{
+test('transactions retain at most one hour and 50 receipts while protecting pending ids',async()=>{
     const s=server(),recent={},clock=100000;
     for(let index=0;index<105;index++){
         const id=`recent-operation-${String(index).padStart(3,'0')}`;
@@ -734,7 +734,7 @@ test('transactions retain at most one hour and 100 receipts while protecting pen
         [expiredId]:{id:expiredId,uid:'test-user',type:'resources',createdAt:2,committedAt:2,result:{json:'{"ok":true}'}}
     },lastOperationId:'recent-operation-104'};
     await s.store.execute(job('new-operation-id',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:1}),[oldId]);
-    assert.equal(Object.keys(s.room.operations).length,100);
+    assert.equal(Object.keys(s.room.operations).length,50);
     assert.ok(s.room.operations[oldId]);
     assert.equal(s.room.operations[expiredId],undefined);
     assert.ok(s.room.operations['recent-operation-000']);
