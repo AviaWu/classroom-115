@@ -304,6 +304,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         let settled;
         try{
             const transaction=await transactRoom(current=>{
+                if(current===null) return null;
                 if(current?._projectionSync?.operationId!==operationId) return;
                 const receipt=current.operations?.[operationId];
                 let progress=mergeStudentStatesIntoProgress(current.progress??null,latestStates);
@@ -345,6 +346,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             const mapping=uidMap(root),clock=now();let settled,blocked=false;
             try{
                 const transaction=await transactRoom(current=>{
+                    if(current===null&&!['restore','initialize'].includes(command.type)) return null;
                     current=current||{};
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];

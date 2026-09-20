@@ -52,7 +52,7 @@ function sdkServer(options={}) {
         now:options.now||(()=>100000),fetch:async(...args)=>{fetchCalls.push(args);throw new Error('unexpected REST request');},transactRoom});
     return {store,get room(){return room;},set room(value){room=clone(value);},get transactions(){return transactions;},fetchCalls};
 }
-function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRoomTransaction,onStudentTransaction,afterStudentTransaction}={}){
+function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRoomTransaction,onStudentTransaction,afterStudentTransaction,coldRoomCalls=[]}={}){
     const defaultStudent={id:1,gender:'M',tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',doneTasks:[],
         ownedClothes:[],equippedClothes:null,ownedLayout:[],equippedLayout:[],ownedBg:[],equippedBg:null,bossProgress:[]};
     const defaultState={studentId:1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]};
@@ -73,6 +73,10 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         transactRoom:async update=>{
             roomCalls++;
             await onRoomTransaction?.({root,call:roomCalls});
+            if(coldRoomCalls.includes(roomCalls)){
+                const coldResult=update(null);
+                if(coldResult!==null) return {committed:false,value:null};
+            }
             const current=clone(root.games['classroom-115']),next=update(current);
             if(next===undefined) return {committed:false,value:current};
             root.games['classroom-115']=resolveServerValues(next);return {committed:true,value:clone(root.games['classroom-115'])};
@@ -385,6 +389,26 @@ test('coordinated teacher flow covers student 28 equipment without a root transa
     await server.store.execute(job('coordinated-background-28',{type:'equip',studentId:28,kind:'background',itemId:'bg'}));
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedBg,'bg');
+});
+test('student 28 equipment survives a cold room cache before the teacher transaction reads the server',async()=>{
+    const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt'}),
+        clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+    const server=coordinatedServer({progress,studentRoster:{'uid-28':{studentId:28,active:true}},
+        studentStates:{'uid-28':{studentId:28,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}},
+        coldRoomCalls:[1]});
+    const outcome=await server.store.execute(job('cold-room-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
+    assert.equal(outcome.progress.students[27].equippedClothes,null);
+    assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
+});
+test('teacher projection finalization survives a cold room cache',async()=>{
+    const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt'}),
+        clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
+    const server=coordinatedServer({progress,studentRoster:{'uid-28':{studentId:28,active:true}},
+        studentStates:{'uid-28':{studentId:28,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}},
+        coldRoomCalls:[2]});
+    const outcome=await server.store.execute(job('cold-finalize-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
+    assert.equal(outcome.progress.students[27].equippedClothes,null);
+    assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
 });
 test('coordinated teacher flow projects purchases, lottery, and task rewards',async()=>{
     const cases=[
