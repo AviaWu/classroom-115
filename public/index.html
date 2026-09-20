@@ -830,7 +830,8 @@ function seedBuiltinBoyClothes(persist=true){
         level:"R"
     })).concat([
         {filename:"ba1.png",id:"builtin_boy_event_ba1",name:"男生活動服裝 1",level:"活動贈送"},
-        {filename:"ba2.png",id:"builtin_boy_event_ba2",name:"男生活動服裝 2",level:"活動贈送"}
+        {filename:"ba2.png",id:"builtin_boy_event_ba2",name:"男生活動服裝 2",level:"活動贈送"},
+        {filename:"ba3.png",id:"builtin_boy_event_ba3",name:"男生活動服裝 3",level:"活動贈送"}
     ]);
     products.forEach(product=>{
         const image = `/images/boy/${encodeURIComponent(product.filename)}`;
@@ -856,7 +857,8 @@ function seedBuiltinGirlClothes(persist=true){
     const filenames = Array.from({length:42}, (_,index)=>`g (${index+1}).png`);
     const eventProducts = [
         {filename:"ga1.png",id:"builtin_girl_event_ga1",name:"女生活動服裝 1",level:"活動贈送"},
-        {filename:"ga2.png",id:"builtin_girl_event_ga2",name:"女生活動服裝 2",level:"活動贈送"}
+        {filename:"ga2.png",id:"builtin_girl_event_ga2",name:"女生活動服裝 2",level:"活動贈送"},
+        {filename:"ga3.png",id:"builtin_girl_event_ga3",name:"女生活動服裝 3",level:"活動贈送"}
     ];
     const allowedImages = new Set(
         [...filenames,...eventProducts.map(product=>product.filename)]
@@ -916,6 +918,11 @@ function seedBuiltinLayouts(persist=true){
         "1000095502-removebg-preview.png",
         "1000095503-removebg-preview.png"
     ];
+    const products=filenames.map((filename,index)=>({
+        filename,id:`builtin_pet_dec2_${index}`,name:`寵物 ${index+1}`,level:"R"
+    })).concat([
+        {filename:"deca3.png",id:"builtin_pet_event_deca3",name:"活動寵物 3",level:"活動贈送"}
+    ]);
     const removedItems = state.layouts.filter(item=>
         /^\/images\/dec\//i.test(item.image||"") || item.image===DEFAULT_PET_IMAGE
     );
@@ -928,15 +935,15 @@ function seedBuiltinLayouts(persist=true){
             student.equippedLayout = student.equippedLayout.filter(id=>!removedIds.includes(id));
         });
     }
-    filenames.forEach((filename,index)=>{
-        const image = `/images/Dec2/${encodeURIComponent(filename)}`;
+    products.forEach(product=>{
+        const image = `/images/Dec2/${encodeURIComponent(product.filename)}`;
         if(!state.layouts.some(item=>item.image===image)){
             state.layouts.push({
-                id: `builtin_pet_dec2_${index}`,
-                name: `寵物 ${index+1}`,
-                level: "R",
-                price: priceForLevel("R"),
-                active: true,
+                id:product.id,
+                name:product.name,
+                level:product.level,
+                price:priceForLevel(product.level),
+                active:true,
                 image
             });
             changed = true;
@@ -2090,28 +2097,37 @@ async function submitBackendPassword(){
     }
 }
 
-function missingBuiltinEventClothingChanges(){
+function missingBuiltinProductChanges(){
     const catalogues=[
         {
             collection:"clothesM",
-            builtInPattern:/^\/images\/boy\/b(?:%20| )\(/,
+            hasBuiltIns:list=>list.some(item=>/^\/images\/boy\/b(?:%20| )\(/.test(item.image||"")),
             products:[
                 {id:"builtin_boy_event_ba1",name:"男生活動服裝 1",level:"活動贈送",price:0,active:true,image:"/images/boy/ba1.png"},
-                {id:"builtin_boy_event_ba2",name:"男生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/boy/ba2.png"}
+                {id:"builtin_boy_event_ba2",name:"男生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/boy/ba2.png"},
+                {id:"builtin_boy_event_ba3",name:"男生活動服裝 3",level:"活動贈送",price:0,active:true,image:"/images/boy/ba3.png"}
             ]
         },
         {
             collection:"clothesF",
-            builtInPattern:/^\/images\/girl\/g(?:%20| )\(/,
+            hasBuiltIns:list=>list.some(item=>/^\/images\/girl\/g(?:%20| )\(/.test(item.image||"")),
             products:[
                 {id:"builtin_girl_event_ga1",name:"女生活動服裝 1",level:"活動贈送",price:0,active:true,image:"/images/girl/ga1.png"},
-                {id:"builtin_girl_event_ga2",name:"女生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/girl/ga2.png"}
+                {id:"builtin_girl_event_ga2",name:"女生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/girl/ga2.png"},
+                {id:"builtin_girl_event_ga3",name:"女生活動服裝 3",level:"活動贈送",price:0,active:true,image:"/images/girl/ga3.png"}
+            ]
+        },
+        {
+            collection:"layouts",
+            hasBuiltIns:list=>list.some(item=>/^builtin_pet_dec2_\d+$/.test(item.id||"")),
+            products:[
+                {id:"builtin_pet_event_deca3",name:"活動寵物 3",level:"活動贈送",price:0,active:true,image:"/images/Dec2/deca3.png"}
             ]
         }
     ];
-    return catalogues.flatMap(({collection,builtInPattern,products})=>{
+    return catalogues.flatMap(({collection,hasBuiltIns,products})=>{
         const list=state[collection];
-        if(!list.some(item=>builtInPattern.test(item.image||""))) return [];
+        if(!hasBuiltIns(list)) return [];
         return products
             .filter(product=>!list.some(item=>item.id===product.id||item.image===product.image))
             .map(product=>({collection,id:product.id,action:"add",value:product}));
@@ -2119,9 +2135,9 @@ function missingBuiltinEventClothingChanges(){
 }
 async function backend(){
     if(currentUser?.role!=="teacher" || !backendAuthenticated) return;
-    const eventClothingChanges=missingBuiltinEventClothingChanges();
-    if(eventClothingChanges.length){
-        await runCommand({type:"edit",changes:eventClothingChanges},"seed:builtin-event-clothing-v1");
+    const productChanges=missingBuiltinProductChanges();
+    if(productChanges.length){
+        await runCommand({type:"edit",changes:productChanges},"seed:builtin-products-v2");
     }
     currentView={type:"backend"};
     const used = getStorageUsage();

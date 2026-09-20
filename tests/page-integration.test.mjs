@@ -262,6 +262,22 @@ test('teacher backend requires its independent password every time it opens',asy
     h.w.closeModal();await h.w.openBackend();
     assert.ok(h.w.document.getElementById('backendPw'));
 });
+test('backend synchronizes the new built-in clothing and pet products to cloud',async t=>{
+    const h=page(t);h.cloud={...h.cloud,
+        clothesM:[{...h.cloud.clothesM[0],image:'/images/boy/b%20(1).png'}],
+        clothesF:[{id:'dress',name:'女生服裝',level:'R',price:50,active:true,image:'/images/girl/g%20(1).png'}],
+        layouts:[{...h.cloud.layouts[0],id:'builtin_pet_dec2_0',image:'/images/Dec2/1000095479-removebg-preview.png'}]
+    };await h.start();await h.login();
+    const boy=h.cloud.clothesM.find(item=>item.id==='builtin_boy_event_ba3');
+    const girl=h.cloud.clothesF.find(item=>item.id==='builtin_girl_event_ga3');
+    const pet=h.cloud.layouts.find(item=>item.id==='builtin_pet_event_deca3');
+    assert.deepEqual(boy,{id:'builtin_boy_event_ba3',name:'男生活動服裝 3',level:'活動贈送',price:0,active:true,image:'/images/boy/ba3.png'});
+    assert.deepEqual(girl,{id:'builtin_girl_event_ga3',name:'女生活動服裝 3',level:'活動贈送',price:0,active:true,image:'/images/girl/ga3.png'});
+    assert.deepEqual(pet,{id:'builtin_pet_event_deca3',name:'活動寵物 3',level:'活動贈送',price:0,active:true,image:'/images/Dec2/deca3.png'});
+    assert.equal(h.writes,1);
+    await h.run('backend()');assert.equal(h.writes,1);
+});
+
 test('event gifts remain free and omit the level wording in shop and closet',async t=>{
     const h=page(t);h.cloud={...h.cloud,clothesM:[...h.cloud.clothesM,{id:'event',name:'活動服裝',level:'活動贈送',price:0,active:true,image:'/images/boy/ba1.png'}]};
     await h.start();await h.run('shop(1)');
