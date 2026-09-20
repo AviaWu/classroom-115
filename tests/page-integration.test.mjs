@@ -55,7 +55,9 @@ test('browser module wires child subscriptions and avoids root SDK transactions'
 });
 test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{
     const h=page(t);h.sync.setConnected(true);await h.sync.refresh();
-    assert.equal(h.w.document.getElementById('loginAccount').options.length,30);
+    assert.equal(h.w.document.getElementById('loginAccount').options.length,31);
+    assert.equal(h.w.document.getElementById('loginAccount').options[27].textContent,'學生 27 號');
+    assert.equal(h.w.document.getElementById('loginAccount').options[30].textContent,'學生 30 號');
     h.signIn('student-1','0000');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);assert.match(h.w.document.getElementById('loginMessage').textContent,/錯誤/);
     h.signIn('student-1','3847');assert.equal(h.w.document.getElementById('loginScreen').hidden,true);assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 1 號');
     h.w.logout();h.signIn('teacher','5905606');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);
