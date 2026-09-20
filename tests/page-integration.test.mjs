@@ -408,11 +408,12 @@ test('restore skips drawing metadata without image data',async t=>{
     await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)]}));
     assert.deepEqual(h.cloud.drawings,[]);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
 });
-test('pet interaction uses three rows and its pet image opens the pet closet',async t=>{
+test('pet interaction keeps compact moods in its first row and opens a dedicated pet selector',async t=>{
     const h=page(t);h.cloud={...h.cloud,students:[{...h.cloud.students[0],ownedLayout:['pet'],equippedLayout:['pet']},h.cloud.students[1]]};await h.start();await h.run('openPetMood(1)');
     assert.match(h.w.document.querySelector('#modal h2').textContent,/寵物互動/);assert.doesNotMatch(h.w.document.querySelector('#modal h2').textContent,/寵物心情互動/);
-    const interaction=h.w.document.querySelector('.pet-interaction');assert.equal(interaction.children.length,3);assert.ok(interaction.children[0].querySelector('.pet-interaction-image'));assert.ok(interaction.children[0].querySelector('.pet-level-card'));assert.ok(interaction.children[0].querySelector('.pet-mood-reply'));assert.ok(interaction.children[1].classList.contains('pet-mood-side'));assert.ok(interaction.children[2].classList.contains('pet-boss-row'));
-    const petButton=h.w.document.querySelector('.pet-image-button');assert.equal(petButton.getAttribute('onclick'),"closet(1,'layouts')");await h.run("closet(1,'layouts')");assert.match(h.w.document.querySelector('#modal h2').textContent,/衣櫃/);assert.equal(h.w.document.querySelector('#modal .tab.active').textContent,'寵物');assert.ok(h.w.document.getElementById('closetTabContent').textContent.includes('測試寵物'));
+    const interaction=h.w.document.querySelector('.pet-interaction'),firstRow=interaction.children[0];assert.equal(interaction.children.length,2);assert.ok(firstRow.querySelector('.pet-interaction-image'));assert.ok(firstRow.querySelector('.pet-level-card'));assert.ok(firstRow.querySelector('.pet-mood-reply'));assert.ok(firstRow.querySelector('.pet-mood-side'));assert.ok(interaction.children[1].classList.contains('pet-boss-row'));
+    const petButton=h.w.document.querySelector('.pet-image-button');assert.equal(petButton.getAttribute('onclick'),'openPetSelector(1)');await h.run('openPetSelector(1)');assert.match(h.w.document.querySelector('#modal h2').textContent,/更換寵物/);assert.equal(h.w.document.querySelector('#modal .tabs'),null);assert.equal(h.w.document.getElementById('closetTabContent'),null);assert.ok(h.w.document.querySelector('.pet-selector').textContent.includes('測試寵物'));
+    await h.run('closet(1)');const tabs=[...h.w.document.querySelectorAll('#modal .tab')].map(tab=>tab.textContent);assert.deepEqual(tabs,['服裝','背景']);assert.doesNotMatch(h.w.document.getElementById('modal').textContent,/更換寵物/);
 });
 test('boss battle shows its image and HP, advances automatically, and hides a defeated boss',async t=>{
     const h=page(t);await h.start();await h.run('openPetMood(1)');assert.match(h.w.document.getElementById('modal').textContent,/目前世界一片和平/);

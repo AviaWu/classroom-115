@@ -152,18 +152,18 @@ input[type="number"]{width:85px}
 .task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
 .pet-interaction-trigger{cursor:pointer}
 .pet-interaction-trigger:focus{outline:4px solid #f3d98b;outline-offset:3px}
-.pet-interaction{display:grid;grid-template-rows:auto auto auto;gap:22px;max-width:980px;margin:auto}
-.pet-mood-side{text-align:left}
-.pet-mood-side h3{margin-top:0;padding:9px 12px;background:#34405c;color:#f3d98b;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;text-align:center}
-.pet-mood-grid{display:grid;grid-template-columns:repeat(3,minmax(82px,1fr));gap:11px}
-.pet-mood-button{--mood-color:#f3d98b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;width:100%;min-width:0;min-height:78px;padding:8px 4px;overflow:hidden;background:#d7d7d7;border:4px solid #20263a;color:#20263a;box-shadow:4px 4px 0 #172033;font-family:"Courier New",monospace}
+.pet-interaction{display:grid;grid-template-rows:auto auto;gap:22px;max-width:1100px;margin:auto}
+.pet-mood-side{min-width:0;text-align:left}
+.pet-mood-side h3{margin:0 0 7px;padding:6px 8px;background:#34405c;color:#f3d98b;border:3px solid #20263a;box-shadow:3px 3px 0 #172033;font-size:14px;text-align:center}
+.pet-mood-grid{display:grid;grid-template-columns:repeat(3,minmax(48px,1fr));gap:6px}
+.pet-mood-button{--mood-color:#f3d98b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-width:0;min-height:50px;padding:4px 2px;overflow:hidden;background:#d7d7d7;border:3px solid #20263a;color:#20263a;box-shadow:3px 3px 0 #172033;font-family:"Courier New",monospace}
 .pet-mood-button:hover{background:#e8e8e8;transform:translate(-1px,-1px);box-shadow:5px 5px 0 #172033}
 .pet-mood-button.selected{background:var(--mood-color);transform:translate(2px,2px);box-shadow:2px 2px 0 #172033}
 .pet-mood-button:focus-visible{outline:4px solid #efb1a5;outline-offset:3px}
-.pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:clamp(11px,1.55vw,16px);line-height:1.15;white-space:nowrap;letter-spacing:-1px}
-.pet-mood-button b{font-size:14px}
+.pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:12px;line-height:1;white-space:nowrap;letter-spacing:-1px}
+.pet-mood-button b{font-size:11px}
 .pet-stage{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;margin:auto}
-.pet-display-row{display:grid;grid-template-columns:minmax(180px,240px) minmax(180px,.8fr) minmax(280px,1.4fr);gap:14px;width:100%;min-height:230px;align-items:stretch}
+.pet-display-row{display:grid;grid-template-columns:minmax(170px,220px) minmax(160px,.7fr) minmax(240px,1.2fr) minmax(190px,.8fr);gap:14px;width:100%;min-height:230px;align-items:stretch}
 .pet-image-button{display:block;width:100%;min-width:0;padding:0;background:transparent;border:0;box-shadow:none;color:inherit}
 .pet-image-button:hover{background:transparent;transform:none;box-shadow:none}
 .pet-image-button:focus-visible{outline:4px solid #efb1a5;outline-offset:4px}
@@ -185,7 +185,7 @@ input[type="number"]{width:85px}
 .pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
 .pet-mood-reply p{margin:8px 0 0}
 .pet-interaction-image{display:block;width:100%;height:190px;box-sizing:border-box;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
-@media(max-width:700px){.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr))}.pet-display-row{grid-template-columns:1fr 1fr;min-height:0}.pet-mood-reply{grid-column:1/-1;min-height:120px}.pet-mood-reply::before{display:none}.pet-interaction-image{height:170px}.pet-level-card{padding:8px}.pet-level-heading{gap:4px;margin-bottom:8px}.pet-level-heading span:first-child{font-size:14px}.pet-affection-status{margin-top:6px;font-size:10px}.boss-card{padding:7px}.boss-card img{width:54px;height:44px}.boss-card h3{font-size:13px}.boss-card p{font-size:10px}.boss-choice-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.pet-display-row{grid-template-columns:1fr 1fr;min-height:0}.pet-mood-reply{grid-column:1/-1;min-height:120px}.pet-mood-reply::before{display:none}.pet-mood-side{grid-column:1/-1}.pet-mood-grid{grid-template-columns:repeat(6,minmax(42px,1fr))}.pet-interaction-image{height:170px}.pet-level-card{padding:8px}.pet-level-heading{gap:4px;margin-bottom:8px}.pet-level-heading span:first-child{font-size:14px}.pet-affection-status{margin-top:6px;font-size:10px}.boss-card{padding:7px}.boss-card img{width:54px;height:44px}.boss-card h3{font-size:13px}.boss-card p{font-size:10px}.boss-choice-grid{grid-template-columns:repeat(2,1fr)}}
 .drawing-board-layout{display:grid;grid-template-columns:150px minmax(0,1fr) 190px;gap:18px;align-items:start;clear:both}
 .drawing-history{display:flex;flex-direction:column;gap:10px;max-height:650px;overflow:auto;padding:3px}
 .drawing-thumb{width:100%;padding:5px;background:#fff8e8;text-align:left}
@@ -1452,14 +1452,14 @@ function openPetMood(id){
         <div class="pet-interaction">
             <section class="pet-stage" aria-label="寵物狀態與對話">
                 <div class="pet-display-row">
-                    <button class="pet-image-button" onclick="closet(${id},'layouts')" aria-label="更換寵物"><img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}"><span class="pet-image-hint">點擊圖片更換寵物</span></button>
+                    <button class="pet-image-button" onclick="openPetSelector(${id})" aria-label="更換寵物"><img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}"><span class="pet-image-hint">點擊圖片更換寵物</span></button>
                     ${petLevelHtml(student)}
                     <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
+                    <section class="pet-mood-side" aria-label="選擇心情">
+                        <h3>選擇現在的心情</h3>
+                        <div class="pet-mood-grid">${moodButtons}</div>
+                    </section>
                 </div>
-            </section>
-            <section class="pet-mood-side" aria-label="選擇心情">
-                <h3>選擇現在的心情</h3>
-                <div class="pet-mood-grid">${moodButtons}</div>
             </section>
             <section class="pet-boss-row" aria-label="BOSS 挑戰">${bossStatusHtml(student)}</section>
         </div>`);
@@ -1883,13 +1883,13 @@ async function buyBg(id,pid){
 //衣櫃
 function closet(id,initialTab="clothes"){
     if(!canAccessStudent(id)) return;
+    if(initialTab==="layouts") return openPetSelector(id);
     currentView={type:"closet",id,tab:initialTab};
     openModal(`<h2>${id}號｜衣櫃</h2>
     <div class="closet-layout">
         <div>
             <div class="tabs">
                 <button class="tab" onclick="switchClosetTab(${id},'clothes')">服裝</button>
-                <button class="tab" onclick="switchClosetTab(${id},'layouts')">寵物</button>
                 <button class="tab" onclick="switchClosetTab(${id},'bgs')">背景</button>
             </div>
             <div id="closetTabContent"></div>
@@ -1900,6 +1900,16 @@ function closet(id,initialTab="clothes"){
         </aside>
     </div>`);
     switchClosetTab(id,initialTab);
+}
+function openPetSelector(id){
+    if(!canAccessStudent(id)) return;
+    currentView={type:"pet-selector",id};
+    const student=state.students.find(item=>item.id===id);
+    if(!student) return;
+    const pets=state.layouts.filter(item=>student.ownedLayout.includes(item.id));
+    const defaultPetCard=`<section class="shop-level level-r"><div class="shop-level-header"><h3>預設寵物</h3><span>永久擁有</span></div><div class="shopgrid"><div class="product"><div class="pic"><img src="${esc(DEFAULT_PET_IMAGE)}" alt="${esc(DEFAULT_PET_NAME)}"></div><b>${esc(DEFAULT_PET_NAME)}</b><div><button onclick="equipDefaultPet(${id})" ${student.equippedLayout.length===0?"disabled":""}>${student.equippedLayout.length===0?"使用中":"使用"}</button></div></div></div></section>`;
+    const petCards=groupedClosetCards(pets,pet=>`<div class="product"><div class="pic">${pet.image?`<img src="${esc(pet.image)}" alt="${esc(pet.name)}">`:"🐾"}</div><b>${esc(pet.name)}</b><div><button onclick="toggleEquipLayout(${id},'${esc(pet.id)}')">${student.equippedLayout.includes(pet.id)?"卸下":"使用"}</button></div></div>`,"還沒有其他寵物");
+    openModal(`<h2>${id}號｜更換寵物</h2><button onclick="openPetMood(${id})">← 返回寵物互動</button><div class="pet-selector">${defaultPetCard}${petCards}</div>`);
 }
 function closetPreviewHtml(id){
     const s = state.students[id-1];
@@ -1943,24 +1953,6 @@ function switchClosetTab(id,tab){
             <div><button onclick="equipClothes(${id},'${esc(p.id)}')">${s.equippedClothes===p.id?"脫下":"穿上"}</button></div>
         </div>`,"還沒有服裝");
     }
-    if(tab==="layouts"){
-        const list = state.layouts.filter(x=>s.ownedLayout.includes(x.id));
-        const defaultPetCard = `<section class="shop-level level-r">
-            <div class="shop-level-header"><h3>預設寵物</h3><span>永久擁有</span></div>
-            <div class="shopgrid">
-                <div class="product">
-                    <div class="pic"><img src="${esc(DEFAULT_PET_IMAGE)}" alt="${esc(DEFAULT_PET_NAME)}"></div>
-                    <b>${esc(DEFAULT_PET_NAME)}</b>
-                    <div><button onclick="equipDefaultPet(${id})" ${s.equippedLayout.length===0?"disabled":""}>${s.equippedLayout.length===0?"使用中":"使用"}</button></div>
-                </div>
-            </div>
-        </section>`;
-        html = defaultPetCard + groupedClosetCards(list,p=>`<div class="product">
-            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🐾"}</div>
-            <b>${esc(p.name)}</b>
-            <div><button onclick="toggleEquipLayout(${id},'${esc(p.id)}')">${s.equippedLayout.includes(p.id)?"卸下":"穿上"}</button></div>
-        </div>`,"還沒有其他寵物");
-    }
     if(tab==="bgs"){
         const list = state.backgrounds.filter(x=>s.ownedBg.includes(x.id));
         html = groupedClosetCards(list,p=>`<div class="product">
@@ -1972,7 +1964,7 @@ function switchClosetTab(id,tab){
     document.getElementById("closetTabContent").innerHTML = html;
     document.getElementById("closetPreview").innerHTML = closetPreviewHtml(id);
     document.querySelectorAll("#modal .tabs .tab").forEach((el,i)=>{
-        el.classList.toggle("active", ["clothes","layouts","bgs"][i]===tab);
+        el.classList.toggle("active", ["clothes","bgs"][i]===tab);
     });
 }
 async function equipClothes(id,pid){
@@ -3129,7 +3121,7 @@ function refreshVisibleView(){
         return;
     }
     if(view.type==="login") return;
-    if(view.id && ["tasks","shop","closet","pet"].includes(view.type) && !state.students.some(s=>s.id===view.id)){
+    if(view.id && ["tasks","shop","closet","pet","pet-selector"].includes(view.type) && !state.students.some(s=>s.id===view.id)){
         closeModal();return;
     }
     const panel=document.querySelector("#modal .panel"),scroll=panel?.scrollTop||0;
@@ -3140,6 +3132,7 @@ function refreshVisibleView(){
         if(view.type==="tasks") tasks(view.id);
         if(view.type==="shop"){shop(view.id);switchShopTab(view.id,view.tab);}
         if(view.type==="closet") closet(view.id,view.tab);
+        if(view.type==="pet-selector") openPetSelector(view.id);
         if(view.type==="pet"){
             openPetMood(view.id);
             if(reply) document.getElementById("petMoodReply").textContent=reply;
