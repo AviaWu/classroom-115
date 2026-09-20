@@ -1442,6 +1442,7 @@ function openPetMood(id){
         name:DEFAULT_PET_NAME,
         image:DEFAULT_PET_IMAGE
     };
+    const defaultReply=student.lastPetMoodDate===taiwanDateKey()?"我的主人，我一直陪伴著你。":"我的主人，今天還沒和我互動呢！我好寂寞！";
     const moodColors = ["#ffd43b","#ff6b9a","#ff8c42","#66d9c4","#ffe66d","#b197fc","#4dabf7","#6c7a9c","#ff7043","#adb5bd","#5c7cfa","#9c36b5"];
     const moodButtons = Object.keys(PET_MOOD_RESPONSES).map((mood,index)=>`
         <button class="pet-mood-button" style="--mood-color:${moodColors[index]}" onclick="showPetMoodReply(${id},'${mood}',this)" aria-label="選擇${mood}心情" aria-pressed="false">
@@ -1453,7 +1454,7 @@ function openPetMood(id){
                 <div class="pet-display-row">
                     <button class="pet-image-button" onclick="openPetSelector(${id})" aria-label="更換寵物"><img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}"><span class="pet-image-hint">點擊圖片更換寵物</span></button>
                     <div class="pet-dialog-level-column">
-                        <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
+                        <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">${defaultReply}</div>
                         ${petLevelHtml(student)}
                     </div>
                     <section class="pet-mood-side" aria-label="選擇心情">
@@ -1516,9 +1517,14 @@ async function showPetMoodReply(studentId,mood,button){
     let reply=responses[Math.floor(Math.random()*responses.length)];
     const result=await runCommand({type:"petMood",studentId},`pet:${studentId}`);
     if(!result) return;
-    reply+=result.awarded ? (result.bonus?`\n好感度 +1！寵物升到 Lv.${result.level}，獲得 ${result.bonus} 代幣！`:"\n今日好感度 +1！") : "\n今天已經獲得過好感度，明天再來互動吧！";
+    if(result.awarded) reply+=result.bonus?`\n好感度 +1！寵物升到 Lv.${result.level}，獲得 ${result.bonus} 代幣！`:"\n今日好感度 +1！";
     const element=document.getElementById("petMoodReply");
     if(element && currentView?.id===studentId) element.textContent=reply;
+}
+
+function taiwanDateKey(date=new Date()){
+    const taiwan=new Date(date.getTime()+8*60*60*1000);
+    return taiwan.toISOString().slice(0,10);
 }
 
 //排程任務：每日依日期、每週依週一日期去重；截止不晚於出現時間時延至下一週期。
