@@ -42,6 +42,20 @@ test('absolute resource reset preserves concurrent pet and BOSS fields it did no
     assert.equal(applied.state.bossProgress[0].bossId,'other');
 });
 
+test('full restore sets every personal field even when the room snapshot initially matched',()=>{
+    const backup=student({tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',
+        equippedLayout:['cat'],bossProgress:[{bossId:'boss',hp:5,passwordVerified:true,answeredQuestionIds:[],defeated:false,completedAt:null}]});
+    const plan=planFor(backup,backup,{type:'restore',value:{students:[backup]}});
+    const applied=applyTeacherStudentPlan(state({tokens:150,lotteryTickets:4,petAffection:9,lastPetMoodDate:'2026-09-20',
+        equippedLayout:['dog'],bossProgress:[]}),plan,'teacher-restore');
+    assert.equal(applied.state.tokens,100);
+    assert.equal(applied.state.lotteryTickets,1);
+    assert.equal(applied.state.petAffection,0);
+    assert.equal(applied.state.lastPetMoodDate,'');
+    assert.deepEqual(applied.state.equippedLayout,['cat']);
+    assert.deepEqual(applied.state.bossProgress,backup.bossProgress);
+});
+
 test('pet mood plan recomputes inside the student transaction and cannot award twice',()=>{
     const before=student({tokens:100,petAffection:9});
     const after=student({tokens:110,petAffection:10,lastPetMoodDate:'1970-01-01'});

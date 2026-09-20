@@ -6,8 +6,9 @@ import {spawnSync} from 'node:child_process';
 import {JSDOM} from 'jsdom';
 import * as operations from '../public/game-operations.mjs';
 import {createCloudSync} from '../public/cloud-sync.mjs';
-import {createFirebaseStore,createProgressSubscriber} from '../public/firebase-store.mjs';
+import {createFirebaseStore,createProgressSubscriber,createTeacherProgressSubscriber,createTeacherStudentStatesSubscriber} from '../public/firebase-store.mjs';
 import {createFirebaseRestClient} from '../public/firebase-rest-client.mjs';
+import {mergeStudentStatesIntoProgress} from '../public/teacher-projections.mjs';
 const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const scripts=[...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)];
 const clone=structuredClone;
@@ -67,7 +68,7 @@ test('browser wardrobe wiring commits only student 28 through the server ETag tr
     const context=vm.createContext({
         initializeApp:()=>({}),getAuth:()=>({currentUser:{uid:'teacher',getIdToken:async()=>'token'}}),getDatabase:()=>({}),
         onAuthStateChanged(){},ref:(database,path)=>path,onValue:()=>()=>{},update(){throw new Error('unexpected multi-path write');},
-        GameOperations:operations,createFirebaseStore,createProgressSubscriber,
+        GameOperations:operations,createFirebaseStore,createProgressSubscriber,createTeacherProgressSubscriber,
         createFirebaseRestClient:config=>createFirebaseRestClient({...config,fetch:request}),
         createCloudSync:()=>({setConnected(){},setActive(){}}),
         window:{addEventListener(){}},document:{addEventListener(){},hidden:false},navigator:{onLine:false},currentUser:null,
@@ -79,6 +80,58 @@ test('browser wardrobe wiring commits only student 28 through the server ETag tr
     assert.equal(outcome.progress.students[27].equippedClothes,null);
     assert.equal(outcome.progress.students[26].equippedClothes,'shirt');
     assert.ok(reads.every(path=>path.startsWith('games/classroom-115/progress/')||path==='games/classroom-115/progress'||path==='games/classroom-115/restoredAt'));
+});
+for(const order of ['progress-first','states-first']) test(`browser teacher wiring waits for complete personal data and backs up server values (${order})`,async t=>{
+    const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
+    const progress={...fixture(),students:[{id:1,gender:'M',ownedClothes:['shirt']}],questionPapers:[{id:'paper',name:'試卷',questions:[{id:'q',text:'題目',options:['對','錯'],answerIndex:0}]}]};
+    const root={games:{'classroom-115':{progress}},studentRoster:{one:{studentId:1,active:true}},
+        studentStates:{one:{studentId:1,tokens:67,lotteryTickets:2,petAffection:4,lastPetMoodDate:''}}};
+    const callbacks=new Map(),views=[],errors=[],writes=[];let authCallback,syncInstance;
+    const request=async(input,options)=>{
+        const path=new URL(input).pathname.slice(1,-5),parts=path.split('/');
+        if(options.method==='PUT'){
+            assert.equal(options.headers['if-match'],'"page-etag"');
+            writes.push(path);
+            const parent=parts.slice(0,-1).reduce((value,key)=>value[key],root);
+            parent[parts.at(-1)]=JSON.parse(options.body);
+        }
+        const value=parts.reduce((value,key)=>value?.[key],root);
+        return Response.json(value??null,{headers:{ETag:'"page-etag"'}});
+    };
+    const context=vm.createContext({
+        initializeApp:()=>({}),getAuth:()=>({currentUser:{uid:'teacher',getIdToken:async()=>'token'}}),getDatabase:()=>({}),
+        onAuthStateChanged:(_,callback)=>authCallback=callback,accountForEmail:()=>({role:'teacher',studentId:null}),
+        applyAuthenticatedSession:account=>context.currentUser=account,
+        ref:(_,path)=>path,onValue:(path,callback)=>{callbacks.set(path,callback);return ()=>callbacks.delete(path);},
+        update(){throw new Error('unexpected write');},GameOperations:operations,createFirebaseStore,createProgressSubscriber,
+        createTeacherProgressSubscriber,createTeacherStudentStatesSubscriber,mergeStudentStatesIntoProgress,
+        createFirebaseRestClient:config=>createFirebaseRestClient({...config,fetch:request}),
+        createCloudSync:config=>syncInstance=createCloudSync({...config,setInterval:()=>0,clearInterval(){}}),
+        window:{addEventListener(){}},document:{addEventListener(){},hidden:false},navigator:{onLine:true},currentUser:null,
+        sessionStorage:{getItem:()=>null,setItem(){}},crypto:{randomUUID:()=> 'page-wardrobe'},applyCloudState:progress=>views.push(progress),
+        setSyncLocked(){},setSyncStatus(){},console:{error:(...args)=>errors.push(args)},
+    });
+    vm.runInContext(moduleSource.replace(/^\s*import .*;$/gm,''),context);
+    t.after(()=>syncInstance.dispose());authCallback({email:'teacher@classroom-115.local'});
+    await new Promise(resolve=>setImmediate(resolve));
+    const sendProgress=()=>{for(const [path,callback] of callbacks){if(path.startsWith('games/'))callback({val:()=>progress[path.split('/').at(-1)]??null});}};
+    const sendStates=()=>callbacks.get('studentStates')({val:()=>clone(root.studentStates)});
+    (order==='progress-first'?sendProgress:sendStates)();
+    assert.equal(syncInstance.canManage(),false);assert.equal(views.length,0);
+    (order==='progress-first'?sendStates:sendProgress)();
+    assert.equal(syncInstance.canEdit(),true);assert.equal(views.at(-1).students[0].tokens,67);
+    assert.equal(views.at(-1).questionPapers[0]?.id,'paper');
+    root.studentStates.one.tokens=89; // Server reward not yet seen in the subscription.
+    const backup=await context.window.readLatestProgress();
+    assert.equal(backup.students[0].tokens,89);assert.equal(Object.hasOwn(progress.students[0],'tokens'),false);
+    await syncInstance.refresh();
+    assert.equal(views.at(-1).students[0].tokens,89);
+    await syncInstance.perform({type:'equip',studentId:1,kind:'clothes',itemId:'shirt'});
+    assert.equal(views.at(-1).students[0].equippedClothes,'shirt');
+    assert.equal(views.at(-1).students[0].tokens,89);
+    assert.deepEqual(writes,['games/classroom-115/progress/students/0']);
+    assert.equal(Object.hasOwn(root.games['classroom-115'].progress.students[0],'tokens'),false);
+    assert.equal(errors.length,0);
 });
 test('browser module selects personal projection subscriptions for student sessions',()=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
@@ -416,6 +469,13 @@ function captureBackupDownloads(h){
     }};
 }
 const backupInput = value=>({files:[{text:async()=>JSON.stringify(value)}],value:'backup.json'});
+test('the backup import page rejects compact exports before normalization invents zero balances',async t=>{
+    const h=page(t);await h.start();await h.login();
+    const compact={...h.cloud,students:h.cloud.students.map(({tokens,lotteryTickets,petAffection,lastPetMoodDate,equippedLayout,bossProgress,...student})=>student)};
+    await h.w.importData(backupInput(compact));
+    assert.equal(h.writes,0);assert.equal(h.cloud.students[0].tokens,200);
+    assert.match(h.alerts.at(-1),/個人資料|完整備份/);
+});
 test('new progress and teacher backend contain no album or legacy cleanup action',async t=>{
     const h=page(t);await h.start();await h.login();
     assert.equal('drawingAlbum' in h.w.initialProgress(),false);

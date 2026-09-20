@@ -14,9 +14,9 @@ export function createCloudSync(io) {
     function startSubscription(){
         if(!io.subscribeRemote || unsubscribeRemote || !connected || !active) return;
         const ticket=epoch;
-        unsubscribeRemote=io.subscribeRemote(value=>{
+        unsubscribeRemote=io.subscribeRemote((value,studentStates)=>{
             if(ticket!==epoch || !connected || !active) return;
-            apply(value);verified=true;notify();void checkReceipts().then(()=>work()).catch(error=>{
+            apply(value,studentStates);verified=true;notify();void checkReceipts().then(()=>work()).catch(error=>{
                 verified=false;notify();io.error?.(error);
             });
         },error=>{

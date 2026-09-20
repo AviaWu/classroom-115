@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "test:emulator": "node --test --test-concurrency=1 tests/database-rules.emulator.mjs tests/firebase-store.emulator.mjs tests/database-rules.phase1.emulator.mjs tests/firebase-transaction.emulator.mjs",
+    "test:emulator": "node --test --test-concurrency=1 tests/database-rules.emulator.mjs tests/firebase-store.emulator.mjs tests/database-rules.phase1.emulator.mjs tests/firebase-transaction.emulator.mjs tests/progress-phase2.emulator.mjs",
     "preview:test": "node tests/preview-server.mjs"
   },
   "devDependencies": {

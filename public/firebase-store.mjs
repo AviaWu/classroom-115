@@ -1,9 +1,9 @@
 import {applyOperation,normalizeProgress} from './game-operations.mjs';
 import {createStudentProjections} from './student-projections.mjs';
-import {mergeStudentStatesIntoProgress} from './teacher-projections.mjs';
+import {mergeStudentStatesIntoProgress,normalizeStoredProgress,progressForStorage} from './teacher-projections.mjs';
 import {applyTeacherStudentPlan,createTeacherSyncPlan,stripTeacherOperationMarker} from './teacher-sync-plan.mjs';
 
-const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','coopTasks',
+const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','questionPapers','coopTasks',
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
     'drawings','pendingArtworkDeletes','globalBgImage','lastSaved'];
 
@@ -18,7 +18,7 @@ export function createProgressSubscriber({database,getToken,ref,onValue,path='ga
                 if(stopped || loaded.size!==PROGRESS_FIELDS.length) return;
                 const entries=Object.entries(values).filter(([,value])=>value!==null);
                 if(!entries.length){onProgress(null);return;}
-                const progress=normalizeProgress(Object.fromEntries(entries));
+                const progress=normalizeStoredProgress(Object.fromEntries(entries));
                 if(!progress?.students.length) throw new Error('雲端資料格式不正確：缺少成員，已停止操作。');
                 onProgress(progress);
             };
@@ -57,6 +57,29 @@ export function createStudentProjectionSubscriber({database,uid,ref,onValue}){
 
 export function createTeacherStudentStatesSubscriber({database,ref,onValue}){
     return (onStates,onError)=>onValue(ref(database,'studentStates'),snapshot=>onStates(snapshot.val()||{}),onError);
+}
+
+// A progress snapshot alone is no longer a complete classroom. Publish only
+// after both streams are available, and fail closed on a missing projection.
+export function createTeacherProgressSubscriber(dependencies){
+    return (onProgress,onError)=>{
+        let stopped=false,progress,states;
+        const loaded=new Set();
+        const failed=key=>error=>{if(!stopped){loaded.delete(key);onError(error);}};
+        const receive=(key,value)=>{
+            if(stopped) return;
+            if(key==='progress') progress=value;else states=value;
+            loaded.add(key);
+            if(loaded.size!==2) return;
+            try{
+                mergeStudentStatesIntoProgress(progress,states);
+                onProgress(progress,states);
+            }catch(error){onError(error);}
+        };
+        const stopProgress=createProgressSubscriber(dependencies)(value=>receive('progress',value),failed('progress'));
+        const stopStates=createTeacherStudentStatesSubscriber(dependencies)(value=>receive('states',value),failed('states'));
+        return ()=>{stopped=true;stopProgress();stopStates();};
+    };
 }
 
 // REST handles direct reads and artwork payloads. The teacher page serializes commands
@@ -140,7 +163,9 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(command.type==='restore'){
             const value=command.value;
             if(!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('畫作資料格式不正確');
-            return {type:'restore',drawings:newestArtworks(Array.isArray(value.drawings)?value.drawings:[])};
+            const drawings=newestArtworks(Array.isArray(value.drawings)?value.drawings:[]);
+            mergeStudentStatesIntoProgress(value,{}); // A compact DB export is not a complete backup.
+            return {type:'restore',drawings};
         }
         return null;
     }
@@ -171,8 +196,17 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     }
     async function readRemote(){
         const {value}=await call('/progress');
-        const normalized=normalizeProgress(value);
+        const normalized=normalizeStoredProgress(value);
         if(value!==null && !normalized?.students.length) throw new Error("雲端資料格式不正確：缺少成員，已停止操作。");
+        return normalized;
+    }
+    async function readCompleteProgress(){
+        if(typeof readRoot!=='function') return normalizeProgress(mergeStudentStatesIntoProgress(await readRemote(),{}));
+        const root=(await readRoot())||{},room=root.games?.['classroom-115']||{};
+        if(room._projectionSync||Object.values(room.operations||{}).some(receipt=>receipt?.phase==='projecting')) throw new Error('老師操作仍在同步，請完成後再下載備份。');
+        const progress=mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{},uidMap(root));
+        const normalized=normalizeProgress(progress);
+        if(progress!==null&&!normalized?.students.length) throw new Error('雲端資料格式不正確：缺少成員，已停止操作。');
         return normalized;
     }
     const legacyEquipmentInfo=command=>{
@@ -199,7 +233,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             });
             if(!transaction?.committed&&!settled) throw Object.assign(new Error('衣櫃裝備交易未完成，稍後會重試。'),{retryable:true});
             const value=await readProgress();
-            const progress=normalizeProgress(value);
+            const progress=normalizeStoredProgress(value);
             if(value!==null&&!progress?.students.length) throw new Error('雲端資料格式不正確：缺少成員，已停止操作。');
             return {progress,result:settled?.result||{ok:true}};
         }catch(error){throw markRetryable(error);}
@@ -231,9 +265,10 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 if(rootTransaction && current===null && !['initialize','restore'].includes(command.type)) return null;
                 const root=rootTransaction?(current||{}):null;
                 const room=rootTransaction?(root.games?.['classroom-115']||{}):(current||{});
+                const mapping=rootTransaction?uidMap(root):{};
                 const receipt=room.operations?.[job.id];
                 if(receipt){
-                    settled={progress:normalizeProgress(room.progress??null),result:JSON.parse(receipt.result.json)};
+                    settled={progress:normalizeProgress(mergeStudentStatesIntoProgress(room.progress??null,root?.studentStates||{},rootTransaction?mapping:undefined)),result:JSON.parse(receipt.result.json)};
                     return;
                 }
                 const clock=now();
@@ -245,15 +280,15 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                     settled={error:new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。')};
                     return;
                 }
-                const progress=rootTransaction?mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{}):room.progress??null;
+                const progress=mergeStudentStatesIntoProgress(room.progress??null,root?.studentStates||{},rootTransaction?mapping:undefined);
                 const outcome=applyOperation(progress,command,clock);
-                if(!outcome.changed){
+                if(!outcome.changed&&command.type!=='restore'){
                     settled={progress:outcome.progress,result:outcome.result||{ok:true}};
                     return;
                 }
                 const result={ok:true,...outcome.result};
                 const next={...room,
-                    progress:{...outcome.progress,lastSaved:new Date(clock).toISOString()},
+                    progress:{...(rootTransaction?progressForStorage(outcome.progress,room.progress,mapping):outcome.progress),lastSaved:new Date(clock).toISOString()},
                     operations:{...retainedOperations(room.operations,pendingIds,clock),[job.id]:{
                         id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,
                         committedAt:{'.sv':'timestamp'},result:{json:JSON.stringify(result)},
@@ -261,10 +296,9 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                     lastOperationId:job.id,
                 };
                 if(['restore','initialize'].includes(command.type)) next.restoredAt={'.sv':'timestamp'};
-                settled={progress:normalizeProgress(next.progress),result};
+                settled={progress:{...outcome.progress,lastSaved:next.progress.lastSaved},result};
                 if(!rootTransaction) return next;
-                const uidByStudentId=Object.fromEntries(Object.entries(root.studentRoster||{}).filter(([,entry])=>entry?.active===true&&Number.isInteger(entry.studentId)).map(([uid,entry])=>[entry.studentId,uid]));
-                const projections=createStudentProjections(next.progress,uidByStudentId);
+                const projections=createStudentProjections(outcome.progress,mapping);
                 return {...root,games:{...(root.games||{}),'classroom-115':next},...projections,studentRoster:root.studentRoster||projections.studentRoster};
             });
             if(settled?.error){await cleanupRejectedArtwork(artwork);throw settled.error;}
@@ -275,7 +309,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             const saved=rootTransaction?transaction.value?.games?.['classroom-115']:transaction.value;
             const receipt=saved?.operations?.[job.id];
             if(saved?.progress && receipt?.result?.json){
-                return {progress:normalizeProgress(saved.progress),result:JSON.parse(receipt.result.json),
+                return {progress:normalizeProgress(mergeStudentStatesIntoProgress(saved.progress,rootTransaction?transaction.value.studentStates:{},rootTransaction?uidMap(transaction.value):undefined)),result:JSON.parse(receipt.result.json),
                     ...(rootTransaction?{studentStates:transaction.value?.studentStates||{}}:{})};
             }
             if(settled) return settled;
@@ -289,9 +323,16 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(error?.code?.includes('network') || error?.code==='database/disconnected') error.retryable=true;
         return error;
     };
-    const uidMap=root=>Object.fromEntries(Object.entries(root.studentRoster||{})
-        .filter(([,entry])=>entry?.active===true&&Number.isInteger(entry.studentId))
-        .map(([uid,entry])=>[entry.studentId,uid]));
+    const uidMap=root=>{
+        const mapping={};
+        for(const [uid,entry] of Object.entries(root.studentRoster||{})){
+            if(entry?.active!==true) continue;
+            if(!Number.isInteger(entry.studentId)||entry.studentId<1) throw new Error('學生編號對照資料不正確，已停止操作。');
+            if(mapping[entry.studentId]) throw new Error(`第 ${entry.studentId} 號學生 UID 對照重複，已停止操作。`);
+            mapping[entry.studentId]=uid;
+        }
+        return mapping;
+    };
     async function transactObservedRoom(update){
         if(typeof observeRoom!=='function') return transactRoom(update);
         let stop=()=>{};
@@ -315,6 +356,15 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         }
         return updates;
     }
+    function requiredPetUpdates(root,plan,mapping){
+        const updates={};
+        for(const uid of Object.values(mapping)){
+            const desired=plan.studentPets?.[uid]||{},current=root.studentPets?.[uid]||{};
+            const retained={...current,...desired};
+            if(JSON.stringify(current)!==JSON.stringify(retained)) updates[`studentPets/${uid}`]=retained;
+        }
+        return updates;
+    }
     async function applyStudentProjection(operationId,studentPlan){
         let applied;
         try{
@@ -333,6 +383,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         const room=root.games?.['classroom-115']||{},syncPlan=room._projectionSync;
         if(!syncPlan?.operationId||!syncPlan.plan) return null;
         const operationId=syncPlan.operationId,plan=syncPlan.plan;
+        const requiredPets=requiredPetUpdates(root,plan,syncPlan.uidByStudentId||{});
+        try{if(Object.keys(requiredPets).length) await writeRoot(requiredPets);}catch(error){throw markRetryable(error);}
         const applied=await Promise.all(Object.values(plan.studentPlans||{}).map(studentPlan=>applyStudentProjection(operationId,studentPlan)));
         const states=Object.fromEntries(applied.map(entry=>[entry.uid,entry.state]).filter(([,state])=>state));
         const updates=projectionUpdates(root,plan,syncPlan.uidByStudentId||{});
@@ -348,18 +400,18 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 current=current??fallbackRoom;
                 if(current?._projectionSync?.operationId!==operationId) return;
                 const receipt=current.operations?.[operationId];
-                let progress=mergeStudentStatesIntoProgress(current.progress??null,latestStates);
+                let progress=mergeStudentStatesIntoProgress(current.progress??null,latestStates,uidMap(latestRoot));
                 const {_projectionSync,...withoutLock}=current;
                 const committed={...receipt,phase:null,committedAt:{'.sv':'timestamp'},result:{json:JSON.stringify(finalResult)},
                     projectionUids:Object.keys(plan.studentPlans||{})};
                 settled={progress:normalizeProgress(progress),result:finalResult};
-                return {...withoutLock,progress:{...progress,lastSaved:new Date(now()).toISOString()},
+                return {...withoutLock,progress:{...progressForStorage(progress,current.progress,syncPlan.uidByStudentId||{}),lastSaved:new Date(now()).toISOString()},
                     operations:{...(current.operations||{}),[operationId]:committed},lastOperationId:operationId};
             });
             if(!transaction?.committed){
                 const current=transaction?.value||{};
                 const receipt=current.operations?.[operationId];
-                if(receipt&&receipt.phase!=='projecting') settled={progress:normalizeProgress(current.progress),result:JSON.parse(receipt.result.json)};
+                if(receipt&&receipt.phase!=='projecting') settled={progress:normalizeProgress(mergeStudentStatesIntoProgress(current.progress,latestStates,uidMap(latestRoot))),result:JSON.parse(receipt.result.json)};
                 else throw Object.assign(new Error('老師同步鎖已變更，稍後會重試。'),{retryable:true});
             }
         }catch(error){throw markRetryable(error);}
@@ -377,33 +429,34 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             const existing=room.operations?.[job.id];
             if(existing&&existing.phase!=='projecting'){
                 await cleanupStudentMarkers(job.id,existing.projectionUids||[]);
-                return {progress:normalizeProgress(room.progress??null),result:JSON.parse(existing.result.json),studentStates:root.studentStates||{}};
+                return {progress:normalizeProgress(mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{},uidMap(root))),result:JSON.parse(existing.result.json),studentStates:root.studentStates||{}};
             }
             if(room._projectionSync){
                 await resumeProjection(root);
                 continue;
             }
-            command??=await prepareCommand(job.command,artwork);
             const mapping=uidMap(root),clock=now();let settled,blocked=false;
+            mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{},mapping);
+            command??=await prepareCommand(job.command,artwork);
             try{
                 const transaction=await transactObservedRoom(current=>{
                     current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];
                     if(receipt&&receipt.phase!=='projecting'){
-                        settled={progress:normalizeProgress(current.progress??null),result:JSON.parse(receipt.result.json)};return;
+                        settled={progress:normalizeProgress(mergeStudentStatesIntoProgress(current.progress??null,root.studentStates||{},mapping)),result:JSON.parse(receipt.result.json)};return;
                     }
                     if(current.restoredAt&&job.createdAt<=current.restoredAt&&!['restore','initialize'].includes(command.type)){
                         settled={error:new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。')};return;
                     }
-                    const before=mergeStudentStatesIntoProgress(current.progress??null,root.studentStates||{});
+                    const before=mergeStudentStatesIntoProgress(current.progress??null,root.studentStates||{},mapping);
                     const outcome=applyOperation(before,command,clock);
-                    if(!outcome.changed){settled={progress:outcome.progress,result:outcome.result||{ok:true}};return;}
+                    if(!outcome.changed&&command.type!=='restore'){settled={progress:outcome.progress,result:outcome.result||{ok:true}};return;}
                     const result={ok:true,...outcome.result};
                     const plan=createTeacherSyncPlan({beforeProgress:before,afterProgress:outcome.progress,command,result,
                         uidByStudentId:mapping,clock});
                     const receiptValue={id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,phase:'projecting',result:{json:JSON.stringify(result)}};
-                    const next={...current,progress:{...outcome.progress,lastSaved:new Date(clock).toISOString()},
+                    const next={...current,progress:{...progressForStorage(outcome.progress,current.progress,mapping),lastSaved:new Date(clock).toISOString()},
                         operations:{...retainedOperations(current.operations,pendingIds,clock),[job.id]:receiptValue},lastOperationId:job.id,
                         _projectionSync:{operationId:job.id,createdAt:clock,uidByStudentId:mapping,
                             resultUid:['petMood','bossAttack'].includes(command.type)?mapping[command.studentId]||null:null,plan}};
@@ -430,7 +483,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             const response=await call('',{headers:{'X-Firebase-ETag':'true'}});
             const room=response.value || {};
             const receipt=room.operations?.[job.id];
-            if(receipt) return {progress:normalizeProgress(room.progress??null),result:JSON.parse(receipt.result.json)};
+            if(receipt) return {progress:normalizeProgress(mergeStudentStatesIntoProgress(room.progress??null,{})),result:JSON.parse(receipt.result.json)};
             const clock=now();
             if(clock-job.createdAt>24*60*60*1000){
                 await cleanupRejectedArtwork(artwork);
@@ -441,8 +494,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 await cleanupRejectedArtwork(artwork);
                 throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
             }
-            const outcome=applyOperation(room.progress??null,candidate,clock);
-            if(!outcome.changed) return {progress:outcome.progress,result:outcome.result||{ok:true}};
+            const outcome=applyOperation(mergeStudentStatesIntoProgress(room.progress??null,{}),candidate,clock);
+            if(!outcome.changed&&candidate.type!=='restore') return {progress:outcome.progress,result:outcome.result||{ok:true}};
             command ??= await prepareCommand(job.command,artwork);
             const result={ok:true,...outcome.result};
             const next={...room,
@@ -462,7 +515,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         }
         throw Object.assign(new Error('雲端正在接收其他裝置的操作，稍後會重試。'),{retryable:true});
     }
-    return {readRemote,readReceipt,readArtwork,writeArtwork,deleteArtwork,execute};
+    return {readRemote,readCompleteProgress,readReceipt,readArtwork,writeArtwork,deleteArtwork,execute};
 }
 
 // Authentication may fail before the first server read. Retry lazily on the next

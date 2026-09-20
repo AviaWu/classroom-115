@@ -53,7 +53,7 @@ export function createTeacherSyncPlan({beforeProgress,afterProgress,command,resu
         const changes={};
         for(const field of PERSONAL_FIELDS){
             const previous=before?.[field],next=after[field];
-            if(equal(previous,next)) continue;
+            if(command.type!=='restore'&&equal(previous,next)) continue;
             if(command.type==='resetBossProgress'&&field==='bossProgress'){
                 changes[field]={mode:'removeBoss',bossId:command.bossId};
             }else if(before&&isAdditive(command,field)&&typeof previous==='number'&&typeof next==='number'){

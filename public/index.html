@@ -3114,7 +3114,7 @@ function prepareArtworkRestore(value){
         .map(({savedAt,data})=>({id:"drawing_"+crypto.randomUUID(),savedAt,data}));
     candidate.drawings=[];
     delete candidate.pendingArtworkDeletes;
-    return {...window.GameOperations.normalizeProgress(candidate),drawings};
+    return {...window.GameOperations.normalizeProgressForRestore(candidate),drawings};
 }
 async function exportData(){
     if(!backendAuthenticated) return;
@@ -3236,7 +3236,7 @@ setInterval(syncScheduledTasks,30000);
   import { getDatabase, onValue, ref, update } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
   import { createFirebaseRestClient } from "./firebase-rest-client.mjs";
-  import { createFirebaseStore, createProgressSubscriber, createStudentProjectionSubscriber, createTeacherStudentStatesSubscriber } from "./firebase-store.mjs";
+  import { createFirebaseStore, createTeacherProgressSubscriber, createStudentProjectionSubscriber } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
   import { accountForEmail, credentialsForLogin } from "./auth-accounts.mjs";
   import { studentProjectionToProgress } from "./student-projections.mjs";
@@ -3266,21 +3266,14 @@ setInterval(syncScheduledTasks,30000);
     finally{authTransition=false;}
   };
   window.firebaseLogout=()=>signOut(auth);
-  let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,teacherStatesUnsubscribe=null,teacherRawProgress=null,teacherStudentStates={};
+  let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,teacherProgress=null;
   function applyTeacherCloudState(progress,latestStudentStates){
-    if(latestStudentStates) teacherStudentStates=latestStudentStates;
-    teacherRawProgress=progress;
-    return applyCloudState(mergeStudentStatesIntoProgress(progress,teacherStudentStates));
+    teacherProgress=latestStudentStates ? mergeStudentStatesIntoProgress(progress,latestStudentStates) : progress;
+    return applyCloudState(teacherProgress);
   }
-  function startTeacherProjectionMode(){
-    teacherStatesUnsubscribe?.();teacherStudentStates={};teacherRawProgress=null;
-    teacherStatesUnsubscribe=createTeacherStudentStatesSubscriber({database,ref,onValue})(states=>{
-      teacherStudentStates=states;
-      if(teacherRawProgress) applyTeacherCloudState(teacherRawProgress);
-    },error=>console.error("教師學生狀態同步失敗",error));
-  }
-  function stopTeacherProjectionMode(){teacherStatesUnsubscribe?.();teacherStatesUnsubscribe=null;teacherStudentStates={};teacherRawProgress=null;}
+  function stopTeacherProjectionMode(){teacherProgress=null;}
   function startStudentMode(user){
+    stopTeacherProjectionMode();
     sync?.setConnected(false);studentProjectionUnsubscribe?.();studentProjection=null;
     const subscribe=createStudentProjectionSubscriber({database,uid:user.uid,ref,onValue});
     studentStateStore=createStudentStateStore({uid:user.uid,
@@ -3302,7 +3295,7 @@ setInterval(syncScheduledTasks,30000);
     if(account){
       applyAuthenticatedSession(account);
       if(account.role==="student") startStudentMode(user);
-      else {stopStudentMode();startTeacherProjectionMode();window.firebaseGameStore=sync;sync?.setConnected(false);sync?.setConnected(navigator.onLine);}
+      else {stopStudentMode();stopTeacherProjectionMode();window.firebaseGameStore=sync;sync?.setConnected(false);sync?.setConnected(navigator.onLine);}
       return;
     }
     if(authTransition) return;
@@ -3340,11 +3333,21 @@ setInterval(syncScheduledTasks,30000);
       transactProgressStudent:(studentId,updater)=>restClient.transact(`games/classroom-115/progress/students/${studentId-1}`,updater),
       transactStudentState:(uid,updater)=>restClient.transact(`studentStates/${uid}`,updater)
   });
-  window.readLatestProgress=store.readRemote;
+  window.readLatestProgress=store.readCompleteProgress;
   window.artworkStore=store;
-  const subscribeProgress=createProgressSubscriber({database,getToken,ref,onValue});
+  const subscribeProgress=createTeacherProgressSubscriber({database,getToken,ref,onValue});
   sync=createCloudSync({
-      ...store,applyState:applyTeacherCloudState,lock:setSyncLocked,status:setSyncStatus,
+      ...store,readRemote:store.readCompleteProgress,applyState:applyTeacherCloudState,lock:setSyncLocked,status:setSyncStatus,
+      execute:async(job,pendingIds)=>{
+        const outcome=await store.execute(job,pendingIds);
+        if(job.command.type==='equip'&&['clothes','background'].includes(job.command.kind)){
+          // Wardrobe writes stay scoped to one legacy student. Reuse the already
+          // displayed personal values, with no unrelated Firebase reads.
+          const personal=Object.fromEntries((teacherProgress?.students||[]).map(student=>[student.id,{...student,studentId:student.id}]));
+          return {...outcome,progress:mergeStudentStatesIntoProgress(outcome.progress,personal)};
+        }
+        return outcome;
+      },
       subscribeRemote:subscribeProgress,
       error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},
       newId:()=>crypto.randomUUID(),now:()=>Date.now()+serverOffset,

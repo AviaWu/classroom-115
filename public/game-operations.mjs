@@ -61,6 +61,13 @@ function templateDefaults(item, weekly = false) {
 }
 
 /** Normalize transport omissions without repopulating a catalogue the teacher deleted. */
+export function normalizeProgressForRestore(value) {
+    if(Array.isArray(value?.students) && value.students.some(student=>student && !Number.isFinite(student.tokens))) {
+        throw new Error('備份缺少學生個人資料，請使用老師後台下載的完整備份。');
+    }
+    return normalizeProgress(value);
+}
+
 export function normalizeProgress(value) {
     if (value == null) return null;
     if (!object(value)) throw new Error('遊戲進度格式不正確');
@@ -341,7 +348,7 @@ export function applyOperation(value,command,now = Date.now()) {
     if (command.type === 'initialize' || command.type === 'restore') {
         const previousArtworkIds = command.type === 'restore' && progress !== null ? drawingIds(progress.drawings) : new Set();
         const previousArtworkDeletes = command.type === 'restore' && progress !== null ? progress.pendingArtworkDeletes : [];
-        const restored = requireProgress(normalizeProgress(command.value));
+        const restored = requireProgress(command.type==='restore'?normalizeProgressForRestore(command.value):normalizeProgress(command.value));
         if (command.type === 'restore') addArtworkDeletes(restored,[...previousArtworkDeletes,...[...previousArtworkIds].filter(id=>!drawingIds(restored.drawings).has(id))]);
         return {progress:restored,result:null,changed:!equal(progress,restored)};
     }

@@ -68,3 +68,6 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Reviewed local backups and migration plans (may contain student data)
+.local-migrations/
