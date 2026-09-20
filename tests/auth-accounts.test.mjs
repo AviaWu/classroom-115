@@ -17,6 +17,13 @@ test('teacher and test accounts use their dedicated addresses',()=>{
     });
 });
 
+test('unassigned legacy accounts 29 and 30 can authenticate but have no student mapping',()=>{
+    assert.deepEqual(credentialsForLogin('student-29','5487'),{
+        role:'student',studentId:29,email:'student-29@classroom-115.local',password:'c115-5487'
+    });
+    assert.deepEqual(accountForEmail('student-30@classroom-115.local'),{role:'student',studentId:30});
+});
+
 test('invalid accounts and non-PIN passwords cannot produce Firebase credentials',()=>{
     assert.equal(credentialsForLogin('student-0','1234'),null);
     assert.equal(credentialsForLogin('student-27','1234'),null);

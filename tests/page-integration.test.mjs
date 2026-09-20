@@ -55,7 +55,7 @@ test('browser module wires child subscriptions and avoids root SDK transactions'
 });
 test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{
     const h=page(t);h.sync.setConnected(true);await h.sync.refresh();
-    assert.equal(h.w.document.getElementById('loginAccount').options.length,28);
+    assert.equal(h.w.document.getElementById('loginAccount').options.length,30);
     h.signIn('student-1','0000');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);assert.match(h.w.document.getElementById('loginMessage').textContent,/錯誤/);
     h.signIn('student-1','3847');assert.equal(h.w.document.getElementById('loginScreen').hidden,true);assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 1 號');
     h.w.logout();h.signIn('teacher','5905606');assert.equal(h.w.document.getElementById('loginScreen').hidden,false);
@@ -81,6 +81,12 @@ test('student sees only their pet view on a blank page and cannot open teacher f
     await h.run('openPetMood(2)');
     assert.equal(h.alerts.filter(message=>message==='點錯啦!這不是你的人物喔!').length,1);
     h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
+});
+test('unassigned legacy account signs in to an otherwise blank page',async t=>{
+    const h=page(t);await h.start();h.w.logout();h.signIn('student-29','5487');
+    assert.equal(h.w.document.getElementById('sessionBadge').textContent,'學生 29 號');
+    assert.equal(h.w.document.getElementById('students').innerHTML,'');
+    assert.equal(h.w.document.getElementById('modal').classList.contains('open'),false);
 });
 test('Escape closes an open shared modal',async t=>{
     const h=page(t);await h.start();await h.run('shop(1)');

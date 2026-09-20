@@ -6,7 +6,7 @@ export function credentialsForLogin(account,pin){
     if(account==='test') return {role:'student',studentId:28,email:`test@${DOMAIN}`,password:`c115-${pin}`};
     const match=typeof account==='string' && account.match(/^student-(\d+)$/);
     const studentId=Number(match?.[1]);
-    if(!Number.isInteger(studentId) || studentId<1 || studentId>26) return null;
+    if(!Number.isInteger(studentId) || !((studentId>=1 && studentId<=26) || studentId===29 || studentId===30)) return null;
     return {role:'student',studentId,email:`student-${studentId}@${DOMAIN}`,password:`c115-${pin}`};
 }
 
@@ -16,5 +16,5 @@ export function accountForEmail(email){
     if(email===`test@${DOMAIN}`) return {role:'student',studentId:28};
     const match=email.match(new RegExp(`^student-(\\d+)@${DOMAIN.replace('.', '\\.')}$`));
     const studentId=Number(match?.[1]);
-    return Number.isInteger(studentId) && studentId>=1 && studentId<=26 ? {role:'student',studentId} : null;
+    return Number.isInteger(studentId) && ((studentId>=1 && studentId<=26) || studentId===29 || studentId===30) ? {role:'student',studentId} : null;
 }
