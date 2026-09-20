@@ -152,7 +152,7 @@ input[type="number"]{width:85px}
 .task-new{position:absolute;top:-13px;right:4px;color:#d83d3d;font-size:11px;font-weight:900;line-height:1;background:#fff8e8;padding:2px 3px;white-space:nowrap;z-index:2}
 .pet-interaction-trigger{cursor:pointer}
 .pet-interaction-trigger:focus{outline:4px solid #f3d98b;outline-offset:3px}
-.pet-interaction{display:grid;grid-template-columns:minmax(270px,1fr) minmax(420px,1.2fr);gap:28px;max-width:980px;margin:auto;align-items:center}
+.pet-interaction{display:grid;grid-template-rows:auto auto auto;gap:22px;max-width:980px;margin:auto}
 .pet-mood-side{text-align:left}
 .pet-mood-side h3{margin-top:0;padding:9px 12px;background:#34405c;color:#f3d98b;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;text-align:center}
 .pet-mood-grid{display:grid;grid-template-columns:repeat(3,minmax(82px,1fr));gap:11px}
@@ -163,8 +163,12 @@ input[type="number"]{width:85px}
 .pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:clamp(11px,1.55vw,16px);line-height:1.15;white-space:nowrap;letter-spacing:-1px}
 .pet-mood-button b{font-size:14px}
 .pet-stage{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;margin:auto}
-.pet-display-row{display:grid;grid-template-columns:minmax(0,260px) minmax(180px,1fr);gap:14px;width:100%;min-height:310px;align-items:stretch}
-.pet-status-column{display:grid;grid-template-rows:1fr 1fr;gap:12px;min-width:0}
+.pet-display-row{display:grid;grid-template-columns:minmax(180px,240px) minmax(180px,.8fr) minmax(280px,1.4fr);gap:14px;width:100%;min-height:230px;align-items:stretch}
+.pet-image-button{display:block;width:100%;min-width:0;padding:0;background:transparent;border:0;box-shadow:none;color:inherit}
+.pet-image-button:hover{background:transparent;transform:none;box-shadow:none}
+.pet-image-button:focus-visible{outline:4px solid #efb1a5;outline-offset:4px}
+.pet-image-hint{display:block;margin-top:5px;font-size:12px;font-weight:900;text-align:center}
+.pet-boss-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .pet-level-card{display:flex;flex-direction:column;justify-content:center;width:100%;height:100%;box-sizing:border-box;padding:12px;background:#fff4d6;border:4px solid #20263a;box-shadow:4px 4px 0 #172033}
 .boss-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:0;padding:10px;background:#ffe0dc;border:4px solid #20263a;box-shadow:4px 4px 0 #172033;text-align:center}
 .boss-card img{width:68px;height:58px;object-fit:contain}.boss-card h3{margin:0;font-size:16px}.boss-card p{margin:0;font-size:12px;font-weight:800}
@@ -176,12 +180,12 @@ input[type="number"]{width:85px}
 .pet-affection-bar{width:100%;height:18px;box-sizing:border-box;overflow:hidden;background:#ead4d4;border:3px solid #20263a}
 .pet-affection-fill{height:100%;background:linear-gradient(90deg,#ff8fab,#ffd43b);transition:width .35s ease}
 .pet-affection-status{margin-top:14px;font-size:12px;font-weight:800;line-height:1.5;text-align:center}
-.pet-mood-reply{--reply-color:#fffdf3;position:relative;width:100%;min-height:96px;box-sizing:border-box;margin-bottom:24px;padding:18px;background:var(--reply-color);border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:19px;font-weight:700;line-height:1.75;letter-spacing:.5px;text-align:left;transition:background-color .18s ease}
-.pet-mood-reply::before{content:"";position:absolute;right:42px;bottom:-18px;width:28px;height:28px;background:var(--reply-color);border-right:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg);transition:background-color .18s ease}
+.pet-mood-reply{--reply-color:#fffdf3;position:relative;width:100%;min-height:100%;box-sizing:border-box;margin:0;padding:18px;background:var(--reply-color);border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:19px;font-weight:700;line-height:1.75;letter-spacing:.5px;text-align:left;transition:background-color .18s ease}
+.pet-mood-reply::before{content:"";position:absolute;left:-18px;top:42px;width:28px;height:28px;background:var(--reply-color);border-left:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg);transition:background-color .18s ease}
 .pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
 .pet-mood-reply p{margin:8px 0 0}
-.pet-interaction-image{display:block;width:100%;height:100%;box-sizing:border-box;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
-@media(max-width:700px){.pet-interaction{grid-template-columns:1fr}.pet-stage{order:-1}.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr))}.pet-display-row{grid-template-columns:minmax(0,1fr) minmax(135px,.9fr);min-height:270px}.pet-level-card{padding:8px}.pet-level-heading{gap:4px;margin-bottom:8px}.pet-level-heading span:first-child{font-size:14px}.pet-affection-status{margin-top:6px;font-size:10px}.boss-card{padding:7px}.boss-card img{width:54px;height:44px}.boss-card h3{font-size:13px}.boss-card p{font-size:10px}.pet-mood-reply{max-width:430px}.boss-choice-grid{grid-template-columns:repeat(2,1fr)}}
+.pet-interaction-image{display:block;width:100%;height:190px;box-sizing:border-box;object-fit:contain;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033}
+@media(max-width:700px){.pet-mood-grid{grid-template-columns:repeat(3,minmax(78px,1fr))}.pet-display-row{grid-template-columns:1fr 1fr;min-height:0}.pet-mood-reply{grid-column:1/-1;min-height:120px}.pet-mood-reply::before{display:none}.pet-interaction-image{height:170px}.pet-level-card{padding:8px}.pet-level-heading{gap:4px;margin-bottom:8px}.pet-level-heading span:first-child{font-size:14px}.pet-affection-status{margin-top:6px;font-size:10px}.boss-card{padding:7px}.boss-card img{width:54px;height:44px}.boss-card h3{font-size:13px}.boss-card p{font-size:10px}.boss-choice-grid{grid-template-columns:repeat(2,1fr)}}
 .drawing-board-layout{display:grid;grid-template-columns:150px minmax(0,1fr) 190px;gap:18px;align-items:start;clear:both}
 .drawing-history{display:flex;flex-direction:column;gap:10px;max-height:650px;overflow:auto;padding:3px}
 .drawing-thumb{width:100%;padding:5px;background:#fff8e8;text-align:left}
@@ -1073,7 +1077,7 @@ function render(){
         }
 
         return `<div class="card" style="--member-level-color:${memberLevelColor}" data-clothing-level="${esc(eqCloth?.level||"default")}">
-            <div class="avatar pet-interaction-trigger" role="button" tabindex="0" aria-label="查看${s.id}號的寵物心情互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
+            <div class="avatar pet-interaction-trigger" role="button" tabindex="0" aria-label="查看${s.id}號的寵物互動" onclick="openPetMood(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPetMood(${s.id})}">${bgHtml}${charHtml}</div>
             <div class="resource-line">
                 <span class="num">${s.id}</span>
                 <span class="tokens">🪙 ${s.tokens}</span>
@@ -1444,19 +1448,20 @@ function openPetMood(id){
         <button class="pet-mood-button" style="--mood-color:${moodColors[index]}" onclick="showPetMoodReply(${id},'${mood}',this)" aria-label="選擇${mood}心情" aria-pressed="false">
             <span aria-hidden="true">${PET_MOOD_ICONS[mood]}</span><b>${mood}</b>
         </button>`).join("");
-    openModal(`<h2>${id}號｜寵物心情互動</h2>
+    openModal(`<h2>${id}號｜寵物互動</h2>
         <div class="pet-interaction">
+            <section class="pet-stage" aria-label="寵物狀態與對話">
+                <div class="pet-display-row">
+                    <button class="pet-image-button" onclick="closet(${id},'layouts')" aria-label="更換寵物"><img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}"><span class="pet-image-hint">點擊圖片更換寵物</span></button>
+                    ${petLevelHtml(student)}
+                    <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
+                </div>
+            </section>
             <section class="pet-mood-side" aria-label="選擇心情">
                 <h3>選擇現在的心情</h3>
                 <div class="pet-mood-grid">${moodButtons}</div>
             </section>
-            <section class="pet-stage">
-                <div id="petMoodReply" class="pet-mood-reply" aria-live="polite">我的主人，我一直陪伴著你。</div>
-                <div class="pet-display-row">
-                    <img class="pet-interaction-image" src="${esc(pet.image)}" alt="${esc(pet.name)}">
-                    <div class="pet-status-column">${petLevelHtml(student)}${bossStatusHtml(student)}</div>
-                </div>
-            </section>
+            <section class="pet-boss-row" aria-label="BOSS 挑戰">${bossStatusHtml(student)}</section>
         </div>`);
 }
 
@@ -2325,13 +2330,13 @@ async function backend(){
     <section id="backend-boss" class="backend-page">
     <h3>發布新 BOSS</h3>
     <div class="row" style="display:block">
-        <div class="edit-item-row"><input id="bossName" placeholder="BOSS 名稱"><label>血量：<input id="bossHp" type="number" min="1" step="1" value="100"></label><label>4 位攻打密碼：<input id="bossPassword" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"></label><label>代幣：<input id="bossReward" type="number" min="0" step="1" value="0"></label><label>樂透券：<input id="bossRewardTickets" type="number" min="0" step="1" value="0"></label><label>考卷：<select id="bossPaperId">${state.questionPapers.map(paper=>`<option value="${esc(paper.id)}">${esc(paper.name)}（${paper.questions.length} 題）</option>`).join("")}</select></label></div>
+        <div class="edit-item-row"><input id="bossName" placeholder="BOSS 名稱"><label>血量：<input id="bossHp" type="number" min="1" step="1" value="100"></label><label>4 位攻打密碼：<input id="bossPassword" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"></label><label>代幣：<input id="bossReward" type="number" min="0" step="1" value="0"></label><label>樂透券：<input id="bossRewardTickets" type="number" min="0" step="1" value="0"></label><label>考卷：<select id="bossPaperId" ${state.questionPapers.length?"":"disabled"}><option value="">${state.questionPapers.length?"請選擇考卷":"請先建立考卷"}</option>${state.questionPapers.map(paper=>`<option value="${esc(String(paper.id))}">${esc(paper.name||"未命名考卷")}（${paper.questions.length} 題）</option>`).join("")}</select></label></div>
         <label style="display:block;margin-top:12px">選擇 BOSS 圖片：</label>
         <div class="boss-choice-grid">${BUILTIN_BOSSES.map((boss,index)=>`<button type="button" class="boss-choice ${index===0?"active":""}" onclick="selectBossImage(this,'${esc(boss.image)}')"><img src="${esc(boss.image)}" alt="${esc(boss.name)}"><span>${esc(boss.name)}</span></button>`).join("")}</div>
         <input type="hidden" id="bossImage" value="${esc(BUILTIN_BOSSES[0].image)}"><button class="primary" onclick="saveBoss()">發布 BOSS</button>
     </div>
     <h3>已發布 BOSS 紀錄</h3>
-    ${state.bosses.map(boss=>{const completed=state.students.filter(student=>student.bossProgress.some(progress=>progress.bossId===boss.id&&progress.defeated)).map(student=>student.id);return `<div class="row" style="display:block"><div class="edit-item-row"><img src="${esc(boss.image)}" alt="${esc(boss.name)}" style="width:72px;height:72px;object-fit:contain"><input data-field="bosses:${esc(boss.id)}:name" value="${esc(boss.name)}" onchange="updateBoss('${esc(boss.id)}','name',this.value)" placeholder="名稱"><label>HP <input data-field="bosses:${esc(boss.id)}:maxHp" type="number" min="1" value="${boss.maxHp}" onchange="updateBoss('${esc(boss.id)}','maxHp',this.value)"></label><label>🪙 <input data-field="bosses:${esc(boss.id)}:reward" type="number" min="0" value="${boss.reward}" onchange="updateBoss('${esc(boss.id)}','reward',this.value)"></label><label>🎟️ <input data-field="bosses:${esc(boss.id)}:rewardTickets" type="number" min="0" value="${boss.rewardTickets||0}" onchange="updateBoss('${esc(boss.id)}','rewardTickets',this.value)"></label><select data-field="bosses:${esc(boss.id)}:paperId" onchange="updateBoss('${esc(boss.id)}','paperId',this.value)">${state.questionPapers.map(paper=>`<option value="${esc(paper.id)}" ${paper.id===boss.paperId?"selected":""}>${esc(paper.name)}</option>`).join("")}</select><button onclick="resetAllBossHp('${esc(boss.id)}')">重置全員血量</button><button onclick="toggleBossActive('${esc(boss.id)}')">${boss.active?"停用":"啟用"}</button><button class="danger" onclick="deleteBoss('${esc(boss.id)}')">刪除</button></div><div class="small">完成成員：${completed.length?completed.join("、")+" 號":"尚無"}</div></div>`;}).join("")||`<div class="empty">尚無已發布 BOSS</div>`}
+    ${state.bosses.map(boss=>{const completed=state.students.filter(student=>student.bossProgress.some(progress=>progress.bossId===boss.id&&progress.defeated)).map(student=>student.id);return `<div class="row" style="display:block"><div class="edit-item-row"><img src="${esc(boss.image)}" alt="${esc(boss.name)}" style="width:72px;height:72px;object-fit:contain"><input data-field="bosses:${esc(boss.id)}:name" value="${esc(boss.name)}" onchange="updateBoss('${esc(boss.id)}','name',this.value)" placeholder="名稱"><label>HP <input data-field="bosses:${esc(boss.id)}:maxHp" type="number" min="1" value="${boss.maxHp}" onchange="updateBoss('${esc(boss.id)}','maxHp',this.value)"></label><label>🪙 <input data-field="bosses:${esc(boss.id)}:reward" type="number" min="0" value="${boss.reward}" onchange="updateBoss('${esc(boss.id)}','reward',this.value)"></label><label>🎟️ <input data-field="bosses:${esc(boss.id)}:rewardTickets" type="number" min="0" value="${boss.rewardTickets||0}" onchange="updateBoss('${esc(boss.id)}','rewardTickets',this.value)"></label><label>考卷：<select data-field="bosses:${esc(boss.id)}:paperId" onchange="updateBoss('${esc(boss.id)}','paperId',this.value)" ${state.questionPapers.length?"":"disabled"}><option value="">${state.questionPapers.length?"請選擇考卷":"請先建立考卷"}</option>${state.questionPapers.map(paper=>`<option value="${esc(String(paper.id))}" ${String(paper.id)===String(boss.paperId)?"selected":""}>${esc(paper.name||"未命名考卷")}（${paper.questions.length} 題）</option>`).join("")}</select></label><button onclick="resetAllBossHp('${esc(boss.id)}')">重置全員血量</button><button onclick="toggleBossActive('${esc(boss.id)}')">${boss.active?"停用":"啟用"}</button><button class="danger" onclick="deleteBoss('${esc(boss.id)}')">刪除</button></div><div class="small">完成成員：${completed.length?completed.join("、")+" 號":"尚無"}</div></div>`;}).join("")||`<div class="empty">尚無已發布 BOSS</div>`}
     <p class="small">BOSS 題目由題庫考卷提供；重置血量會同時清除全員答題與擊敗紀錄。</p>
     </section>
     <section id="backend-tokens" class="backend-page">
@@ -2559,18 +2564,23 @@ function selectBossImage(button,image){
 }
 async function saveBoss(){
     const name=document.getElementById("bossName").value.trim(),maxHp=Number(document.getElementById("bossHp").value);
-    const attackPassword=document.getElementById("bossPassword").value,reward=Number(document.getElementById("bossReward").value),rewardTickets=Number(document.getElementById("bossRewardTickets").value),paperId=document.getElementById("bossPaperId").value,image=document.getElementById("bossImage").value;
+    const attackPassword=document.getElementById("bossPassword").value,reward=Number(document.getElementById("bossReward").value),rewardTickets=Number(document.getElementById("bossRewardTickets").value),paperId=document.getElementById("bossPaperId")?.value||"",image=document.getElementById("bossImage").value;
     if(!name||!Number.isInteger(maxHp)||maxHp<1||![reward,rewardTickets].every(value=>Number.isInteger(value)&&value>=0)) return alert("請完整填寫名稱、正整數血量與 0 以上整數獎勵");
     if(!/^\d{4}$/.test(attackPassword)) return alert("攻打密碼必須是 4 位數字");
-    if(!state.questionPapers.some(paper=>paper.id===paperId))return alert("請先在題庫建立並選擇考卷");
+    const selectedPaper=state.questionPapers.find(paper=>String(paper.id)===paperId);
+    if(!selectedPaper)return alert("請先在題庫建立並選擇考卷");
     if(!BUILTIN_BOSSES.some(item=>item.image===image)) return alert("請選擇 BOSS 圖片");
-    state.bosses.push({id:`boss_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,name,image,maxHp,attackPassword,reward,rewardTickets,paperId,questions:[],active:true,publishedAt:Date.now()});
+    state.bosses.push({id:`boss_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,name,image,maxHp,attackPassword,reward,rewardTickets,paperId:selectedPaper.id,questions:[],active:true,publishedAt:Date.now()});
     markChanged();save();render();refreshBackendPage("backend-boss");
 }
 function updateBoss(bossId,field,value){
     const boss=state.bosses.find(item=>item.id===bossId);if(!boss)return;
     if(["maxHp","reward","rewardTickets"].includes(field)){value=Number(value);if(!Number.isInteger(value)||value<(field==="maxHp"?1:0))return alert("請輸入有效的整數");}
-    if(field==="paperId"&&!state.questionPapers.some(paper=>paper.id===value))return alert("考卷不存在");
+    if(field==="paperId"){
+        const selectedPaper=state.questionPapers.find(paper=>String(paper.id)===String(value));
+        if(!selectedPaper)return alert("考卷不存在");
+        value=selectedPaper.id;
+    }
     if(field==="name"&&!value.trim())return alert("名稱不可空白");
     boss[field]=field==="name"?value.trim():value;markChanged();save();render();refreshBackendPage("backend-boss");
 }

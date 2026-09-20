@@ -408,6 +408,12 @@ test('restore skips drawing metadata without image data',async t=>{
     await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)]}));
     assert.deepEqual(h.cloud.drawings,[]);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
 });
+test('pet interaction uses three rows and its pet image opens the pet closet',async t=>{
+    const h=page(t);h.cloud={...h.cloud,students:[{...h.cloud.students[0],ownedLayout:['pet'],equippedLayout:['pet']},h.cloud.students[1]]};await h.start();await h.run('openPetMood(1)');
+    assert.match(h.w.document.querySelector('#modal h2').textContent,/寵物互動/);assert.doesNotMatch(h.w.document.querySelector('#modal h2').textContent,/寵物心情互動/);
+    const interaction=h.w.document.querySelector('.pet-interaction');assert.equal(interaction.children.length,3);assert.ok(interaction.children[0].querySelector('.pet-interaction-image'));assert.ok(interaction.children[0].querySelector('.pet-level-card'));assert.ok(interaction.children[0].querySelector('.pet-mood-reply'));assert.ok(interaction.children[1].classList.contains('pet-mood-side'));assert.ok(interaction.children[2].classList.contains('pet-boss-row'));
+    const petButton=h.w.document.querySelector('.pet-image-button');assert.equal(petButton.getAttribute('onclick'),"closet(1,'layouts')");await h.run("closet(1,'layouts')");assert.match(h.w.document.querySelector('#modal h2').textContent,/衣櫃/);assert.equal(h.w.document.querySelector('#modal .tab.active').textContent,'寵物');assert.ok(h.w.document.getElementById('closetTabContent').textContent.includes('測試寵物'));
+});
 test('boss battle shows its image and HP, advances automatically, and hides a defeated boss',async t=>{
     const h=page(t);await h.start();await h.run('openPetMood(1)');assert.match(h.w.document.getElementById('modal').textContent,/目前世界一片和平/);
     const paper={id:'paper',name:'挑戰考卷',questions:[{id:'q1',text:'1 加 1 是多少？',options:['1','2','3','4'],answerIndex:1},{id:'q2',text:'天空是藍色',options:['是','否'],answerIndex:0}]};
@@ -428,11 +434,21 @@ test('teacher manages reusable papers, publishes editable bosses, and resets eve
     h.w.document.getElementById(`paperQuestionText-${secondPaper.id}`).value='二加二';for(const [index,value] of ['2','3','4','5'].entries())h.w.document.getElementById(`paperOption${index}-${secondPaper.id}`).value=value;h.w.document.getElementById(`paperAnswerIndex-${secondPaper.id}`).value='2';await h.run(`addPaperQuestion('${secondPaper.id}')`);
     assert.deepEqual(h.cloud.questionPapers[0].questions[0].options,['是','否']);assert.equal(h.cloud.questionPapers[1].questions[0].answerIndex,2);
     await h.run("activateBackendPage('backend-boss')");
-    for(const [index,name] of ['黑龍','白龍'].entries()){h.w.document.getElementById('bossName').value=name;h.w.document.getElementById('bossHp').value='20';h.w.document.getElementById('bossPassword').value='2468';h.w.document.getElementById('bossReward').value='50';h.w.document.getElementById('bossRewardTickets').value=String(index+1);h.w.document.getElementById('bossPaperId').value=h.cloud.questionPapers[index].id;await h.run('saveBoss()');}
+    const createPaperSelect=h.w.document.getElementById('bossPaperId');assert.equal(createPaperSelect.options.length,3);assert.equal(createPaperSelect.options[0].value,'');assert.match(createPaperSelect.options[1].textContent,/自然考卷（1 題）/);assert.equal(createPaperSelect.value,'');
+    for(const [index,name] of ['黑龍','白龍'].entries()){h.w.document.getElementById('bossName').value=name;h.w.document.getElementById('bossHp').value='20';h.w.document.getElementById('bossPassword').value='2468';h.w.document.getElementById('bossReward').value='50';h.w.document.getElementById('bossRewardTickets').value=String(index+1);h.w.document.getElementById('bossPaperId').value=String(h.cloud.questionPapers[index].id);await h.run('saveBoss()');}
     assert.equal(h.cloud.bosses.length,2);const firstId=h.cloud.bosses[0].id;
+    const firstBossPaperSelect=h.w.document.querySelector(`[data-field="bosses:${firstId}:paperId"]`);assert.equal(firstBossPaperSelect.value,String(firstPaper.id));assert.match(firstBossPaperSelect.selectedOptions[0].textContent,/自然考卷（1 題）/);
     await h.run(`updateBoss('${firstId}','name','赤龍')`);await h.run(`updateBoss('${firstId}','maxHp','35')`);await h.run(`updateBoss('${firstId}','reward','80')`);await h.run(`updateBoss('${firstId}','rewardTickets','4')`);await h.run(`updateBoss('${firstId}','paperId','${secondPaper.id}')`);
     assert.deepEqual({...h.cloud.bosses[0],questions:undefined},{...h.cloud.bosses[0],name:'赤龍',maxHp:35,reward:80,rewardTickets:4,paperId:secondPaper.id,questions:undefined});
     h.cloud={...h.cloud,students:h.cloud.students.map(student=>({...student,bossProgress:[{bossId:firstId,hp:1,passwordVerified:true,answeredQuestionIds:['x'],defeated:student.id===1}]}))};await h.sync.refresh();await h.run(`resetAllBossHp('${firstId}')`);
     assert.deepEqual(h.cloud.students.map(student=>student.bossProgress),[[],[]]);
     await h.run(`toggleBossActive('${firstId}')`);assert.equal(h.cloud.bosses[0].active,false);await h.run(`deleteBoss('${firstId}')`);assert.equal(h.cloud.bosses.length,1);
+});
+test('boss paper dropdown handles empty and numeric paper IDs',async t=>{
+    const h=page(t);await h.start();await h.login();await h.run("activateBackendPage('backend-boss')");
+    const emptySelect=h.w.document.getElementById('bossPaperId');assert.equal(emptySelect.disabled,true);assert.equal(emptySelect.options[0].textContent,'請先建立考卷');
+    h.cloud={...h.cloud,questionPapers:[{id:7,name:'數字編號考卷',questions:[]}]};await h.sync.refresh();await h.run("backend();activateBackendPage('backend-boss')");
+    const select=h.w.document.getElementById('bossPaperId');assert.equal(select.disabled,false);assert.equal(select.options.length,2);select.value='7';
+    h.w.document.getElementById('bossName').value='測試王';h.w.document.getElementById('bossHp').value='10';h.w.document.getElementById('bossPassword').value='1234';await h.run('saveBoss()');
+    assert.equal(h.cloud.bosses[0].paperId,7);
 });
