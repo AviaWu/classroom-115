@@ -1163,6 +1163,7 @@ function openModal(content){
 }
 
 function closeModal(){
+    if(currentView?.type==="backend") backendAuthenticated=false;
     currentView=null;
     draftFields.clear();
     document.getElementById("body").innerHTML = "";
@@ -2045,8 +2046,34 @@ async function equipBg(id,pid){
 //後台
 openBackend = async function(){
     if(!requireLogin() || currentUser.role!=="teacher") return;
-    backendAuthenticated=true;
-    await backend();
+    backendAuthenticated=false;
+    openModal(`<section class="backend-password"><h2>老師後台</h2><p>請輸入後台密碼以繼續。</p><form onsubmit="submitBackendPassword();return false"><label for="backendPw">後台密碼
+        <input id="backendPw" type="password" inputmode="numeric" autocomplete="current-password" required autofocus>
+    </label><p id="backendMessage" class="login-message" role="alert"></p><button class="primary" type="submit">登入後台</button></form></section>`);
+    document.getElementById("backendPw")?.focus();
+}
+async function submitBackendPassword(){
+    if(!requireLogin() || currentUser.role!=="teacher") return;
+    const password=document.getElementById("backendPw")?.value||"";
+    const message=document.getElementById("backendMessage");
+    if(!password){
+        if(message) message.textContent="請輸入後台密碼。";
+        return;
+    }
+    if(typeof window.firebaseVerifyBackendPassword!=="function"){
+        if(message) message.textContent="後台驗證服務尚未就緒，請稍後重試。";
+        return;
+    }
+    if(message) message.textContent="驗證中…";
+    try{
+        await window.firebaseVerifyBackendPassword(password);
+        backendAuthenticated=true;
+        await backend();
+    }catch{
+        backendAuthenticated=false;
+        if(message) message.textContent="後台密碼錯誤，請再試一次。";
+        document.getElementById("backendPw")?.select();
+    }
 }
 
 function missingBuiltinEventClothingChanges(){
@@ -3206,7 +3233,7 @@ setInterval(syncScheduledTasks,30000);
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+  import { getAuth, inMemoryPersistence, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
   import { getDatabase, onValue, ref, update } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
   import { createFirebaseRestClient } from "./firebase-rest-client.mjs";
@@ -3229,6 +3256,8 @@ setInterval(syncScheduledTasks,30000);
 
   window.GameOperations=GameOperations;
   const app=initializeApp(firebaseConfig),auth=getAuth(app),database=getDatabase(app);
+  const backendVerifierAuth=getAuth(initializeApp(firebaseConfig,"backend-verifier"));
+  const backendVerifierReady=typeof setPersistence==="function" ? setPersistence(backendVerifierAuth,inMemoryPersistence) : Promise.resolve();
   let serverOffset=0;
   const pendingKey="classroom-pending-operations";
   let authTransition=false;
@@ -3240,6 +3269,14 @@ setInterval(syncScheduledTasks,30000);
     finally{authTransition=false;}
   };
   window.firebaseLogout=()=>signOut(auth);
+  window.firebaseVerifyBackendPassword=async password=>{
+    await backendVerifierReady;
+    try{
+      await signInWithEmailAndPassword(backendVerifierAuth,"teacher-cms@classroom-115.local",password);
+    }finally{
+      await signOut(backendVerifierAuth);
+    }
+  };
   let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,studentUser=null,studentQuestionPapers={},teacherProgress=null;
   function applyTeacherCloudState(progress,latestStudentStates){
     teacherProgress=latestStudentStates ? mergeStudentStatesIntoProgress(progress,latestStudentStates) : progress;

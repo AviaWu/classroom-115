@@ -27,6 +27,7 @@ function page(t){
         if(testPins[account]===pin){resolve();return {catch(){}};}
         return {catch(reject){reject(new Error('invalid credentials'));}};
     }});
+    w.firebaseVerifyBackendPassword=password=>password==='5905606' ? Promise.resolve() : Promise.reject(new Error('invalid backend password'));
     w.GameOperations=operations;
     w.artworkStore={readArtwork:async id=>{artworkReads.push(id);return artworkReadHook ? artworkReadHook(id) : clone(artworkPayloads.get(id)||null);}};
     const sync=createCloudSync({readRemote:async()=>clone(cloud),execute:async job=>{
@@ -47,7 +48,7 @@ function page(t){
     w.firebaseGameStore=sync;
     t.after(()=>{sync.dispose();w.close();});
     const signIn=(account,password)=>{w.document.getElementById('loginAccount').value=account;w.document.getElementById('loginPassword').value=password;w.login(new w.Event('submit'));};
-    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,setPrompt:value=>promptValue=value,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){await w.openBackend();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
+    return {w,sync,alerts,artworkReads,artworkPayloads,setArtworkRead:fn=>artworkReadHook=fn,setPrompt:value=>promptValue=value,get writes(){return writes;},get cloud(){return cloud;},set cloud(v){cloud=operations.normalizeProgress(v);},async start(){sync.setConnected(true);await sync.refresh();signIn('teacher','1127');},signIn,async login(){await w.openBackend();w.document.getElementById('backendPw').value='5905606';await w.submitBackendPassword();},async run(code){const result=w.eval(code);await result;await sync.flush();return result;}};
 }
 test('page source delegates password verification to Firebase without embedded account secrets',()=>{
     assert.doesNotMatch(html,/STUDENT_PASSWORDS|TEACHER_PASSWORD|BACKEND_PASSWORD/);
@@ -249,10 +250,17 @@ test('Escape closes an open shared modal',async t=>{
     assert.equal(modal.classList.contains('open'),false);
     assert.equal(h.w.document.getElementById('body').innerHTML,'');
 });
-test('teacher Firebase session opens the backend without a second client-side password',async t=>{
+test('teacher backend requires its independent password every time it opens',async t=>{
     const h=page(t);await h.start();await h.run('tasks(2)');assert.deepEqual(h.alerts,[]);
-    await h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
+    await h.w.openBackend();
+    const password=h.w.document.getElementById('backendPw');
+    assert.ok(password);assert.match(h.w.document.getElementById('body').textContent,/請輸入後台密碼/);
+    password.value='0000000';await h.w.submitBackendPassword();
+    assert.equal(h.w.document.getElementById('backendPw'),password);assert.match(h.w.document.getElementById('backendMessage').textContent,/錯誤/);
+    password.value='5905606';await h.w.submitBackendPassword();
     assert.match(h.w.document.getElementById('body').textContent,/老師後台/);
+    h.w.closeModal();await h.w.openBackend();
+    assert.ok(h.w.document.getElementById('backendPw'));
 });
 test('event gifts remain free and omit the level wording in shop and closet',async t=>{
     const h=page(t);h.cloud={...h.cloud,clothesM:[...h.cloud.clothesM,{id:'event',name:'活動服裝',level:'活動贈送',price:0,active:true,image:'/images/boy/ba1.png'}]};
