@@ -7,7 +7,7 @@ export function createCloudSync(io) {
     const canEdit=()=>canManage() && remote!==null;
     const persist=()=>io.persistPending?.(jobs.map(({id,key,command,createdAt})=>({id,key,command,createdAt})));
     const lock=()=>io.lock(!canEdit());
-    const apply=value=>{remote=structuredClone(value);io.applyState(structuredClone(value));void cleanupEvictedArtworks();};
+    const apply=(value,studentStates)=>{remote=structuredClone(value);io.applyState(structuredClone(value),studentStates&&structuredClone(studentStates));void cleanupEvictedArtworks();};
     const notify=()=>{lock();io.status(connected && verified ? '' : '離線中');};
     const transient=e=>e.retryable===true || e.name==='AbortError' || e instanceof TypeError;
     const stopSubscription=()=>{unsubscribeRemote?.();unsubscribeRemote=null;};
@@ -65,7 +65,7 @@ export function createCloudSync(io) {
                 try{
                     const outcome=await io.execute(job,jobs.map(item=>item.id));
                     writeEpoch++;
-                    apply(outcome.progress);
+                    apply(outcome.progress,outcome.studentStates);
                     settle(job,null,outcome.result);
                 }catch(error){
                     writeEpoch++;

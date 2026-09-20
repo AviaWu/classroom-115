@@ -1,0 +1,72 @@
+{
+  "rules": {
+    ".read": "auth != null && auth.token.email === \"teacher@classroom-115.local\"",
+    ".write": "auth != null && auth.token.email === \"teacher@classroom-115.local\"",
+    "games": {
+      "classroom-115": {
+        ".read": "auth != null && auth.token.email === \"teacher@classroom-115.local\"",
+        ".write": "auth != null && auth.token.email === \"teacher@classroom-115.local\""
+      }
+    },
+    "studentRoster": {
+      ".read": "auth != null && auth.token.email === \"teacher@classroom-115.local\"",
+      ".write": "auth != null && auth.token.email === \"teacher@classroom-115.local\"",
+      "$uid": {
+        ".validate": "newData.hasChildren(['studentId', 'active']) && newData.child('studentId').isNumber() && newData.child('studentId').val() >= 1 && newData.child('studentId').val() <= 28 && newData.child('active').isBoolean()"
+      }
+    },
+    "studentStates": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === \"teacher@classroom-115.local\")",
+        ".write": "auth != null && (auth.token.email === \"teacher@classroom-115.local\" || (auth.uid === $uid && data.exists() && root.child('studentRoster').child($uid).child('active').val() === true && newData.child('studentId').val() === data.child('studentId').val()))",
+        ".validate": "newData.hasChildren(['studentId', 'tokens', 'lotteryTickets', 'petAffection', 'lastPetMoodDate']) && newData.child('studentId').isNumber() && newData.child('studentId').val() === newData.parent().parent().child('studentRoster').child($uid).child('studentId').val() && newData.child('tokens').isNumber() && newData.child('lotteryTickets').isNumber() && newData.child('lotteryTickets').val() >= 0 && newData.child('lotteryTickets').val() % 1 === 0 && newData.child('petAffection').isNumber() && newData.child('petAffection').val() >= 0 && newData.child('lastPetMoodDate').isString()",
+        "studentId": { ".validate": true },
+        "tokens": { ".validate": true },
+        "lotteryTickets": { ".validate": true },
+        "petAffection": { ".validate": true },
+        "lastPetMoodDate": { ".validate": true },
+        "equippedLayout": {
+          ".validate": "newData.hasChild('0') && newData.parent().parent().parent().child('studentPets').child($uid).child(newData.child('0').val()).exists()",
+          "$index": {
+            ".validate": "$index === '0' && newData.isString()"
+          }
+        },
+        "bossProgress": {
+          "$index": {
+            ".validate": "newData.hasChildren(['bossId', 'hp', 'passwordVerified', 'defeated']) && newData.child('bossId').isString() && newData.child('hp').isNumber() && newData.child('hp').val() >= 0 && newData.child('passwordVerified').isBoolean() && newData.child('defeated').isBoolean() && (!newData.hasChild('completedAt') || newData.child('completedAt').isNumber())",
+            "bossId": { ".validate": true },
+            "hp": { ".validate": true },
+            "passwordVerified": { ".validate": true },
+            "answeredQuestionIds": {
+              "$questionIndex": {
+                ".validate": "newData.isString()"
+              }
+            },
+            "defeated": { ".validate": true },
+            "completedAt": { ".validate": true },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "studentPets": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email === \"teacher@classroom-115.local\")",
+        ".write": "auth != null && auth.token.email === \"teacher@classroom-115.local\" && root.child('studentRoster').child($uid).child('active').val() === true"
+      }
+    },
+    "publicBosses": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === \"teacher@classroom-115.local\""
+    },
+    "publicQuestionPapers": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === \"teacher@classroom-115.local\""
+    }
+  }
+}

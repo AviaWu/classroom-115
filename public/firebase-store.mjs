@@ -1,4 +1,6 @@
 import {applyOperation,normalizeProgress} from './game-operations.mjs';
+import {createStudentProjections} from './student-projections.mjs';
+import {mergeStudentStatesIntoProgress} from './teacher-projections.mjs';
 
 const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','coopTasks',
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
@@ -29,9 +31,36 @@ export function createProgressSubscriber({database,getToken,ref,onValue,path='ga
     };
 }
 
+export function createStudentProjectionSubscriber({database,uid,ref,onValue}){
+    if(typeof uid!=='string' || !uid) throw new Error('學生 UID 不正確');
+    return (onProjection,onError)=>{
+        let stopped=false;
+        const values={},loaded=new Set();
+        const paths={
+            studentState:`studentStates/${uid}`,
+            studentPets:`studentPets/${uid}`,
+            publicBosses:'publicBosses',
+            publicQuestionPapers:'publicQuestionPapers',
+        };
+        const publish=()=>{
+            if(stopped || loaded.size!==Object.keys(paths).length) return;
+            onProjection({...values});
+        };
+        const unsubscribers=Object.entries(paths).map(([key,path])=>onValue(ref(database,path),snapshot=>{
+            if(stopped) return;
+            values[key]=snapshot.val()||{};loaded.add(key);publish();
+        },error=>{if(!stopped) onError(error);}));
+        return ()=>{stopped=true;for(const unsubscribe of unsubscribers) unsubscribe();};
+    };
+}
+
+export function createTeacherStudentStatesSubscriber({database,ref,onValue}){
+    return (onStates,onError)=>onValue(ref(database,'studentStates'),snapshot=>onStates(snapshot.val()||{}),onError);
+}
+
 // REST handles direct reads and artwork payloads. The page injects the Firebase SDK
 // transaction transport; the REST ETag path remains available to non-browser tools.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom}) {
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -167,8 +196,11 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         }
         let command=await prepareCommand(job.command,artwork),settled;
         try{
-            const transaction=await transactRoom(current=>{
-                const room=current || {};
+            const rootTransaction=typeof transactRoot==='function';
+            const transaction=await (transactRoot||transactRoom)(current=>{
+                if(rootTransaction && current===null && !['initialize','restore'].includes(command.type)) return null;
+                const root=rootTransaction?(current||{}):null;
+                const room=rootTransaction?(root.games?.['classroom-115']||{}):(current||{});
                 const receipt=room.operations?.[job.id];
                 if(receipt){
                     settled={progress:normalizeProgress(room.progress??null),result:JSON.parse(receipt.result.json)};
@@ -183,7 +215,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                     settled={error:new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。')};
                     return;
                 }
-                const outcome=applyOperation(room.progress??null,command,clock);
+                const progress=rootTransaction?mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{}):room.progress??null;
+                const outcome=applyOperation(progress,command,clock);
                 if(!outcome.changed){
                     settled={progress:outcome.progress,result:outcome.result||{ok:true}};
                     return;
@@ -199,17 +232,21 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 };
                 if(['restore','initialize'].includes(command.type)) next.restoredAt={'.sv':'timestamp'};
                 settled={progress:normalizeProgress(next.progress),result};
-                return next;
+                if(!rootTransaction) return next;
+                const uidByStudentId=Object.fromEntries(Object.entries(root.studentRoster||{}).filter(([,entry])=>entry?.active===true&&Number.isInteger(entry.studentId)).map(([uid,entry])=>[entry.studentId,uid]));
+                const projections=createStudentProjections(next.progress,uidByStudentId);
+                return {...root,games:{...(root.games||{}),'classroom-115':next},...projections,studentRoster:root.studentRoster||projections.studentRoster};
             });
             if(settled?.error){await cleanupRejectedArtwork(artwork);throw settled.error;}
             if(!transaction.committed){
                 if(settled) return settled;
                 throw Object.assign(new Error('雲端交易未完成，稍後會重試。'),{retryable:true});
             }
-            const saved=transaction.value;
+            const saved=rootTransaction?transaction.value?.games?.['classroom-115']:transaction.value;
             const receipt=saved?.operations?.[job.id];
             if(saved?.progress && receipt?.result?.json){
-                return {progress:normalizeProgress(saved.progress),result:JSON.parse(receipt.result.json)};
+                return {progress:normalizeProgress(saved.progress),result:JSON.parse(receipt.result.json),
+                    ...(rootTransaction?{studentStates:transaction.value?.studentStates||{}}:{})};
             }
             if(settled) return settled;
             throw Object.assign(new Error('雲端交易回應不完整，稍後會重試。'),{retryable:true});
@@ -220,7 +257,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     }
     async function execute(job,pendingIds=[]){
         const artwork=preflightArtwork(job.command);
-        if(transactRoom) return executeSdkTransaction(job,pendingIds,artwork);
+        if(transactRoot||transactRoom) return executeSdkTransaction(job,pendingIds,artwork);
         let command;
         // Same command, ID and lottery samples survive every retry.
         for(let attempt=0;attempt<20;attempt++){

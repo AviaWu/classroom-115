@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createFirebaseStore,createProgressSubscriber} from '../public/firebase-store.mjs';
+import {createFirebaseStore,createProgressSubscriber,createStudentProjectionSubscriber} from '../public/firebase-store.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
 const resolveServerValues=(value,clock=100000)=>{
     if(value && typeof value==='object'){
@@ -74,6 +74,27 @@ test('progress subscription waits for every child once then publishes merged chi
     s.emit('students',[{id:1,tokens:25}]);
     assert.equal(published.length,2);assert.equal(published[1].students[0].tokens,25);assert.deepEqual(published[1].tasks,values.tasks);assert.deepEqual(published[1].bosses,published[0].bosses);
     assert.deepEqual(errors,[]);stop();assert.deepEqual(s.unsubscribed,[...s.listeners.keys()]);
+});
+
+test('student projection subscription reads only one student state, pets, public bosses and papers',async()=>{
+    const listeners=new Map(),published=[];
+    const subscribe=createStudentProjectionSubscriber({database:{},uid:'student-uid',ref:(_database,path)=>path,onValue:(path,next)=>{
+        listeners.set(path,next);return ()=>listeners.delete(path);
+    }});
+    const stop=subscribe(value=>published.push(value),error=>{throw error;});
+    assert.deepEqual([...listeners.keys()].sort(),[
+        'publicBosses','publicQuestionPapers','studentPets/student-uid','studentStates/student-uid'
+    ]);
+    for(const [path,value] of Object.entries({
+        'studentStates/student-uid':{studentId:1,tokens:3},
+        'studentPets/student-uid':{pet:{id:'pet'}},
+        publicBosses:{boss:{id:'boss'}},
+        publicQuestionPapers:{paper:{id:'paper'}},
+    })) listeners.get(path)({val:()=>value});
+    assert.deepEqual(published,[{studentState:{studentId:1,tokens:3},studentPets:{pet:{id:'pet'}},publicBosses:{boss:{id:'boss'}},publicQuestionPapers:{paper:{id:'paper'}}}]);
+    listeners.get('studentStates/student-uid')({val:()=>({studentId:1,tokens:4})});
+    assert.equal(published[1].studentState.tokens,4);
+    stop();assert.equal(listeners.size,0);
 });
 test('progress subscription converts a legacy single boss into the current bosses array',async()=>{
     const legacyBoss={id:'legacy-dragon',name:'舊巨龍',hp:12,questions:[]};
@@ -208,6 +229,79 @@ test('SDK transactions commit progress and receipts without using the REST room 
     assert.equal(s.room.progress.students[0].tokens,105);assert.equal(s.room.progress.lastSaved,'1970-01-01T00:01:40.000Z');
     assert.equal(s.room.progress.revision,undefined);assert.equal(s.room.operations['sdk-operation-id'].committedAt,100000);
     assert.equal(s.transactions,1);assert.deepEqual(s.fetchCalls,[]);
+});
+
+test('teacher root transaction merges latest student state and atomically rebuilds every projection',async()=>{
+    let root={
+        games:{'classroom-115':initial()},
+        studentRoster:{'uid-one':{studentId:1,active:true}},
+        studentStates:{'uid-one':{studentId:1,tokens:150,lotteryTickets:1,petAffection:3,lastPetMoodDate:'',equippedLayout:['cat'],bossProgress:[]}},
+        studentPets:{},publicBosses:{},publicQuestionPapers:{},
+    };
+    root.games['classroom-115'].progress.layouts=[{id:'cat',name:'小貓',image:'cat.png',level:'R'}];
+    root.games['classroom-115'].progress.students[0].ownedLayout=['cat'];
+    root.games['classroom-115'].progress.students[0].equippedLayout=['cat'];
+    root.games['classroom-115'].progress.bosses=[{id:'boss',name:'王',image:'boss.png',maxHp:10,reward:2,rewardTickets:1,attackPassword:'1234',paperId:'paper',active:true}];
+    root.games['classroom-115'].progress.questionPapers=[{id:'paper',questions:[{id:'q',text:'?',options:['是','否'],answerIndex:0}]}];
+    const transactRoot=async update=>{
+        const next=update(clone(root));
+        if(next===undefined)return {committed:false,value:clone(root)};
+        root=resolveServerValues(next);return {committed:true,value:clone(root)};
+    };
+    const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
+        fetch:async()=>{throw new Error('unexpected REST request');},transactRoot});
+    const outcome=await store.execute(job('teacher-add',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(outcome.progress.students[0].tokens,155);
+    assert.equal(outcome.studentStates['uid-one'].tokens,155);
+    assert.equal(root.games['classroom-115'].progress.students[0].tokens,155);
+    assert.equal(root.studentStates['uid-one'].tokens,155);
+    assert.equal(root.studentPets['uid-one'].cat.id,'cat');
+    assert.equal(root.publicBosses.boss.attackPassword,'1234');
+    assert.equal(root.publicQuestionPapers.paper.questions[0].id,'q');
+});
+test('teacher root transaction tolerates an initial null SDK cache snapshot',async()=>{
+    let root={
+        games:{'classroom-115':initial()},
+        studentRoster:{'uid-one':{studentId:1,active:true}},
+        studentStates:{'uid-one':{studentId:1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:''}},
+        studentPets:{},publicBosses:{},publicQuestionPapers:{},artworks:{'classroom-115':{drawing:{data:'kept'}}},
+    };
+    const transactRoot=async update=>{
+        assert.equal(update(null),null);
+        root=resolveServerValues(update(clone(root)));
+        return {committed:true,value:clone(root)};
+    };
+    const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
+        fetch:async()=>{throw new Error('unexpected REST request');},transactRoot});
+    const outcome=await store.execute(job('cold-root',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(outcome.progress.students[0].tokens,105);
+    assert.equal(root.artworks['classroom-115'].drawing.data,'kept');
+});
+test('teacher root transaction can initialize a genuinely empty database',async()=>{
+    let root=null;
+    const transactRoot=async update=>{root=resolveServerValues(update(root));return {committed:true,value:clone(root)};};
+    const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
+        fetch:async()=>{throw new Error('unexpected REST request');},transactRoot});
+    const outcome=await store.execute(job('initialize-empty-root',{type:'initialize',value:initial().progress}));
+    assert.equal(outcome.progress.students[0].id,1);
+    assert.equal(root.games['classroom-115'].progress.students[0].id,1);
+});
+test('teacher resize keeps inactive account mappings available for later growth',async()=>{
+    const room=initial();
+    room.progress.students=[{id:1,tokens:10,lotteryTickets:0},{id:2,tokens:20,lotteryTickets:0}];
+    let root={games:{'classroom-115':room},studentRoster:{
+        'uid-one':{studentId:1,active:true},'uid-two':{studentId:2,active:true},
+    },studentStates:{
+        'uid-one':{studentId:1,tokens:10,lotteryTickets:0,petAffection:0,lastPetMoodDate:''},
+        'uid-two':{studentId:2,tokens:20,lotteryTickets:0,petAffection:0,lastPetMoodDate:''},
+    },studentPets:{},publicBosses:{},publicQuestionPapers:{}};
+    const transactRoot=async update=>{root=resolveServerValues(update(clone(root)));return {committed:true,value:clone(root)};};
+    const store=createFirebaseStore({databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
+        fetch:async()=>{throw new Error('unexpected REST request');},transactRoot});
+    await store.execute(job('shrink-roster',{type:'resizeStudents',count:1}));
+    assert.deepEqual(root.studentRoster['uid-two'],{studentId:2,active:true});
+    await store.execute(job('grow-roster',{type:'resizeStudents',count:2}));
+    assert.equal(root.studentStates['uid-two'].studentId,2);
 });
 test('SDK transaction retries recalculate an operation from the newest room value',async()=>{
     let room=initial(),updates=0;

@@ -47,11 +47,18 @@ test('inline scripts and modules parse',()=>{
         else new vm.Script(source);
     }
 });
-test('browser module wires child subscriptions and avoids root SDK transactions',()=>{
+test('browser module wires child subscriptions and teacher root SDK transactions',()=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
     assert.match(moduleSource,/createProgressSubscriber\(\{database,getToken,ref,onValue\}\)/);
     assert.match(moduleSource,/subscribeRemote:subscribeProgress/);
-    assert.doesNotMatch(moduleSource,/runTransaction|transactRoom|selectTransactionRoom/);
+    assert.match(moduleSource,/transactRoot:update=>transactValue\(ref\(database\),update\)/);
+    assert.doesNotMatch(moduleSource,/selectTransactionRoom/);
+});
+test('browser module selects personal projection subscriptions for student sessions',()=>{
+    const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
+    assert.match(moduleSource,/createStudentProjectionSubscriber/);
+    assert.match(moduleSource,/startStudentMode/);
+    assert.match(moduleSource,/studentProjectionToProgress/);
 });
 test('login screen accepts configured teacher and student credentials and rejects incorrect passwords',async t=>{
     const h=page(t);h.sync.setConnected(true);await h.sync.refresh();

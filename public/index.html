@@ -2016,10 +2016,15 @@ async function toggleEquipLayout(id,pid){
     if(!canAccessStudent(id)) return;
     const student=state.students.find(s=>s.id===id);
     if(!student) return;
+    if(currentUser?.role==="student"){
+        await runCommand({type:"equipPet",petId:student.equippedLayout.includes(pid)?null:pid},`equip-pet:${pid}`);
+        return;
+    }
     await runCommand({type:"equip",studentId:id,kind:"layout",itemId:student.equippedLayout.includes(pid)?null:pid},`equip:${id}:layout`);
 }
 async function equipDefaultPet(id){
     if(!canAccessStudent(id)) return;
+    if(currentUser?.role==="student") {await runCommand({type:"equipPet",petId:null},"equip-pet:default");return;}
     await runCommand({type:"equip",studentId:id,kind:"layout",itemId:null},`equip:${id}:layout`);
 }
 async function equipBg(id,pid){
@@ -3228,11 +3233,14 @@ setInterval(syncScheduledTasks,30000);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-  import { getDatabase, onValue, ref } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+  import { getDatabase, onValue, ref, runTransaction } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
   import { createCloudSync } from "./cloud-sync.mjs";
-  import { createFirebaseStore, createProgressSubscriber } from "./firebase-store.mjs";
+  import { createFirebaseStore, createProgressSubscriber, createStudentProjectionSubscriber, createTeacherStudentStatesSubscriber } from "./firebase-store.mjs";
   import * as GameOperations from "./game-operations.mjs";
   import { accountForEmail, credentialsForLogin } from "./auth-accounts.mjs";
+  import { studentProjectionToProgress } from "./student-projections.mjs";
+  import { mergeStudentStatesIntoProgress } from "./teacher-projections.mjs";
+  import { createStudentStateStore } from "./student-state-store.mjs";
   const firebaseConfig = {
     apiKey: "AIzaSyCqaX7A6gCTSOo9NBrdb2KizOHFo9dVEJo",
     authDomain: "classroom-115.firebaseapp.com",
@@ -3257,16 +3265,48 @@ setInterval(syncScheduledTasks,30000);
     finally{authTransition=false;}
   };
   window.firebaseLogout=()=>signOut(auth);
-  let sync;
+  let sync,studentProjectionUnsubscribe=null,studentProjection=null,studentStateStore=null,teacherStatesUnsubscribe=null,teacherRawProgress=null,teacherStudentStates={};
+  const transactValue=async(reference,update)=>{const result=await runTransaction(reference,update);return {committed:result.committed,value:result.snapshot.val()};};
+  function applyTeacherCloudState(progress,latestStudentStates){
+    if(latestStudentStates) teacherStudentStates=latestStudentStates;
+    teacherRawProgress=progress;
+    return applyCloudState(mergeStudentStatesIntoProgress(progress,teacherStudentStates));
+  }
+  function startTeacherProjectionMode(){
+    teacherStatesUnsubscribe?.();teacherStudentStates={};teacherRawProgress=null;
+    teacherStatesUnsubscribe=createTeacherStudentStatesSubscriber({database,ref,onValue})(states=>{
+      teacherStudentStates=states;
+      if(teacherRawProgress) applyTeacherCloudState(teacherRawProgress);
+    },error=>console.error("教師學生狀態同步失敗",error));
+  }
+  function stopTeacherProjectionMode(){teacherStatesUnsubscribe?.();teacherStatesUnsubscribe=null;teacherStudentStates={};teacherRawProgress=null;}
+  function startStudentMode(user){
+    sync?.setConnected(false);studentProjectionUnsubscribe?.();studentProjection=null;
+    const subscribe=createStudentProjectionSubscriber({database,uid:user.uid,ref,onValue});
+    studentStateStore=createStudentStateStore({uid:user.uid,
+      transactState:(update,path)=>transactValue(ref(database,path),update),
+      getPublicData:()=>studentProjection||{},now:()=>Date.now()+serverOffset});
+    window.firebaseGameStore={available:true,canEdit:()=>Boolean(studentProjection?.studentState?.studentId),canManage:()=>Boolean(studentProjection?.studentState?.studentId),
+      perform:command=>studentProjection?.studentState?.studentId ? studentStateStore.perform(command) : Promise.reject(new Error("學生資料尚未建立")),
+      refresh:()=>Promise.resolve(Boolean(studentProjection?.studentState?.studentId)),hasPendingSave:()=>false,flush:()=>Promise.resolve(true),pendingActions:()=>[]};
+    studentProjectionUnsubscribe=subscribe(projection=>{
+      studentProjection=projection;
+      const view=studentProjectionToProgress(projection);
+      if(view) applyCloudState(view);else {state=normalizeState({students:[]});render();}
+      setSyncLocked(!view);
+    },error=>{console.error("學生資料同步失敗",error);setSyncLocked(true);setSyncStatus(error.message||"學生資料同步失敗");});
+  }
+  function stopStudentMode(){studentProjectionUnsubscribe?.();studentProjectionUnsubscribe=null;studentProjection=null;studentStateStore=null;}
   onAuthStateChanged(auth,user=>{
     const account=accountForEmail(user?.email);
     if(account){
       applyAuthenticatedSession(account);
-      sync?.setConnected(false);sync?.setConnected(navigator.onLine);
+      if(account.role==="student") startStudentMode(user);
+      else {stopStudentMode();startTeacherProjectionMode();window.firebaseGameStore=sync;sync?.setConnected(false);sync?.setConnected(navigator.onLine);}
       return;
     }
     if(authTransition) return;
-    currentUser=null;clearSavedLogin();backendAuthenticated=false;sync?.setConnected(false);initializeLogin();
+    currentUser=null;clearSavedLogin();backendAuthenticated=false;stopStudentMode();stopTeacherProjectionMode();sync?.setConnected(false);initializeLogin();
   });
   const getToken=async()=>{
     if(!auth.currentUser) throw new Error("請先使用帳號與密碼登入");
@@ -3275,13 +3315,14 @@ setInterval(syncScheduledTasks,30000);
   const store=createFirebaseStore({
       databaseURL:firebaseConfig.databaseURL,
       getToken,getUid:()=>auth.currentUser.uid,
-      now:()=>Date.now()+serverOffset
+      now:()=>Date.now()+serverOffset,
+      transactRoot:update=>transactValue(ref(database),update)
   });
   window.readLatestProgress=store.readRemote;
   window.artworkStore=store;
   const subscribeProgress=createProgressSubscriber({database,getToken,ref,onValue});
   sync=createCloudSync({
-      ...store,applyState:applyCloudState,lock:setSyncLocked,status:setSyncStatus,
+      ...store,applyState:applyTeacherCloudState,lock:setSyncLocked,status:setSyncStatus,
       subscribeRemote:subscribeProgress,
       error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},
       newId:()=>crypto.randomUUID(),now:()=>Date.now()+serverOffset,
@@ -3299,7 +3340,8 @@ setInterval(syncScheduledTasks,30000);
   window.addEventListener("offline",()=>sync.setConnected(false));
   window.addEventListener("online",()=>sync.setConnected(true));
   onValue(ref(database,".info/serverTimeOffset"),snapshot=>{serverOffset=snapshot.val()||0;});
-  if(navigator.onLine) sync.setConnected(true);
+  if(currentUser?.role==="student" && auth.currentUser) startStudentMode(auth.currentUser);
+  else if(navigator.onLine) sync.setConnected(true);
   else setSyncStatus("離線中");
 </script>
 </body>
