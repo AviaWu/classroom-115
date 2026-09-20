@@ -56,7 +56,7 @@
               ".validate": "newData.isString() && (data.exists() || newData.val() === auth.uid)"
             },
             "type": {
-              ".validate": "newData.isString() && (data.exists() || newData.val().matches(/^(initialize|restore|completeTask|purchase|lottery|equip|petMood|bossAttack|coopComplete|saveDrawing|confirmArtworkDeletion|resources|resetCloset|resetResources|resizeStudents|gender|edit|schedule)$/))"
+              ".validate": "newData.isString() && (data.exists() || newData.val().matches(/^(initialize|restore|completeTask|purchase|lottery|equip|petMood|bossAttack|resetBossProgress|coopComplete|saveDrawing|confirmArtworkDeletion|resources|resetCloset|resetResources|resizeStudents|gender|edit|schedule)$/))"
             },
             "createdAt": {
               ".validate": "newData.isNumber() && (data.exists() || (newData.val() >= now - 86400000 && newData.val() <= now + 60000))"

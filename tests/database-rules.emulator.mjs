@@ -166,7 +166,7 @@ test('writes require authentication and the receipt belongs to the current authe
     await allowed(operation({progress:legacy},{uid:'another-user'}),{uid:'another-user'});
 });
 
-for (const type of ['resetCloset','resetResources','resizeStudents','gender','bossAttack']) {
+for (const type of ['resetCloset','resetResources','resizeStudents','gender','bossAttack','resetBossProgress']) {
     test(`the ${type} operation can commit with a fresh receipt`,async()=>{
         await seed({progress:legacy});
         const next = operation({progress:legacy},{type});

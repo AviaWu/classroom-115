@@ -21,6 +21,8 @@ games/
     │   ├── weeklyTaskTemplates[]
     │   ├── coopTaskTemplates[]
     │   ├── coopTasks[]
+    │   ├── questionPapers[]
+    │   ├── bosses[]
     │   ├── drawings[]              （最多 3 筆 metadata）
     │   ├── pendingArtworkDeletes[]
     │   ├── deletedTaskIds[]
@@ -61,7 +63,7 @@ artworks/
 
 | 欄位 | 型別 | 內容 |
 | --- | --- | --- |
-| `students` | 學生陣列 | 每位學生的資源、已完成任務、衣櫃與寵物互動進度。 |
+| `students` | 學生陣列 | 每位學生的資源、已完成任務、衣櫃、寵物互動與個別 BOSS 進度。 |
 | `tasks` | 任務陣列 | 一次性及已產生的每日、每週個人任務。 |
 | `clothesM`、`clothesF` | 商品陣列 | 男生、女生服裝目錄。 |
 | `layouts` | 商品陣列 | 寵物目錄；欄位沿用 `layout` 名稱。 |
@@ -70,6 +72,8 @@ artworks/
 | `dailyTaskTemplates`、`weeklyTaskTemplates` | 模板陣列 | 產生個人週期任務的設定。 |
 | `coopTaskTemplates` | 模板陣列 | 產生每日或每週協力任務的設定。 |
 | `coopTasks` | 協力任務陣列 | 怪獸、獎勵、完成成員與全班發獎狀態。 |
+| `questionPapers` | 考卷陣列 | 可供多隻 BOSS 引用的獨立題庫與題目。 |
+| `bosses` | BOSS 陣列 | BOSS 顯示、血量、雙資源獎勵、攻打密碼及所選考卷。 |
 | `drawings` | 畫作索引陣列 | 最近三張作品的 `{id, savedAt}`，不含圖片。 |
 | `pendingArtworkDeletes` | 畫作 ID 陣列 | 已移出最近三張、等待刪除外部圖片的 ID。 |
 | `deletedTaskIds` | ID 陣列 | 已刪除個人任務的 ID，避免同 ID 任務再次加入。 |
@@ -96,7 +100,9 @@ artworks/
 | `equippedLayout` | 商品 ID 陣列 | 最多一個已裝備寵物；空陣列使用預設寵物。 |
 | `ownedBg` | 商品 ID 陣列 | 已擁有背景，對應 `backgrounds[].id`。 |
 | `equippedBg` | 商品 ID 或 `null` | 目前使用的角色背景。 |
-| `bossProgress` | BOSS 進度陣列 | 該學生對各 BOSS 的剩餘生命值、密碼驗證、已答對題目、擊敗狀態與完成時間，以 `bossId` 對應 `progress/bosses[].id`。 |
+| `bossProgress` | BOSS 進度陣列 | 該學生對各 BOSS 的個人剩餘血量、密碼驗證、答對題目、擊敗狀態與完成時間。 |
+
+`bossProgress[]` 以 `bossId` 關聯 `bosses[].id`，並保存 `hp`、`passwordVerified`、`answeredQuestionIds`、`defeated` 與可省略的 `completedAt`。BOSS 血量及答題歷程在學生間互相獨立；擊敗後該學生不再看見該 BOSS。
 
 衣櫃重置只清除該學生的持有與裝備欄位。全班資源重置會清除目前全體學生的代幣、樂透券及衣櫃，保留 `doneTasks`、`petAffection` 與 `lastPetMoodDate`。
 
@@ -154,6 +160,28 @@ artworks/
 
 協力排程 ID 例如 `coop_daily_c_2026-09-15`、`coop_weekly_cw_2026-09-14`。刪除模板只停止日後產生任務，不刪除已產生的任務。
 
+## BOSS 與題庫考卷
+
+| `questionPapers[]` 欄位 | 型別 | 意義 |
+| --- | --- | --- |
+| `id` | ID | 考卷識別碼，供 `bosses[].paperId` 參照。 |
+| `name` | 字串 | 老師後台顯示的考卷名稱。 |
+| `questions` | 題目陣列 | 考卷內可新增、刪除的選擇題或是非題。 |
+
+每題保存 `id`、`text`、`options` 與 `answerIndex`。`options` 必須有 2 或 4 個字串，`answerIndex` 是正確選項的零起始索引。刪除仍被 BOSS 使用的考卷會被前端阻止。
+
+| `bosses[]` 欄位 | 型別 | 意義 |
+| --- | --- | --- |
+| `id`、`name`、`image` | ID、字串、字串 | BOSS 識別碼、名稱及圖片。 |
+| `maxHp` | 正整數 | 每位學生開始攻打時的最大血量。 |
+| `attackPassword` | 4 位數字字串 | 每位學生首次攻打該 BOSS 時驗證。 |
+| `reward` | 非負整數 | 擊敗後發放的代幣。 |
+| `rewardTickets` | 非負整數 | 擊敗後發放的樂透券。 |
+| `paperId` | 考卷 ID | 指向 `questionPapers[].id`。 |
+| `active` | 布林值 | `false` 時不可攻打。 |
+
+尚未使用的題目優先隨機出題；全部題目答對過後，會從已答對題目繼續隨機出題。舊資料若把 `questions` 直接存在 BOSS 內，正規化時會建立 `legacy_paper_{bossId}` 相容考卷。`resetBossProgress` 操作會移除指定 BOSS 在全體學生的 `bossProgress`，因此血量回到最新 `maxHp`，並清除密碼驗證、答題及擊敗紀錄。
+
 ## 畫作與刪除記錄
 
 | `progress/drawings[]` 欄位 | 型別 | 意義 |
@@ -184,6 +212,8 @@ flowchart LR
     personalTemplate["dailyTaskTemplates / weeklyTaskTemplates"] -->|產生固定 ID 任務| task
     coopTemplate["coopTaskTemplates"] -->|產生固定 ID 任務| coop["coopTasks：協力任務"]
     coop -->|completedBy| student
+    boss["bosses：BOSS"] -->|paperId| paper["questionPapers：考卷"]
+    student -->|bossProgress / bossId| boss
     deleted["deletedTaskIds / deletedCoopTaskIds"] -.->|阻止同 ID 再加入| task
     deleted -.->|阻止同 ID 再加入| coop
     recent["progress/drawings：最近三張索引"] -->|id| artwork["artworks/classroom-115/{drawingId}：圖片"]
@@ -204,7 +234,7 @@ flowchart LR
 | `committedAt` | Unix 毫秒 | Firebase 在成功提交時填入的伺服器時間。 |
 | `result.json` | 字串 | 操作結果經 `JSON.stringify` 後的內容，例如 `{"ok":true,"reward":20}`。讀取收據時以 `JSON.parse` 還原。 |
 
-收據保存結果與基本操作資訊，不保存整份進度或完整命令。支援的操作包含初始化／還原、完成任務、購買、樂透、裝備、寵物互動、協力完成、存畫作、確認畫作刪除、資源加減／設定、衣櫃重置、全班資源重置、人數／性別設定、教師欄位編輯及排程。
+收據保存結果與基本操作資訊，不保存整份進度或完整命令。支援的操作包含初始化／還原、完成任務、購買、樂透、裝備、寵物互動、BOSS 攻擊、全員 BOSS 進度重置、協力完成、存畫作、確認畫作刪除、資源加減／設定、衣櫃重置、全班資源重置、人數／性別設定、教師欄位編輯及排程。
 
 在遵循此操作協定的客戶端之間，相同操作 ID 仍存在時會直接讀回原結果，避免重複扣款或發獎。每筆新交易會移除超過一小時或超出最新 100 筆範圍的舊收據；執行交易之裝置仍在 `sessionStorage` 待確認佇列中的 ID 例外保留。這些收據不能用來還原完整歷史進度。沒有資料變更的操作直接回傳結果，不另外建立收據。
 

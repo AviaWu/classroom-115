@@ -70,7 +70,7 @@ test('progress subscription waits for every child once then publishes merged chi
     for(const field of progressFields.slice(0,-1)) s.emit(field,values[field]??null);
     assert.deepEqual(published,[]);
     s.emit('lastSaved','2026-09-16T00:00:00Z');
-    assert.equal(published.length,1);assert.equal(published[0].students[0].tokens,10);assert.deepEqual(published[0].tasks,values.tasks);assert.deepEqual(published[0].bosses,[{...boss,name:'巨龍',image:'',maxHp:20,attackPassword:'',reward:0,questions:[],active:true,publishedAt:0}]);
+    assert.equal(published.length,1);assert.equal(published[0].students[0].tokens,10);assert.deepEqual(published[0].tasks,values.tasks);assert.deepEqual(published[0].bosses,[{...boss,name:'巨龍',image:'',maxHp:20,attackPassword:'',reward:0,rewardTickets:0,paperId:null,questions:[],active:true,publishedAt:0}]);
     s.emit('students',[{id:1,tokens:25}]);
     assert.equal(published.length,2);assert.equal(published[1].students[0].tokens,25);assert.deepEqual(published[1].tasks,values.tasks);assert.deepEqual(published[1].bosses,published[0].bosses);
     assert.deepEqual(errors,[]);stop();assert.deepEqual(s.unsubscribed,[...s.listeners.keys()]);
