@@ -283,7 +283,7 @@ test('purchase, wardrobe and pet controls commit immediately without processing 
     assert.equal(h.cloud.students[0].tokens,50);assert.equal(h.cloud.students[0].equippedClothes,'shirt');
     assert.deepEqual(h.cloud.students[0].equippedLayout,['pet']);assert.equal(h.cloud.students[0].equippedBg,'bg');
     await h.run('equipDefaultPet(1)');assert.deepEqual(h.cloud.students[0].equippedLayout,[]);
-    assert.equal(h.w.document.getElementById('saveStatus').textContent,'');assert.deepEqual(h.alerts,[]);
+    assert.equal(h.w.document.getElementById('saveStatus'),null);assert.deepEqual(h.alerts,[]);
 });
 test('cloud polling preserves current shop tab and scroll position',async t=>{
     const h=page(t);await h.start();await h.run("shop(1);switchShopTab(1,'lottery')");
@@ -320,9 +320,10 @@ test('teacher additions, deltas and deletes persist without a five-second deboun
     h.w.document.getElementById('targetStuId').value='1';h.w.document.getElementById('deltaToken').value='7';await h.run('addTokenOne()');
     assert.equal(h.cloud.students[0].tokens,207);await h.run("deleteTask('task')");assert.ok(!h.cloud.tasks.some(x=>x.id==='task'));
 });
-test('offline permits viewing but blocks cloud mutations',async t=>{
+test('offline permits viewing, blocks cloud mutations, and reports the attempted action',async t=>{
     const h=page(t);await h.start();h.sync.setConnected(false);await h.w.tasks(1);await h.w.finishTask(1,'task');
-    assert.equal(h.writes,0);assert.equal(h.w.document.getElementById('saveStatus').textContent,'離線中');
+    assert.equal(h.writes,0);assert.equal(h.w.document.getElementById('saveStatus'),null);
+    assert.ok(h.alerts.some(message=>/離線|無法連線/.test(message)));
 });
 test('backup is absent from header and export reads the server instead of local UI',async t=>{
     const h=page(t);await h.start();assert.doesNotMatch(h.w.document.querySelector('header').textContent,/備份/);
