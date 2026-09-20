@@ -361,6 +361,7 @@ const STORAGE_LIMIT = 5 * 1024 * 1024;
 const DEFAULT_PRICE = 50;
 const DEFAULT_PET_IMAGE = "/images/Dec2/1000095494-removebg-preview.png";
 const DEFAULT_PET_NAME = "小嗶";
+const PET_ATTACK = Object.freeze({R:5,SR:6,SSR:7,UR:8});
 const LEVEL_PRICES = {"活動贈送":0, R:50, SR:100, SSR:200, UR:300};
 const LEVEL_ORDER = ["活動贈送","R","SR","SSR","UR"];
 const PET_MOOD_ICONS = {
@@ -1441,10 +1442,15 @@ function petProgress(student){
     const affection = Math.max(0,Math.floor(Number(student?.petAffection)||0));
     return {affection,level:Math.floor(affection/10)+1,progress:affection%10};
 }
+function petAttack(student,level=petProgress(student).level){
+    const equippedLayout=Array.isArray(student?.equippedLayout)?student.equippedLayout:[];
+    const pet=state.layouts.find(item=>equippedLayout.includes(item.id));
+    return (PET_ATTACK[pet?.level]??5)+level-1;
+}
 function petLevelHtml(student){
     const progress = petProgress(student);
     return `<div class="pet-level-card">
-        <div class="pet-level-heading"><span>寵物等級 Lv.${progress.level}</span><span>好感度 ${progress.progress}/10</span></div>
+        <div class="pet-level-heading"><span>寵物等級 Lv.${progress.level}</span><span>攻擊力 ${petAttack(student,progress.level)}</span><span>好感度 ${progress.progress}/10</span></div>
         <div class="pet-affection-bar" role="progressbar" aria-label="寵物好感度" aria-valuemin="0" aria-valuemax="10" aria-valuenow="${progress.progress}"><div class="pet-affection-fill" style="width:${progress.progress*10}%"></div></div>
     </div>`;
 }
@@ -1499,6 +1505,14 @@ function openPetMood(id){
 }
 
 function bossQuestions(boss){return state.questionPapers.find(paper=>paper.id===boss.paperId)?.questions||boss.questions||[];}
+function shuffledBossOptions(question){
+    const options=question.options.map((text,answerIndex)=>({text,answerIndex}));
+    for(let index=options.length-1;index>0;index--){
+        const target=Math.floor(Math.random()*(index+1));
+        [options[index],options[target]]=[options[target],options[index]];
+    }
+    return options;
+}
 function renderBossBattle(studentId,bossId,password="",message=""){
     const boss=state.bosses.find(item=>item.id===bossId&&item.active!==false),student=state.students.find(item=>item.id===studentId);
     if(!boss||!student)return openPetMood(studentId);
@@ -1507,12 +1521,12 @@ function renderBossBattle(studentId,bossId,password="",message=""){
     if(!questions.length)return alert("這隻 BOSS 的考卷尚未設定題目");
     const answered=progress?.answeredQuestionIds||[],unused=questions.filter(question=>!answered.includes(question.id));
     const pool=unused.length?unused:questions.filter(question=>answered.includes(question.id));
-    const question=pool[Math.floor(Math.random()*pool.length)],hp=progress?.hp??boss.maxHp,percent=Math.max(0,Math.min(100,hp/boss.maxHp*100));
+    const question=pool[Math.floor(Math.random()*pool.length)],options=shuffledBossOptions(question),hp=progress?.hp??boss.maxHp,percent=Math.max(0,Math.min(100,hp/boss.maxHp*100));
     currentView={type:"boss",id:studentId,bossId};
     openModal(`<section id="bossBattleArea" class="boss-question" aria-label="BOSS 挑戰題目">
         <div class="boss-battle-header">${boss.image?`<img src="${esc(boss.image)}" alt="${esc(boss.name)}">`:""}<div class="boss-battle-status"><h2>挑戰 ${esc(boss.name)}</h2><div class="boss-hp" role="progressbar" aria-label="${esc(boss.name)}戰鬥血量" aria-valuemin="0" aria-valuemax="${boss.maxHp}" aria-valuenow="${hp}"><div class="boss-hp-fill" style="width:${percent}%"></div></div><div>HP ${hp} / ${boss.maxHp}</div><p class="boss-battle-message">${esc(message)}</p></div></div>
         <p class="boss-question-text">${esc(question.text)}</p>
-        <div class="boss-options">${question.options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${index},'${esc(password)}')">${question.options.length===2?(index===0?"是":"否"):"ABCD"[index]}．${esc(option)}</button>`).join("")}</div>
+        <div class="boss-options">${options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${option.answerIndex},'${esc(password)}')">${"ABCD"[index]}．${esc(option.text)}</button>`).join("")}</div>
     </section>`);
 }
 async function startBossBattle(studentId,bossId){
@@ -1536,7 +1550,7 @@ async function answerBossQuestion(studentId,bossId,questionId,answerIndex,passwo
     document.querySelectorAll("#bossBattleArea button").forEach(button=>button.disabled=true);
     const result=await runCommand({type:"bossAttack",studentId,bossId,questionId,answerIndex,password},`boss:${bossId}:${studentId}:${questionId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`);
     if(!result){document.querySelectorAll("#bossBattleArea button").forEach(button=>button.disabled=false);return;}
-    const message=result.correct?(result.defeated?`答對了！擊敗 BOSS，獲得 ${result.reward} 代幣與 ${result.rewardTickets||0} 張樂透券！`:`答對了！造成 ${result.damage} 點傷害。`):"答錯了，這次沒有造成傷害。";
+    const message=result.correct?(result.defeated?`答對了！擊敗 BOSS，獲得 ${result.reward} 代幣與 ${result.rewardTickets||0} 張樂透券！`:`答對了！造成 ${result.damage} 點傷害。`):(result.healing?`答錯了，BOSS 回復 ${result.healing} 點血量。`:"答錯了，BOSS 已是滿血。");
     if(result.defeated){alert(message);openPetMood(studentId);return;}
     renderBossBattle(studentId,bossId,"",message);
 }

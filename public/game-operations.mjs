@@ -432,7 +432,9 @@ export function applyOperation(value,command,now = Date.now()) {
         const allUsed = questions.every(item=>bossProgress.answeredQuestionIds.includes(item.id));
         if (alreadyCorrect && !allUsed) throw new Error('這道題目已經答對過了');
         if (command.answerIndex !== question.answerIndex) {
-            result = {correct:false,damage:0,hp:bossProgress.hp,defeated:false,reward:0,rewardTickets:0,passwordVerified:true};
+            const oldHp = bossProgress.hp;
+            bossProgress.hp = Math.min(boss.maxHp,bossProgress.hp+Math.ceil(boss.maxHp*.05));
+            result = {correct:false,damage:0,healing:bossProgress.hp-oldHp,hp:bossProgress.hp,defeated:false,reward:0,rewardTickets:0,passwordVerified:true};
             break;
         }
         const equippedPet = progress.layouts.find(item=>student.equippedLayout.includes(item.id));
