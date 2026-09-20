@@ -156,32 +156,32 @@ input[type="number"]{width:85px}
 .pet-mood-side{display:flex;flex-direction:column;min-width:0;height:100%;box-sizing:border-box;text-align:left}
 .pet-mood-side h3{margin:0 0 7px;padding:6px 8px;background:#34405c;color:#f3d98b;border:3px solid #20263a;box-shadow:3px 3px 0 #172033;font-size:14px;text-align:center}
 .pet-mood-grid{display:grid;grid-template-columns:repeat(3,minmax(48px,1fr));grid-template-rows:repeat(4,1fr);flex:1;gap:6px}
-.pet-mood-button{--mood-color:#f3d98b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-width:0;min-height:40px;padding:3px 2px;overflow:hidden;background:#d7d7d7;border:3px solid #20263a;color:#20263a;box-shadow:3px 3px 0 #172033;font-family:"Courier New",monospace}
+.pet-mood-button{--mood-color:#f3d98b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:100%;min-width:0;min-height:27px;padding:1px 2px;overflow:hidden;background:#d7d7d7;border:3px solid #20263a;color:#20263a;box-shadow:3px 3px 0 #172033;font-family:"Courier New",monospace}
 .pet-mood-button:hover{background:#e8e8e8;transform:translate(-1px,-1px);box-shadow:5px 5px 0 #172033}
 .pet-mood-button.selected{background:var(--mood-color);transform:translate(2px,2px);box-shadow:2px 2px 0 #172033}
 .pet-mood-button:focus-visible{outline:4px solid #efb1a5;outline-offset:3px}
 .pet-mood-button span{display:block;max-width:100%;overflow:hidden;font-size:12px;line-height:1;white-space:nowrap;letter-spacing:-1px}
 .pet-mood-button b{font-size:11px}
 .pet-stage{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;margin:auto}
-.pet-display-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(320px,1.65fr) minmax(200px,1fr);gap:14px;width:100%;min-height:220px;align-items:stretch}
+.pet-display-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(320px,1.65fr) minmax(200px,1fr);gap:14px;width:100%;min-height:170px;align-items:stretch}
 .pet-display-row>*{height:100%;min-height:0;box-sizing:border-box}
-.pet-dialog-level-column{display:grid;grid-template-rows:minmax(96px,1fr) auto;gap:12px;min-width:0;min-height:0}
+.pet-dialog-level-column{display:grid;grid-template-rows:minmax(64px,1fr) auto;gap:8px;min-width:0;min-height:0}
 .pet-image-button{display:flex;flex-direction:column;width:100%;min-width:0;padding:0;background:#fff8e8;border:4px solid #20263a;box-shadow:5px 5px 0 #172033;color:inherit}
 .pet-image-button:hover{background:#fff8e8;transform:none;box-shadow:5px 5px 0 #172033}
 .pet-image-button:focus-visible{outline:4px solid #efb1a5;outline-offset:4px}
 .pet-image-hint{display:block;padding:5px;font-size:12px;font-weight:900;text-align:center}
 .pet-boss-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.pet-level-card{display:flex;flex-direction:column;justify-content:center;width:100%;box-sizing:border-box;padding:12px;background:#fff4d6;border:4px solid #20263a;box-shadow:4px 4px 0 #172033}
+.pet-level-card{display:flex;flex-direction:column;justify-content:center;width:100%;box-sizing:border-box;padding:8px 12px;background:#fff4d6;border:4px solid #20263a;box-shadow:4px 4px 0 #172033}
 .boss-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:0;padding:10px;background:#ffe0dc;border:4px solid #20263a;box-shadow:4px 4px 0 #172033;text-align:center}
 .boss-card img{width:68px;height:58px;object-fit:contain}.boss-card h3{margin:0;font-size:16px}.boss-card p{margin:0;font-size:12px;font-weight:800}
 .boss-hp{width:100%;height:16px;overflow:hidden;background:#ead4d4;border:3px solid #20263a}.boss-hp-fill{height:100%;background:#d83d3d;transition:width .3s ease}
 .boss-question{max-width:620px;margin:auto;padding:22px;background:#fff4d6;border:4px solid #20263a;box-shadow:6px 6px 0 #172033;text-align:center}.boss-question h2{margin-top:0}.boss-battle-header{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:16px;margin-bottom:16px}.boss-battle-header img{width:110px;height:92px;object-fit:contain}.boss-battle-status{text-align:left}.boss-battle-status h2{margin:0 0 8px}.boss-battle-message{min-height:24px;margin:8px 0 0;font-weight:900}.boss-question-text{padding:16px;background:#fff;border:3px solid #20263a;font-size:20px;font-weight:800}.boss-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.boss-options button{min-height:58px}.boss-result{font-size:22px;font-weight:900}.boss-result.correct{color:#18743a}.boss-result.wrong{color:#b42318}.boss-battle-actions{display:flex;justify-content:center;gap:12px;margin-top:20px}
 .boss-choice-grid{display:grid;grid-template-columns:repeat(4,minmax(90px,1fr));gap:9px;margin:10px 0}.boss-choice img{display:block;width:100%;height:90px;object-fit:contain}.boss-choice.active{background:#f3d98b}
-.pet-level-heading{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px;font-weight:900;text-align:center}
+.pet-level-heading{display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:8px;font-weight:900;text-align:center}
 .pet-level-heading span:first-child{font-size:19px}
 .pet-affection-bar{width:100%;height:18px;box-sizing:border-box;overflow:hidden;background:#ead4d4;border:3px solid #20263a}
 .pet-affection-fill{height:100%;background:linear-gradient(90deg,#ff8fab,#ffd43b);transition:width .35s ease}
-.pet-mood-reply{--reply-color:#fffdf3;position:relative;width:100%;height:100%;min-height:0;box-sizing:border-box;margin:0;padding:14px 16px;background:var(--reply-color);border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:18px;font-weight:700;line-height:1.55;letter-spacing:.5px;text-align:left;transition:background-color .18s ease}
+.pet-mood-reply{--reply-color:#fffdf3;position:relative;width:100%;height:100%;min-height:0;box-sizing:border-box;margin:0;padding:10px 14px;background:var(--reply-color);border:4px solid #20263a;box-shadow:5px 5px 0 #172033;font-family:"Microsoft JhengHei","Comic Sans MS",cursive,sans-serif;font-size:17px;font-weight:700;line-height:1.4;letter-spacing:.5px;text-align:left;transition:background-color .18s ease}
 .pet-mood-reply::before{content:"";position:absolute;left:-18px;top:42px;width:28px;height:28px;background:var(--reply-color);border-left:4px solid #20263a;border-bottom:4px solid #20263a;transform:rotate(45deg);transition:background-color .18s ease}
 .pet-mood-reply b,.pet-mood-reply p{position:relative;z-index:1}
 .pet-mood-reply p{margin:8px 0 0}
