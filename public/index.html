@@ -1466,11 +1466,11 @@ function bossStatusHtml(student){
     if(!bosses.length) return `<div class="boss-card"><h3>BOSS</h3><p>目前世界一片和平</p></div>`;
     return bosses.map(boss=>{
         const progress=student.bossProgress.find(item=>item.bossId===boss.id),hp=progress?.hp??boss.maxHp;
-        const percent=Math.max(0,Math.min(100,hp/boss.maxHp*100));
+        const barMax=Math.max(boss.maxHp,hp),percent=Math.max(0,Math.min(100,hp/barMax*100));
         return `<div class="boss-card">
             ${boss.image?`<img src="${esc(boss.image)}" alt="${esc(boss.name)}">`:""}
             <h3>${esc(boss.name||"BOSS")}</h3>
-            <div class="boss-hp" role="progressbar" aria-label="${esc(boss.name)}血量" aria-valuemin="0" aria-valuemax="${boss.maxHp}" aria-valuenow="${hp}"><div class="boss-hp-fill" style="width:${percent}%"></div></div>
+            <div class="boss-hp" role="progressbar" aria-label="${esc(boss.name)}血量" aria-valuemin="0" aria-valuemax="${barMax}" aria-valuenow="${hp}"><div class="boss-hp-fill" style="width:${percent}%"></div></div>
             <p>個人 HP ${hp} / ${boss.maxHp}｜獎勵 🪙 ${boss.reward}　🎟️ ${boss.rewardTickets||0}</p>
             <button class="danger" onclick="startBossBattle(${student.id},'${esc(boss.id)}')">攻打 BOSS</button>
         </div>`;
@@ -1528,10 +1528,10 @@ function renderBossBattle(studentId,bossId,password="",message=""){
     if(!questions.length)return alert("這隻 BOSS 的考卷尚未設定題目");
     const answered=progress?.answeredQuestionIds||[],unused=questions.filter(question=>!answered.includes(question.id));
     const pool=unused.length?unused:questions.filter(question=>answered.includes(question.id));
-    const question=pool[Math.floor(Math.random()*pool.length)],options=shuffledBossOptions(question),hp=progress?.hp??boss.maxHp,percent=Math.max(0,Math.min(100,hp/boss.maxHp*100));
+    const question=pool[Math.floor(Math.random()*pool.length)],options=shuffledBossOptions(question),hp=progress?.hp??boss.maxHp,barMax=Math.max(boss.maxHp,hp),percent=Math.max(0,Math.min(100,hp/barMax*100));
     currentView={type:"boss",id:studentId,bossId};
     openModal(`<section id="bossBattleArea" class="boss-question" aria-label="BOSS 挑戰題目">
-        <div class="boss-battle-header">${boss.image?`<img src="${esc(boss.image)}" alt="${esc(boss.name)}">`:""}<div class="boss-battle-status"><h2>挑戰 ${esc(boss.name)}</h2><div class="boss-hp" role="progressbar" aria-label="${esc(boss.name)}戰鬥血量" aria-valuemin="0" aria-valuemax="${boss.maxHp}" aria-valuenow="${hp}"><div class="boss-hp-fill" style="width:${percent}%"></div></div><div>HP ${hp} / ${boss.maxHp}</div><p class="boss-battle-message">${esc(message)}</p></div></div>
+        <div class="boss-battle-header">${boss.image?`<img src="${esc(boss.image)}" alt="${esc(boss.name)}">`:""}<div class="boss-battle-status"><h2>挑戰 ${esc(boss.name)}</h2><div class="boss-hp" role="progressbar" aria-label="${esc(boss.name)}戰鬥血量" aria-valuemin="0" aria-valuemax="${barMax}" aria-valuenow="${hp}"><div class="boss-hp-fill" style="width:${percent}%"></div></div><div>HP ${hp} / ${boss.maxHp}</div><p class="boss-battle-message">${esc(message)}</p></div></div>
         <p class="boss-question-text">${esc(question.text)}</p>
         <div class="boss-options">${options.map((option,index)=>`<button onclick="answerBossQuestion(${studentId},'${esc(boss.id)}','${esc(question.id)}',${option.answerIndex},'${esc(password)}')">${"ABCD"[index]}．${esc(option.text)}</button>`).join("")}</div>
     </section>`);

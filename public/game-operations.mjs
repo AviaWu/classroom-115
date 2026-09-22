@@ -135,11 +135,10 @@ export function normalizeProgress(value) {
             rewardTickets,paperId,questions:legacyQuestions,active:boss.active !== false,publishedAt:numeric(boss.publishedAt,0)};
     });
     delete progress.boss;
-    for (const student of progress.students) student.bossProgress = student.bossProgress.map(item=>{
-        const boss = progress.bosses.find(candidate=>candidate.id === item.bossId);
-        const hp = boss ? Math.min(boss.maxHp,item.hp) : item.hp;
-        return {...item,hp,defeated:item.defeated || hp <= 0};
-    });
+    for (const student of progress.students) student.bossProgress = student.bossProgress.map(item=>({
+        ...item,
+        defeated:item.defeated || item.hp <= 0
+    }));
     progress.drawings = indexedDrawings(progress.drawings);
     delete progress.drawingAlbum;
     progress.pendingArtworkDeletes = unique(progress.pendingArtworkDeletes).filter(validDrawingId);
@@ -432,9 +431,8 @@ export function applyOperation(value,command,now = Date.now()) {
         const allUsed = questions.every(item=>bossProgress.answeredQuestionIds.includes(item.id));
         if (alreadyCorrect && !allUsed) throw new Error('這道題目已經答對過了');
         if (command.answerIndex !== question.answerIndex) {
-            const oldHp = bossProgress.hp;
-            bossProgress.hp = Math.min(boss.maxHp,bossProgress.hp+5);
-            result = {correct:false,damage:0,healing:bossProgress.hp-oldHp,hp:bossProgress.hp,defeated:false,reward:0,rewardTickets:0,passwordVerified:true};
+            bossProgress.hp += 5;
+            result = {correct:false,damage:0,healing:5,hp:bossProgress.hp,defeated:false,reward:0,rewardTickets:0,passwordVerified:true};
             break;
         }
         const equippedPet = progress.layouts.find(item=>student.equippedLayout.includes(item.id));

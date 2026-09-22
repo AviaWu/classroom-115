@@ -176,19 +176,19 @@ test('boss attacks require an active boss and only verify its password on the fi
     assert.throws(()=>run(current,'bossAttack',{studentId:1,bossId:'old',password:'1234',questionId:'q1',answerIndex:1}),/停用|不存在/);
     assert.throws(()=>run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'0000',questionId:'q1',answerIndex:1}),/密碼/);
     const wrong=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'1234',questionId:'q1',answerIndex:0});
-    assert.deepEqual(wrong.result,{correct:false,damage:0,healing:0,hp:20,defeated:false,reward:0,rewardTickets:0,passwordVerified:true});
+    assert.deepEqual(wrong.result,{correct:false,damage:0,healing:5,hp:25,defeated:false,reward:0,rewardTickets:0,passwordVerified:true});
     const retry=run(wrong.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q2',answerIndex:2});
     assert.equal(retry.result.correct,true);
 });
 
-test('a wrong boss answer heals exactly five HP without exceeding initial full health', () => {
-    const current=state({bosses:[activeBoss({maxHp:101})],students:[student(1,{bossProgress:[{bossId:'dragon',hp:90,passwordVerified:true,answeredQuestionIds:[],defeated:false,completedAt:null}]})]});
+test('every wrong boss answer adds exactly five HP without a maximum', () => {
+    const current=state({bosses:[activeBoss({maxHp:101})],students:[student(1,{bossProgress:[{bossId:'dragon',hp:99,passwordVerified:true,answeredQuestionIds:[],defeated:false,completedAt:null}]})]});
     const healed=run(current,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q1',answerIndex:0});
-    assert.deepEqual(healed.result,{correct:false,damage:0,healing:5,hp:95,defeated:false,reward:0,rewardTickets:0,passwordVerified:true});
-    assert.equal(healed.progress.students[0].bossProgress[0].hp,95);
-    const capped=run({...healed.progress,students:[student(1,{bossProgress:[{bossId:'dragon',hp:99,passwordVerified:true,answeredQuestionIds:[],defeated:false,completedAt:null}]})]},'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q1',answerIndex:0});
-    assert.deepEqual(capped.result,{correct:false,damage:0,healing:2,hp:101,defeated:false,reward:0,rewardTickets:0,passwordVerified:true});
-    assert.equal(capped.progress.students[0].bossProgress[0].hp,101);
+    assert.deepEqual(healed.result,{correct:false,damage:0,healing:5,hp:104,defeated:false,reward:0,rewardTickets:0,passwordVerified:true});
+    assert.equal(healed.progress.students[0].bossProgress[0].hp,104);
+    const healedAgain=run(healed.progress,'bossAttack',{studentId:1,bossId:'dragon',password:'',questionId:'q1',answerIndex:0});
+    assert.deepEqual(healedAgain.result,{correct:false,damage:0,healing:5,hp:109,defeated:false,reward:0,rewardTickets:0,passwordVerified:true});
+    assert.equal(healedAgain.progress.students[0].bossProgress[0].hp,109);
 });
 
 test('each student has independent boss HP, progress and question history', () => {
