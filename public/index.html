@@ -1557,7 +1557,7 @@ async function answerBossQuestion(studentId,bossId,questionId,answerIndex,passwo
     document.querySelectorAll("#bossBattleArea button").forEach(button=>button.disabled=true);
     const result=await runCommand({type:"bossAttack",studentId,bossId,questionId,answerIndex,password},`boss:${bossId}:${studentId}:${questionId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`);
     if(!result){document.querySelectorAll("#bossBattleArea button").forEach(button=>button.disabled=false);return;}
-    const message=result.correct?(result.defeated?`答對了！擊敗 BOSS，獲得 ${result.reward} 代幣與 ${result.rewardTickets||0} 張樂透券！`:`答對了！造成 ${result.damage} 點傷害。`):(result.healing?`答錯了，BOSS 回復 ${result.healing} 點血量。`:"答錯了，BOSS 已是滿血。");
+    const message=result.correct?(result.defeated?`答對了！擊敗 BOSS，獲得 ${result.reward} 代幣與 ${result.rewardTickets||0} 張樂透券！`:`答對了！造成 ${result.damage} 點傷害。`):"答錯了，BOSS加五點HP。";
     if(result.defeated){alert(message);openPetMood(studentId);return;}
     renderBossBattle(studentId,bossId,"",message);
 }
