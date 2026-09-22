@@ -34,7 +34,10 @@ export function applyStudentOperation(previous,command,publicData,now=Date.now()
         if(!Number.isInteger(command.answerIndex)||command.answerIndex<0||command.answerIndex>=question.options.length) throw new Error('請選擇有效答案');
         const alreadyCorrect=progress.answeredQuestionIds.includes(question.id),allUsed=questions.every(item=>progress.answeredQuestionIds.includes(item.id));
         if(alreadyCorrect&&!allUsed) throw new Error('這道題目已經答對過了');
-        if(command.answerIndex!==question.answerIndex) return {state,result:{correct:false,damage:0,hp:progress.hp,defeated:false,reward:0,rewardTickets:0,passwordVerified:true}};
+        if(command.answerIndex!==question.answerIndex){
+            progress.hp+=5;
+            return {state,result:{correct:false,damage:0,healing:5,hp:progress.hp,defeated:false,reward:0,rewardTickets:0,passwordVerified:true}};
+        }
         const pet=publicData.studentPets?.[state.equippedLayout?.[0]],level=Math.floor((state.petAffection||0)/10)+1,damage=(PET_ATTACK[pet?.level]??5)+level-1;
         if(!alreadyCorrect) progress.answeredQuestionIds.push(question.id);
         progress.hp=Math.max(0,progress.hp-damage);let reward=0,rewardTickets=0;

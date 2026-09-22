@@ -24,6 +24,25 @@ test('student can equip only an owned pet',()=>{
   assert.throws(()=>applyStudentOperation(withoutOwnedList,{type:'equipPet',petId:'other'},publicData,0),/尚未擁有/);
 });
 
+test('student wrong answers add five to current boss HP repeatedly without a maximum',()=>{
+  const command={type:'bossAttack',bossId:'boss',password:'1234',questionId:'q',answerIndex:1};
+  for(const initialHp of [3,10,14]){
+    const original={...state(),bossProgress:[{bossId:'boss',hp:initialHp,passwordVerified:false,defeated:false}]};
+    let current=original;
+    for(let attempt=1;attempt<=3;attempt++){
+      const outcome=applyStudentOperation(current,command,publicData,0);
+      assert.equal(outcome.state.bossProgress[0].hp,initialHp+5*attempt);
+      assert.deepEqual(outcome.result,{correct:false,damage:0,healing:5,hp:initialHp+5*attempt,defeated:false,reward:0,rewardTickets:0,passwordVerified:true});
+      assert.deepEqual(outcome.state.bossProgress[0].answeredQuestionIds,[]);
+      assert.equal(outcome.state.tokens,0);assert.equal(outcome.state.lotteryTickets,0);
+      current=outcome.state;
+    }
+    assert.equal(original.bossProgress[0].hp,initialHp);
+  }
+  const first=applyStudentOperation(state(),command,publicData,0);
+  assert.equal(first.state.bossProgress[0].hp,15);
+});
+
 test('boss attack verifies the first password and grants personal completion rewards',()=>{
   const result=applyStudentOperation(state(),{type:'bossAttack',bossId:'boss',password:'1234',questionId:'q',answerIndex:0},publicData,0);
   assert.equal(result.state.bossProgress[0].hp,5);assert.equal(result.result.correct,true);
