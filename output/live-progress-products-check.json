@@ -1,0 +1,1445 @@
+[2026-09-22T14:34:20.340Z] ----------------------------------------------------------------------
+[2026-09-22T14:34:20.342Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\C0916\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js database:get /games/classroom-115/progress --project classroom-115 --instance classroom-115-default-rtdb --pretty
+[2026-09-22T14:34:20.342Z] CLI Version:   15.30.0
+[2026-09-22T14:34:20.343Z] Platform:      win32
+[2026-09-22T14:34:20.343Z] Node Version:  v24.21.0
+[2026-09-22T14:34:20.343Z] Detected Agent: unknown
+[2026-09-22T14:34:20.343Z] Time:          Tue Sep 22 2026 22:34:20 GMT+0800 (GMT+08:00)
+[2026-09-22T14:34:20.343Z] ----------------------------------------------------------------------
+
+[2026-09-22T14:34:21.206Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[2026-09-22T14:34:21.206Z] > authorizing via signed-in user (c0916071260@gmail.com)
+[2026-09-22T14:34:21.207Z] [iam] checking project classroom-115 for permissions ["firebase.projects.get","firebasedatabase.instances.get"]
+[2026-09-22T14:34:21.217Z] Checked if tokens are valid: true, expires at: 1790091121009
+[2026-09-22T14:34:21.217Z] Checked if tokens are valid: true, expires at: 1790091121009
+[2026-09-22T14:34:21.218Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/classroom-115:testIamPermissions [none]
+[2026-09-22T14:34:21.218Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/classroom-115:testIamPermissions  x-goog-user-project=classroom-115
+[2026-09-22T14:34:21.218Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/classroom-115:testIamPermissions {"permissions":["firebase.projects.get","firebasedatabase.instances.get"]}
+[2026-09-22T14:34:22.160Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/classroom-115:testIamPermissions 200
+[2026-09-22T14:34:22.160Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/classroom-115:testIamPermissions {"permissions":["firebase.projects.get","firebasedatabase.instances.get"]}
+[2026-09-22T14:34:22.160Z] Checked if tokens are valid: true, expires at: 1790091121009
+[2026-09-22T14:34:22.160Z] Checked if tokens are valid: true, expires at: 1790091121009
+[2026-09-22T14:34:22.160Z] >>> [apiv2][query] GET https://firebasedatabase.googleapis.com/v1beta/projects/classroom-115/locations/-/instances/classroom-115-default-rtdb [none]
+[2026-09-22T14:34:23.292Z] <<< [apiv2][status] GET https://firebasedatabase.googleapis.com/v1beta/projects/classroom-115/locations/-/instances/classroom-115-default-rtdb 200
+[2026-09-22T14:34:23.293Z] <<< [apiv2][body] GET https://firebasedatabase.googleapis.com/v1beta/projects/classroom-115/locations/-/instances/classroom-115-default-rtdb {"name":"projects/242136273912/locations/asia-southeast1/instances/classroom-115-default-rtdb","project":"projects/242136273912","databaseUrl":"https://classroom-115-default-rtdb.asia-southeast1.firebasedatabase.app","type":"DEFAULT_DATABASE","state":"ACTIVE"}
+[2026-09-22T14:34:23.297Z] Checked if tokens are valid: true, expires at: 1790091121009
+[2026-09-22T14:34:23.298Z] Checked if tokens are valid: true, expires at: 1790091121009
+[2026-09-22T14:34:23.298Z] >>> [apiv2][query] GET https://classroom-115-default-rtdb.asia-southeast1.firebasedatabase.app/games/classroom-115/progress.json print=pretty
+[2026-09-22T14:34:23.605Z] <<< [apiv2][status] GET https://classroom-115-default-rtdb.asia-southeast1.firebasedatabase.app/games/classroom-115/progress.json 200
+[2026-09-22T14:34:23.606Z] <<< [apiv2][body] GET https://classroom-115-default-rtdb.asia-southeast1.firebasedatabase.app/games/classroom-115/progress.json [stream]
+{
+  "backgrounds" : [ {
+    "active" : true,
+    "id" : "builtin_background_0",
+    "image" : "/images/bgm/bg%20(1).jpg",
+    "level" : "UR",
+    "name" : "UR",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_background_1",
+    "image" : "/images/bgm/bg%20(2).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_2",
+    "image" : "/images/bgm/bg%20(3).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_3",
+    "image" : "/images/bgm/bg%20(4).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_4",
+    "image" : "/images/bgm/bg%20(5).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_5",
+    "image" : "/images/bgm/bg%20(6).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_6",
+    "image" : "/images/bgm/bg%20(7).jpg",
+    "level" : "UR",
+    "name" : "UR",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_background_24",
+    "image" : "/images/bgm/bg%20(25).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_8",
+    "image" : "/images/bgm/bg%20(9).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_11",
+    "image" : "/images/bgm/bg%20(12).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_9",
+    "image" : "/images/bgm/bg%20(10).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_10",
+    "image" : "/images/bgm/bg%20(11).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_23",
+    "image" : "/images/bgm/bg%20(24).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_12",
+    "image" : "/images/bgm/bg%20(13).jpg",
+    "level" : "UR",
+    "name" : "UR",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_background_13",
+    "image" : "/images/bgm/bg%20(14).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_14",
+    "image" : "/images/bgm/bg%20(15).jpg",
+    "level" : "R",
+    "name" : "R",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_background_15",
+    "image" : "/images/bgm/bg%20(16).jpg",
+    "level" : "R",
+    "name" : "R",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_background_16",
+    "image" : "/images/bgm/bg%20(17).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_17",
+    "image" : "/images/bgm/bg%20(18).jpg",
+    "level" : "UR",
+    "name" : "UR",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_background_18",
+    "image" : "/images/bgm/bg%20(19).jpg",
+    "level" : "R",
+    "name" : "R",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_background_19",
+    "image" : "/images/bgm/bg%20(20).jpg",
+    "level" : "R",
+    "name" : "R",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_background_20",
+    "image" : "/images/bgm/bg%20(21).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_background_21",
+    "image" : "/images/bgm/bg%20(22).jpg",
+    "level" : "UR",
+    "name" : "UR",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_background_22",
+    "image" : "/images/bgm/bg%20(23).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_7",
+    "image" : "/images/bgm/bg%20(8).jpg",
+    "level" : "SR",
+    "name" : "SR",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_background_25",
+    "image" : "/images/bgm/bg%20(26).jpg",
+    "level" : "R",
+    "name" : "R",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_background_26",
+    "image" : "/images/bgm/bg%20(27).jpg",
+    "level" : "SSR",
+    "name" : "SSR",
+    "price" : 200
+  } ],
+  "bosses" : [ {
+    "active" : true,
+    "attackPassword" : "0000",
+    "id" : "boss_1789775991245_1ur3x",
+    "image" : "/images/boss/boss%20(3).png",
+    "maxHp" : 100,
+    "name" : "噴火巨龍",
+    "paperId" : "legacy_paper_boss_1789775991245_1ur3x",
+    "publishedAt" : 1789775991245,
+    "questions" : [ {
+      "answerIndex" : 1,
+      "id" : "boss_question_1789776057629_97hkg",
+      "options" : [ "五年乙班", "五年甲班", "五年己班", "五年丙班" ],
+      "text" : "我們是"
+    }, {
+      "answerIndex" : 2,
+      "id" : "boss_question_1789776116949_woksy",
+      "options" : [ "吳秀蘭", "吳秦蘭", "吳香蘭", "吳春蘭" ],
+      "text" : "老師的名字是"
+    }, {
+      "answerIndex" : 1,
+      "id" : "boss_question_1789776162645_7k3wl",
+      "options" : [ "25人", "26人", "27人", "28人" ],
+      "text" : "班上學生一共有"
+    }, {
+      "answerIndex" : 3,
+      "id" : "boss_question_1789776239381_36a47",
+      "options" : [ "甲冠天下", "甲乙丙丁", "金甲厲害", "甲霸尚贏" ],
+      "text" : "班服後面的文字是"
+    }, {
+      "answerIndex" : 1,
+      "id" : "boss_question_1789776376493_fsf2h",
+      "options" : [ "11月7日", "11月14日", "11月21日", "11月28日" ],
+      "text" : "校慶的日期是"
+    }, {
+      "answerIndex" : 3,
+      "id" : "boss_question_1789776423606_lvo03",
+      "options" : [ "1月11日", "1月12日", "1月13日", "1月14日" ],
+      "text" : "戶外教學的日子是"
+    } ],
+    "reward" : 0,
+    "rewardTickets" : 1
+  } ],
+  "clothesF" : [ {
+    "active" : true,
+    "id" : "builtin_girl_1",
+    "image" : "/images/girl/g%20(1).png",
+    "level" : "R",
+    "name" : "葡萄汽水",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_3",
+    "image" : "/images/girl/g%20(3).png",
+    "level" : "SSR",
+    "name" : "魔法學徒",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_4",
+    "image" : "/images/girl/g%20(4).png",
+    "level" : "R",
+    "name" : "草莓口味",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_5",
+    "image" : "/images/girl/g%20(5).png",
+    "level" : "SSR",
+    "name" : "風鈴少女",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_6",
+    "image" : "/images/girl/g%20(6).png",
+    "level" : "R",
+    "name" : "小熊少女",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_7",
+    "image" : "/images/girl/g%20(7).png",
+    "level" : "SR",
+    "name" : "教堂修女",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_8",
+    "image" : "/images/girl/g%20(8).png",
+    "level" : "R",
+    "name" : "制服女孩",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_9",
+    "image" : "/images/girl/g%20(9).png",
+    "level" : "R",
+    "name" : "溫柔姐姐",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_10",
+    "image" : "/images/girl/g%20(10).png",
+    "level" : "R",
+    "name" : "休閒學生",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_11",
+    "image" : "/images/girl/g%20(11).png",
+    "level" : "SSR",
+    "name" : "吟遊詩人",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_12",
+    "image" : "/images/girl/g%20(12).png",
+    "level" : "R",
+    "name" : "夏日薄荷",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_13",
+    "image" : "/images/girl/g%20(13).png",
+    "level" : "SR",
+    "name" : "農村少女",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_2",
+    "image" : "/images/girl/g%20(2).png",
+    "level" : "SR",
+    "name" : "提燈少女",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_15",
+    "image" : "/images/girl/g%20(15).png",
+    "level" : "SSR",
+    "name" : "海盜船長",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_31",
+    "image" : "/images/girl/g%20(31).png",
+    "level" : "R",
+    "name" : "制服姐姐",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_14",
+    "image" : "/images/girl/g%20(14).png",
+    "level" : "SR",
+    "name" : "電音潮流",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_19",
+    "image" : "/images/girl/g%20(19).png",
+    "level" : "SR",
+    "name" : "黑衣刺客",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_20",
+    "image" : "/images/girl/g%20(20).png",
+    "level" : "UR",
+    "name" : "迷幻精靈",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_21",
+    "image" : "/images/girl/g%20(21).png",
+    "level" : "UR",
+    "name" : "遠洋人魚",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_22",
+    "image" : "/images/girl/g%20(22).png",
+    "level" : "UR",
+    "name" : "魔法少女",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_34",
+    "image" : "/images/girl/g%20(34).png",
+    "level" : "SR",
+    "name" : "奇航海盜",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_35",
+    "image" : "/images/girl/g%20(35).png",
+    "level" : "UR",
+    "name" : "珊瑚王女",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_32",
+    "image" : "/images/girl/g%20(32).png",
+    "level" : "R",
+    "name" : "弓箭獵手",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_23",
+    "image" : "/images/girl/g%20(23).png",
+    "level" : "SR",
+    "name" : "公主騎士",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_24",
+    "image" : "/images/girl/g%20(24).png",
+    "level" : "SSR",
+    "name" : "鹿角少女",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_26",
+    "image" : "/images/girl/g%20(26).png",
+    "level" : "UR",
+    "name" : "狐狸女孩",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_27",
+    "image" : "/images/girl/g%20(27).png",
+    "level" : "SR",
+    "name" : "浣熊妹妹",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_25",
+    "image" : "/images/girl/g%20(25).png",
+    "level" : "SR",
+    "name" : "英倫女孩",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_28",
+    "image" : "/images/girl/g%20(28).png",
+    "level" : "SSR",
+    "name" : "糖果女孩",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_29",
+    "image" : "/images/girl/g%20(29).png",
+    "level" : "SSR",
+    "name" : "金髮公主",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_33",
+    "image" : "/images/girl/g%20(33).png",
+    "level" : "SR",
+    "name" : "黑色玫瑰",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_30",
+    "image" : "/images/girl/g%20(30).png",
+    "level" : "R",
+    "name" : "淘氣王女",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_17",
+    "image" : "/images/girl/g%20(17).png",
+    "level" : "UR",
+    "name" : "星月天使",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_38",
+    "image" : "/images/girl/g%20(38).png",
+    "level" : "SSR",
+    "name" : "貓耳萌妹",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_36",
+    "image" : "/images/girl/g%20(36).png",
+    "level" : "SSR",
+    "name" : "異國少女",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_37",
+    "image" : "/images/girl/g%20(37).png",
+    "level" : "UR",
+    "name" : "草原少女",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_18",
+    "image" : "/images/girl/g%20(18).png",
+    "level" : "UR",
+    "name" : "紫色惡魔",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_40",
+    "image" : "/images/girl/g%20(40).png",
+    "level" : "SSR",
+    "name" : "彩虹仙子",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_39",
+    "image" : "/images/girl/g%20(39).png",
+    "level" : "SSR",
+    "name" : "星月法師",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_16",
+    "image" : "/images/girl/g%20(16).png",
+    "level" : "UR",
+    "name" : "鍊金術師",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_41",
+    "image" : "/images/girl/g%20(41).png",
+    "level" : "UR",
+    "name" : "漢服少女",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_42",
+    "image" : "/images/girl/g%20(42).png",
+    "level" : "UR",
+    "name" : "王國公主",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_event_ga1",
+    "image" : "/images/girl/ga1.png",
+    "level" : "活動贈送",
+    "name" : "附小校服",
+    "price" : 0
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_event_ga2",
+    "image" : "/images/girl/ga2.png",
+    "level" : "活動贈送",
+    "name" : "未命名",
+    "price" : 0
+  }, {
+    "active" : true,
+    "id" : "builtin_girl_event_ga3",
+    "image" : "/images/girl/ga3.png",
+    "level" : "SSR",
+    "name" : "星河望月（中秋限定至10/19）",
+    "price" : 200
+  } ],
+  "clothesM" : [ {
+    "active" : true,
+    "id" : "builtin_boy_2",
+    "image" : "/images/boy/b%20(2).png",
+    "level" : "SSR",
+    "name" : "足球少年",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_3",
+    "image" : "/images/boy/b%20(3).png",
+    "level" : "SSR",
+    "name" : "王國騎士",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_4",
+    "image" : "/images/boy/b%20(4).png",
+    "level" : "SR",
+    "name" : "馬戲先生",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_13",
+    "image" : "/images/boy/b%20(13).png",
+    "level" : "SSR",
+    "name" : "莊園青年",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_19",
+    "image" : "/images/boy/b%20(20).png",
+    "level" : "SSR",
+    "name" : "貴族公子",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_5",
+    "image" : "/images/boy/b%20(5).png",
+    "level" : "SSR",
+    "name" : "叢林獵人",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_6",
+    "image" : "/images/boy/b%20(6).png",
+    "level" : "SSR",
+    "name" : "異域商人",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_7",
+    "image" : "/images/boy/b%20(7).png",
+    "level" : "SSR",
+    "name" : "牛仔青年",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_8",
+    "image" : "/images/boy/b%20(8).png",
+    "level" : "SR",
+    "name" : "韓風紳士",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_9",
+    "image" : "/images/boy/b%20(9).png",
+    "level" : "R",
+    "name" : "文青男孩",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_12",
+    "image" : "/images/boy/b%20(12).png",
+    "level" : "R",
+    "name" : "慵懶青年",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_10",
+    "image" : "/images/boy/b%20(10).png",
+    "level" : "R",
+    "name" : "帽T少年",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_11",
+    "image" : "/images/boy/b%20(11).png",
+    "level" : "SR",
+    "name" : "滑板男孩",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_14",
+    "image" : "/images/boy/b%20(14).png",
+    "level" : "SR",
+    "name" : "黑色潮流",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_16",
+    "image" : "/images/boy/b%20(16).png",
+    "level" : "SSR",
+    "name" : "奇航海盜",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_15",
+    "image" : "/images/boy/b%20(15).png",
+    "level" : "SSR",
+    "name" : "吟遊詩人",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_17",
+    "image" : "/images/boy/b%20(17).png",
+    "level" : "SR",
+    "name" : "牛仔小子",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_18",
+    "image" : "/images/boy/b%20(18).png",
+    "level" : "SR",
+    "name" : "武術青年",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_20",
+    "image" : "/images/boy/b%20(21).png",
+    "level" : "SSR",
+    "name" : "冬季來臨",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_21",
+    "image" : "/images/boy/b%20(22).png",
+    "level" : "SR",
+    "name" : "少年廚神",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_22",
+    "image" : "/images/boy/b%20(23).png",
+    "level" : "R",
+    "name" : "白髮少年",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_23",
+    "image" : "/images/boy/b%20(24).png",
+    "level" : "SR",
+    "name" : "暗夜刺客",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_24",
+    "image" : "/images/boy/b%20(25).png",
+    "level" : "SSR",
+    "name" : "海盜船長",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_25",
+    "image" : "/images/boy/b%20(26).png",
+    "level" : "UR",
+    "name" : "魔法學徒",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_26",
+    "image" : "/images/boy/b%20(27).png",
+    "level" : "R",
+    "name" : "工程少年",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_27",
+    "image" : "/images/boy/b%20(28).png",
+    "level" : "SR",
+    "name" : "白衣法師",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_28",
+    "image" : "/images/boy/b%20(29).png",
+    "level" : "R",
+    "name" : "街頭小子",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_29",
+    "image" : "/images/boy/b%20(30).png",
+    "level" : "SR",
+    "name" : "浴衣男孩",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_30",
+    "image" : "/images/boy/b%20(31).png",
+    "level" : "R",
+    "name" : "農村小子",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_1",
+    "image" : "/images/boy/b%20(1).png",
+    "level" : "R",
+    "name" : "潮流男孩",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_31",
+    "image" : "/images/boy/b%20(32).png",
+    "level" : "UR",
+    "name" : "貓耳青年",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_36",
+    "image" : "/images/boy/b%20(37).png",
+    "level" : "UR",
+    "name" : "黑貓男",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_34",
+    "image" : "/images/boy/b%20(35).png",
+    "level" : "UR",
+    "name" : "狼少年",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_33",
+    "image" : "/images/boy/b%20(34).png",
+    "level" : "UR",
+    "name" : "狐狸青年",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_32",
+    "image" : "/images/boy/b%20(33).png",
+    "level" : "UR",
+    "name" : "棕熊旅人",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_35",
+    "image" : "/images/boy/b%20(36).png",
+    "level" : "UR",
+    "name" : "海獺先生",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_37",
+    "image" : "/images/boy/b%20(38).png",
+    "level" : "SR",
+    "name" : "美國學生",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_38",
+    "image" : "/images/boy/b%20(39).png",
+    "level" : "UR",
+    "name" : "馬力歐",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_39",
+    "image" : "/images/boy/b%20(40).png",
+    "level" : "UR",
+    "name" : "路易吉",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_40",
+    "image" : "/images/boy/b%20(41).png",
+    "level" : "UR",
+    "name" : "哆啦A夢",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_42",
+    "image" : "/images/boy/b%20(43).png",
+    "level" : "R",
+    "name" : "英倫男孩",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_41",
+    "image" : "/images/boy/b%20(42).png",
+    "level" : "R",
+    "name" : "黃衣小子",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_43",
+    "image" : "/images/boy/b%20(44).png",
+    "level" : "UR",
+    "name" : "少年偵探",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_event_ba1",
+    "image" : "/images/boy/ba1.png",
+    "level" : "活動贈送",
+    "name" : "附小校服",
+    "price" : 0
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_event_ba2",
+    "image" : "/images/boy/ba2.png",
+    "level" : "活動贈送",
+    "name" : "甲霸尚贏",
+    "price" : 0
+  }, {
+    "active" : true,
+    "id" : "builtin_boy_event_ba3",
+    "image" : "/images/boy/ba3.png",
+    "level" : "SSR",
+    "name" : "星河望月（中秋限定至10/19）",
+    "price" : 200
+  } ],
+  "coopTaskTemplates" : [ {
+    "appearTime" : "12:20",
+    "appearWeekday" : 2,
+    "content" : "完成漱口水潔牙，打敗髒髒怪獸！",
+    "dueTime" : "13:30",
+    "dueWeekday" : 2,
+    "enabled" : true,
+    "id" : "coop_template_1789324153601",
+    "monsterImage" : "/images/mon/m%20(4).jpg",
+    "monsterName" : "口水怪獸",
+    "reward" : 20,
+    "rewardType" : "token",
+    "scheduleType" : "weekly"
+  }, {
+    "appearTime" : "12:35",
+    "appearWeekday" : 1,
+    "content" : "嘰哩呱啦最喜歡吵鬧的環境，午休安靜不說話，靜悄悄的趕跑牠！",
+    "dueTime" : "13:30",
+    "dueWeekday" : 5,
+    "enabled" : true,
+    "id" : "coop_template_1789549867705",
+    "monsterImage" : "/images/mon/m%20(2).jpg",
+    "monsterName" : "嘰哩呱啦",
+    "reward" : 1,
+    "rewardType" : "ticket",
+    "scheduleType" : "daily"
+  }, {
+    "appearTime" : "00:00",
+    "appearWeekday" : 3,
+    "content" : "1、櫃子排整齊\n2、桌面全清空\n3、抽屜排整齊\n4、座位沒垃圾",
+    "dueTime" : "12:40",
+    "dueWeekday" : 3,
+    "enabled" : true,
+    "id" : "coop_template_1789560890406",
+    "monsterImage" : "/images/mon/m%20(3).jpg",
+    "monsterName" : "髒髒怪獸",
+    "reward" : 20,
+    "rewardType" : "token",
+    "scheduleType" : "weekly"
+  } ],
+  "coopTasks" : [ {
+    "claimed" : false,
+    "completedBy" : [ 27, 28, 3, 16, 14, 18, 8, 12, 17 ],
+    "content" : "背伐木（鳥），請組長或語文股長在聯絡簿簽名。",
+    "id" : "t_1789604047210_fcn5",
+    "monsterImage" : "",
+    "monsterName" : "唐詩怪獸",
+    "reward" : 1,
+    "rewardType" : "ticket",
+    "startAt" : 1789604047210
+  }, {
+    "claimed" : true,
+    "completedBy" : [ 26, 27, 28, 11, 10, 4, 8, 3, 12, 20, 9, 23, 6, 19, 14, 1, 22, 24, 21, 16, 17, 13, 15, 5, 2, 18, 7, 25 ],
+    "content" : "1、喝完的牛奶盒剪開洗乾淨丟回收\n2、不喝帶回家，不給別人",
+    "id" : "t_1789705634922_4e46",
+    "monsterImage" : "/images/mon/m%20(1).jpg",
+    "monsterName" : "牛奶怪獸",
+    "reward" : 1,
+    "rewardType" : "ticket",
+    "startAt" : 1789705634922
+  }, {
+    "claimed" : false,
+    "completedBy" : [ 1, 6, 8, 9, 13, 14, 15, 18, 23, 24, 25, 27, 28, 4, 21, 5, 3, 11, 10, 7, 17 ],
+    "content" : "國習L3訂正，並交給老師檢查OK。",
+    "id" : "t_1790046518009_6tsi",
+    "monsterImage" : "/images/mon/m%20(3).jpg",
+    "monsterName" : "國習L3訂正",
+    "reward" : 30,
+    "rewardType" : "token",
+    "startAt" : 1790046518009
+  }, {
+    "claimed" : false,
+    "completedBy" : [ 2, 3, 6, 8, 11, 12, 13, 14, 15, 17, 18, 21, 22, 24, 26, 27, 28, 25, 4, 23, 5, 16, 10 ],
+    "content" : "聽寫L3訂正，並交給老師確認OK",
+    "id" : "t_1790046571993_4lna",
+    "monsterImage" : "/images/mon/m%20(3).jpg",
+    "monsterName" : "聽寫L3訂正",
+    "reward" : 30,
+    "rewardType" : "token",
+    "startAt" : 1790046571993
+  }, {
+    "claimed" : false,
+    "completedBy" : [ 3, 12, 4, 11, 24, 17, 5, 6, 16, 13, 25, 27, 28, 22, 26, 21, 23, 14 ],
+    "content" : "1、喝完豆漿，請將瓶子、蓋子洗乾淨，放回收瓶罐的箱子。\n2、不喝豆漿請帶回家，不給別人。",
+    "id" : "t_1790053146908_8hhe",
+    "monsterImage" : "/images/mon/m%20(4).jpg",
+    "monsterName" : "豆漿怪獸",
+    "reward" : 1,
+    "rewardType" : "ticket",
+    "startAt" : 1790053146908
+  } ],
+  "dailyTaskTemplates" : [ {
+    "appearTime" : "07:30",
+    "dueTime" : "08:10",
+    "enabled" : false,
+    "id" : "daily_template_1789321726488",
+    "reward" : 20,
+    "title" : "8:10前交聯絡簿與作業"
+  } ],
+  "deletedCoopTaskIds" : [ "coop_daily_coop_template_1789324944436_2026-09-14", "coop_weekly_coop_template_1789324153601_2026-09-14", "coop_daily_coop_template_1789324944436_2026-09-15", "t_1789481334652_no9d", "t_1789488783330_fs2x", "t_1789490021155_nxb3", "t_1789490228438_d9dr", "coop_daily_coop_template_1789549867705_2026-09-16", "coop_weekly_coop_template_1789560890406_2026-09-14", "t_1789530285574_0oeu", "t_1789517544193_tc0q", "coop_daily_coop_template_1789549867705_2026-09-20", "coop_daily_coop_template_1789549867705_2026-09-18", "t_1789701791262_n687", "t_1789701749454_0p00", "coop_daily_coop_template_1789549867705_2026-09-17", "coop_daily_coop_template_1789549867705_2026-09-21", "t_1789955946203_903b", "t_1789617552666_d7q0", "t_1789605208515_ktgu", "t_1789516701351_or9u", "t_1789617507858_dgu2", "t_1790081295787_7v2j", "coop_daily_coop_template_1789549867705_2026-09-22", "coop_weekly_coop_template_1789324153601_2026-09-21" ],
+  "deletedTaskIds" : [ "daily_daily_template_1789321726488_2026-09-14", "daily_daily_template_1789321726488_2026-09-15", "t_1789479929941_anvb", "daily_daily_template_1789321726488_2026-09-16", "daily_daily_template_1789321726488_2026-09-17", "daily_daily_template_1789321726488_2026-09-19", "daily_daily_template_1789321726488_2026-09-20", "daily_daily_template_1789321726488_2026-09-18", "t_1789943546473_kmob" ],
+  "drawings" : [ {
+    "id" : "drawing_9e7f2380-b0a6-475c-a6ac-f1b5b4acebf9",
+    "savedAt" : "2026-09-21T06:01:13.612Z"
+  }, {
+    "id" : "drawing_5024c995-2360-49b8-bc5d-c22a85f18521",
+    "savedAt" : "2026-09-18T04:35:49.776Z"
+  }, {
+    "id" : "drawing_06c8fbb1-57b6-4a61-b3f3-937f8d6ddd3a",
+    "savedAt" : "2026-09-18T04:35:48.984Z"
+  } ],
+  "globalBgImage" : "",
+  "lastSaved" : "2026-09-22T13:23:47.138Z",
+  "layouts" : [ {
+    "active" : true,
+    "id" : "builtin_pet_dec2_0",
+    "image" : "/images/Dec2/1000095479-removebg-preview.png",
+    "level" : "UR",
+    "name" : "森森",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_1",
+    "image" : "/images/Dec2/1000095481-removebg-preview.png",
+    "level" : "UR",
+    "name" : "小黑",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_2",
+    "image" : "/images/Dec2/1000095483-removebg-preview.png",
+    "level" : "R",
+    "name" : "阿藍",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_3",
+    "image" : "/images/Dec2/1000095484-removebg-preview.png",
+    "level" : "SR",
+    "name" : "角角",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_4",
+    "image" : "/images/Dec2/1000095486-removebg-preview.png",
+    "level" : "SR",
+    "name" : "夢仔",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_5",
+    "image" : "/images/Dec2/1000095487-removebg-preview.png",
+    "level" : "SR",
+    "name" : "閃電",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_6",
+    "image" : "/images/Dec2/1000095488-removebg-preview.png",
+    "level" : "SSR",
+    "name" : "花狐",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_7",
+    "image" : "/images/Dec2/1000095489-removebg-preview.png",
+    "level" : "SSR",
+    "name" : "夜仔",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_8",
+    "image" : "/images/Dec2/1000095491-removebg-preview.png",
+    "level" : "R",
+    "name" : "小蜥",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_9",
+    "image" : "/images/Dec2/1000095493-removebg-preview.png",
+    "level" : "SSR",
+    "name" : "酷豹",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_11",
+    "image" : "/images/Dec2/1000095495-removebg-preview.png",
+    "level" : "R",
+    "name" : "小鯨",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_12",
+    "image" : "/images/Dec2/1000095496-removebg-preview.png",
+    "level" : "UR",
+    "name" : "月牙",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_13",
+    "image" : "/images/Dec2/1000095497-removebg-preview.png",
+    "level" : "SSR",
+    "name" : "阿熊",
+    "price" : 200
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_14",
+    "image" : "/images/Dec2/1000095500-removebg-preview.png",
+    "level" : "SR",
+    "name" : "阿吼",
+    "price" : 100
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_15",
+    "image" : "/images/Dec2/1000095502-removebg-preview.png",
+    "level" : "R",
+    "name" : "長尾",
+    "price" : 50
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_dec2_16",
+    "image" : "/images/Dec2/1000095503-removebg-preview.png",
+    "level" : "UR",
+    "name" : "龍龍",
+    "price" : 300
+  }, {
+    "active" : true,
+    "id" : "builtin_pet_event_deca3",
+    "image" : "/images/Dec2/deca3.png",
+    "level" : "SSR",
+    "name" : "月兔（中秋限定至10/19）",
+    "price" : 200
+  } ],
+  "questionPapers" : [ {
+    "id" : "legacy_paper_boss_1789775991245_1ur3x",
+    "name" : "五甲知多少",
+    "questions" : [ {
+      "answerIndex" : 1,
+      "id" : "boss_question_1789776057629_97hkg",
+      "options" : [ "五年乙班", "五年甲班", "五年己班", "五年丙班" ],
+      "text" : "我們是"
+    }, {
+      "answerIndex" : 3,
+      "id" : "boss_question_1789776239381_36a47",
+      "options" : [ "甲冠天下", "甲乙丙丁", "金甲厲害", "甲霸尚贏" ],
+      "text" : "班服後面的文字是"
+    }, {
+      "answerIndex" : 3,
+      "id" : "question_1789917416990_x8r4z",
+      "options" : [ "看書", "睡覺休息", "寫作業", "講話" ],
+      "text" : "午休「不能」做的事情是"
+    }, {
+      "answerIndex" : 2,
+      "id" : "question_1789917715945_w3yyv",
+      "options" : [ "要罰寫課文一次", "要寫悔過書500字", "要在聯絡簿寫何時補交", "要被扣500代幣" ],
+      "text" : "作業沒帶或沒寫的話"
+    }, {
+      "answerIndex" : 2,
+      "id" : "question_1789917862006_x2311",
+      "options" : [ "8：00前", "8：05前", "8：10前", "8：30前" ],
+      "text" : "除了禮拜一的朝會，每天早自修交作業的期限是"
+    }, {
+      "answerIndex" : 3,
+      "id" : "question_1789918119716_tz94o",
+      "options" : [ "幫他取各種好笑的綽號", "拍打碰觸他的身體", "亂傳他的八卦或壞話", "以友善的態度說話" ],
+      "text" : "和同學相處時，我可以"
+    }, {
+      "answerIndex" : 3,
+      "id" : "question_1789919185665_yp8ma",
+      "options" : [ "追逐遊戲", "丟紙飛機", "亂玩公物", "和同學聊天" ],
+      "text" : "下課時，我可以在教室"
+    }, {
+      "answerIndex" : 1,
+      "id" : "question_1789919853897_jxkmt",
+      "options" : [ "不分場合，任性吵鬧", "尊重他人，當面理性溝通", "私下抱怨，背地說人壞話", "攻擊對方，互不退讓" ],
+      "text" : "當我有不同意見時，我應該"
+    }, {
+      "answerIndex" : 3,
+      "id" : "question_1789920061596_wno6t",
+      "options" : [ "在老師講課時保持安靜", "在討論時踴躍發表意見", "不做課堂學習以外的事", "以上皆是" ],
+      "text" : "正確的上課態度是"
+    }, {
+      "answerIndex" : 3,
+      "id" : "question_1789950515764_h5tud",
+      "options" : [ "打撲克牌", "離開座位大聲聊天", "跑到隔壁班找同學", "以上都不恰當" ],
+      "text" : "早自修做什麼事是不恰當的"
+    } ]
+  }, {
+    "id" : "paper_1789911402293_wlihe",
+    "name" : "中秋大會考"
+  } ],
+  "students" : [ {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_14",
+    "equippedClothes" : "builtin_boy_31",
+    "gender" : "M",
+    "id" : 1,
+    "ownedBg" : [ "builtin_background_19", "builtin_background_14" ],
+    "ownedClothes" : [ "builtin_boy_10", "builtin_boy_12", "builtin_boy_event_ba2", "builtin_boy_event_ba1", "builtin_boy_9", "builtin_boy_2", "builtin_boy_11", "builtin_boy_22", "builtin_boy_26", "builtin_boy_31", "builtin_boy_41" ],
+    "ownedLayout" : [ "builtin_pet_dec2_8", "builtin_pet_event_deca3" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_23",
+    "equippedClothes" : "builtin_boy_3",
+    "gender" : "M",
+    "id" : 2,
+    "ownedBg" : [ "builtin_background_25", "builtin_background_23", "builtin_background_15" ],
+    "ownedClothes" : [ "builtin_boy_26", "builtin_boy_3", "builtin_boy_41", "builtin_boy_event_ba1", "builtin_boy_event_ba2", "builtin_boy_12", "builtin_boy_22" ],
+    "ownedLayout" : [ "builtin_pet_dec2_8", "builtin_pet_dec2_2" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_11",
+    "equippedClothes" : "builtin_boy_event_ba2",
+    "gender" : "M",
+    "id" : 3,
+    "ownedBg" : [ "builtin_background_11", "builtin_background_18" ],
+    "ownedClothes" : [ "builtin_boy_22", "builtin_boy_2", "builtin_boy_event_ba1", "builtin_boy_event_ba2", "builtin_boy_12", "builtin_boy_9", "builtin_boy_10" ],
+    "ownedLayout" : [ "builtin_pet_dec2_7", "builtin_pet_dec2_9", "builtin_pet_dec2_4", "builtin_pet_dec2_12" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_21",
+    "equippedClothes" : "builtin_boy_34",
+    "gender" : "M",
+    "id" : 4,
+    "ownedBg" : [ "builtin_background_19", "builtin_background_24", "builtin_background_21", "builtin_background_15" ],
+    "ownedClothes" : [ "builtin_boy_42", "builtin_boy_29", "builtin_boy_34", "builtin_boy_10", "builtin_boy_event_ba2", "builtin_boy_event_ba1", "builtin_boy_9" ],
+    "ownedLayout" : [ "builtin_pet_dec2_12" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_11",
+    "equippedClothes" : "builtin_boy_event_ba3",
+    "gender" : "M",
+    "id" : 5,
+    "ownedBg" : [ "builtin_background_19", "builtin_background_11" ],
+    "ownedClothes" : [ "builtin_boy_9", "builtin_boy_5", "builtin_boy_10", "builtin_boy_17", "builtin_boy_event_ba2", "builtin_boy_event_ba1", "builtin_boy_event_ba3" ],
+    "ownedLayout" : [ "builtin_pet_dec2_2", "builtin_pet_dec2_14" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedClothes" : "builtin_boy_event_ba2",
+    "gender" : "M",
+    "id" : 6,
+    "ownedBg" : [ "builtin_background_15", "builtin_background_14" ],
+    "ownedClothes" : [ "builtin_boy_26", "builtin_boy_34", "builtin_boy_event_ba1", "builtin_boy_event_ba2", "builtin_boy_22", "builtin_boy_30", "builtin_boy_1", "builtin_boy_9" ],
+    "ownedLayout" : [ "builtin_pet_dec2_1", "builtin_pet_dec2_14" ]
+  }, {
+    "equippedBg" : "builtin_background_14",
+    "equippedClothes" : "builtin_boy_event_ba3",
+    "gender" : "M",
+    "id" : 7,
+    "ownedBg" : [ "builtin_background_14" ],
+    "ownedClothes" : [ "builtin_boy_14", "builtin_boy_22", "builtin_boy_event_ba2", "builtin_boy_event_ba1", "builtin_boy_event_ba3", "builtin_boy_1", "builtin_boy_12", "builtin_boy_41" ],
+    "ownedLayout" : [ "builtin_pet_dec2_2", "builtin_pet_dec2_15", "builtin_pet_dec2_11" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_3",
+    "equippedClothes" : "builtin_boy_event_ba2",
+    "gender" : "M",
+    "id" : 8,
+    "ownedBg" : [ "builtin_background_3" ],
+    "ownedClothes" : [ "builtin_boy_2", "builtin_boy_37", "builtin_boy_12", "builtin_boy_29", "builtin_boy_event_ba1", "builtin_boy_event_ba2", "builtin_boy_26", "builtin_boy_9" ],
+    "ownedLayout" : [ "builtin_pet_dec2_11", "builtin_pet_dec2_9", "builtin_pet_dec2_15", "builtin_pet_dec2_12" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedClothes" : "builtin_boy_event_ba1",
+    "gender" : "M",
+    "id" : 9,
+    "ownedBg" : [ "builtin_background_19", "builtin_background_18" ],
+    "ownedClothes" : [ "builtin_boy_23", "builtin_boy_41", "builtin_boy_12", "builtin_boy_34", "builtin_boy_event_ba1", "builtin_boy_event_ba2", "builtin_boy_30" ],
+    "ownedLayout" : [ "builtin_pet_dec2_11", "builtin_pet_dec2_14" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedClothes" : "builtin_boy_event_ba1",
+    "gender" : "M",
+    "id" : 10,
+    "ownedBg" : [ "builtin_background_15", "builtin_background_19" ],
+    "ownedClothes" : [ "builtin_boy_10", "builtin_boy_18", "builtin_boy_event_ba2", "builtin_boy_event_ba1", "builtin_boy_40", "builtin_boy_26", "builtin_boy_34" ],
+    "ownedLayout" : [ "builtin_pet_dec2_11", "builtin_pet_dec2_2", "builtin_pet_dec2_3" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedClothes" : "builtin_boy_event_ba3",
+    "gender" : "M",
+    "id" : 11,
+    "ownedBg" : [ "builtin_background_19", "builtin_background_25" ],
+    "ownedClothes" : [ "builtin_boy_event_ba1", "builtin_boy_event_ba2", "builtin_boy_26", "builtin_boy_18", "builtin_boy_34", "builtin_boy_12", "builtin_boy_27", "builtin_boy_5", "builtin_boy_event_ba3", "builtin_boy_30" ],
+    "ownedLayout" : [ "builtin_pet_dec2_6", "builtin_pet_dec2_2", "builtin_pet_event_deca3" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_23",
+    "equippedClothes" : "builtin_boy_event_ba2",
+    "gender" : "M",
+    "id" : 12,
+    "ownedBg" : [ "builtin_background_14", "builtin_background_23", "builtin_background_15", "builtin_background_19" ],
+    "ownedClothes" : [ "builtin_boy_42", "builtin_boy_16", "builtin_boy_event_ba2", "builtin_boy_event_ba1", "builtin_boy_1", "builtin_boy_10" ],
+    "ownedLayout" : [ "builtin_pet_dec2_12", "builtin_pet_dec2_2", "builtin_pet_dec2_1" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_19",
+    "equippedClothes" : "builtin_girl_event_ga2",
+    "gender" : "F",
+    "id" : 13,
+    "ownedBg" : [ "builtin_background_25", "builtin_background_19" ],
+    "ownedClothes" : [ "builtin_girl_6", "builtin_girl_14", "builtin_girl_13", "builtin_girl_36", "builtin_girl_1", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_4" ],
+    "ownedLayout" : [ "builtin_pet_dec2_8", "builtin_pet_dec2_3", "builtin_pet_dec2_11", "builtin_pet_dec2_13" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_25",
+    "equippedClothes" : "builtin_girl_event_ga1",
+    "gender" : "F",
+    "id" : 14,
+    "ownedBg" : [ "builtin_background_19", "builtin_background_25" ],
+    "ownedClothes" : [ "builtin_girl_10", "builtin_girl_31", "builtin_girl_7", "builtin_girl_event_ga2", "builtin_girl_event_ga1", "builtin_girl_9" ],
+    "ownedLayout" : [ "builtin_pet_dec2_6", "builtin_pet_dec2_2" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_25",
+    "equippedClothes" : "builtin_girl_8",
+    "gender" : "F",
+    "id" : 15,
+    "ownedBg" : [ "builtin_background_25", "builtin_background_19", "builtin_background_15" ],
+    "ownedClothes" : [ "builtin_girl_31", "builtin_girl_8", "builtin_girl_1", "builtin_girl_event_ga2", "builtin_girl_event_ga1" ],
+    "ownedLayout" : [ "builtin_pet_dec2_11", "builtin_pet_dec2_15" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedClothes" : "builtin_girl_27",
+    "gender" : "F",
+    "id" : 16,
+    "ownedBg" : [ "builtin_background_22" ],
+    "ownedClothes" : [ "builtin_girl_6", "builtin_girl_14", "builtin_girl_12", "builtin_girl_27", "builtin_girl_8", "builtin_girl_9", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_10", "builtin_girl_1", "builtin_girl_4" ],
+    "ownedLayout" : [ "builtin_pet_dec2_6", "builtin_pet_dec2_11", "builtin_pet_dec2_8" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_14",
+    "equippedClothes" : "builtin_girl_1",
+    "gender" : "F",
+    "id" : 17,
+    "ownedBg" : [ "builtin_background_25", "builtin_background_14", "builtin_background_15", "builtin_background_2", "builtin_background_19" ],
+    "ownedClothes" : [ "builtin_girl_30", "builtin_girl_1", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_10", "builtin_girl_6", "builtin_girl_9", "builtin_girl_38" ],
+    "ownedLayout" : [ "builtin_pet_dec2_8" ]
+  }, {
+    "equippedBg" : "builtin_background_19",
+    "equippedClothes" : "builtin_girl_event_ga1",
+    "gender" : "F",
+    "id" : 18,
+    "ownedBg" : [ "builtin_background_19", "builtin_background_15", "builtin_background_13" ],
+    "ownedClothes" : [ "builtin_girl_4", "builtin_girl_2", "builtin_girl_13", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_36", "builtin_girl_12", "builtin_girl_19", "builtin_girl_6" ],
+    "ownedLayout" : [ "builtin_pet_dec2_12", "builtin_pet_dec2_11", "builtin_pet_event_deca3" ]
+  }, {
+    "equippedBg" : "builtin_background_7",
+    "equippedClothes" : "builtin_girl_event_ga1",
+    "gender" : "F",
+    "id" : 19,
+    "ownedBg" : [ "builtin_background_7", "builtin_background_15", "builtin_background_19" ],
+    "ownedClothes" : [ "builtin_girl_4", "builtin_girl_31", "builtin_girl_35", "builtin_girl_14", "builtin_girl_8", "builtin_girl_9", "builtin_girl_event_ga1" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_24",
+    "equippedClothes" : "builtin_girl_event_ga2",
+    "gender" : "F",
+    "id" : 20,
+    "ownedBg" : [ "builtin_background_24", "builtin_background_19", "builtin_background_15", "builtin_background_18" ],
+    "ownedClothes" : [ "builtin_girl_12", "builtin_girl_1", "builtin_girl_39", "builtin_girl_6", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_9", "builtin_girl_10" ],
+    "ownedLayout" : [ "builtin_pet_dec2_4", "builtin_pet_dec2_5", "builtin_pet_dec2_11", "builtin_pet_dec2_15", "builtin_pet_dec2_2", "builtin_pet_event_deca3", "builtin_pet_dec2_14" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_19",
+    "equippedClothes" : "builtin_girl_1",
+    "gender" : "F",
+    "id" : 21,
+    "ownedBg" : [ "builtin_background_14", "builtin_background_19", "builtin_background_18" ],
+    "ownedClothes" : [ "builtin_girl_event_ga2", "builtin_girl_event_ga1", "builtin_girl_31", "builtin_girl_6", "builtin_girl_10", "builtin_girl_1", "builtin_girl_3", "builtin_girl_30", "builtin_girl_4" ],
+    "ownedLayout" : [ "builtin_pet_dec2_15", "builtin_pet_dec2_11", "builtin_pet_event_deca3" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_24",
+    "equippedClothes" : "builtin_girl_35",
+    "gender" : "F",
+    "id" : 22,
+    "ownedBg" : [ "builtin_background_24", "builtin_background_25" ],
+    "ownedClothes" : [ "builtin_girl_10", "builtin_girl_4", "builtin_girl_12", "builtin_girl_5", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_6", "builtin_girl_8", "builtin_girl_35" ],
+    "ownedLayout" : [ "builtin_pet_dec2_6", "builtin_pet_dec2_15", "builtin_pet_dec2_2", "builtin_pet_event_deca3" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_25",
+    "equippedClothes" : "builtin_girl_12",
+    "gender" : "F",
+    "id" : 23,
+    "ownedBg" : [ "builtin_background_25" ],
+    "ownedClothes" : [ "builtin_girl_13", "builtin_girl_2", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_12" ],
+    "ownedLayout" : [ "builtin_pet_dec2_14", "builtin_pet_dec2_6", "builtin_pet_dec2_8", "builtin_pet_dec2_2", "builtin_pet_event_deca3" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_7",
+    "equippedClothes" : "builtin_girl_12",
+    "gender" : "F",
+    "id" : 24,
+    "ownedBg" : [ "builtin_background_14", "builtin_background_7", "builtin_background_15" ],
+    "ownedClothes" : [ "builtin_girl_12", "builtin_girl_33", "builtin_girl_event_ga2", "builtin_girl_event_ga1", "builtin_girl_27", "builtin_girl_10", "builtin_girl_6", "builtin_girl_1" ],
+    "ownedLayout" : [ "builtin_pet_dec2_4", "builtin_pet_dec2_0", "builtin_pet_dec2_15", "builtin_pet_dec2_8" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_11",
+    "equippedClothes" : "builtin_girl_19",
+    "gender" : "F",
+    "id" : 25,
+    "ownedBg" : [ "builtin_background_11", "builtin_background_15", "builtin_background_18" ],
+    "ownedClothes" : [ "builtin_girl_30", "builtin_girl_8", "builtin_girl_33", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_19", "builtin_girl_32", "builtin_girl_25", "builtin_girl_23", "builtin_girl_39", "builtin_girl_event_ga3" ],
+    "ownedLayout" : [ "builtin_pet_dec2_12" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_24",
+    "equippedClothes" : "builtin_girl_8",
+    "gender" : "F",
+    "id" : 26,
+    "ownedBg" : [ "builtin_background_24", "builtin_background_19", "builtin_background_15", "builtin_background_25" ],
+    "ownedClothes" : [ "builtin_girl_30", "builtin_girl_26", "builtin_girl_10", "builtin_girl_event_ga2", "builtin_girl_event_ga1", "builtin_girl_25", "builtin_girl_8", "builtin_girl_12", "builtin_girl_2" ],
+    "ownedLayout" : [ "builtin_pet_dec2_11", "builtin_pet_dec2_15", "builtin_pet_dec2_3", "builtin_pet_dec2_5" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_18",
+    "equippedClothes" : "builtin_girl_2",
+    "gender" : "F",
+    "id" : 27,
+    "ownedBg" : [ "builtin_background_14", "builtin_background_15", "builtin_background_18", "builtin_background_19", "builtin_background_25", "builtin_background_24", "builtin_background_8", "builtin_background_11", "builtin_background_9", "builtin_background_23", "builtin_background_7", "builtin_background_22", "builtin_background_16", "builtin_background_1", "builtin_background_2", "builtin_background_3", "builtin_background_4", "builtin_background_5", "builtin_background_26", "builtin_background_20", "builtin_background_13", "builtin_background_10", "builtin_background_0", "builtin_background_6", "builtin_background_12", "builtin_background_17", "builtin_background_21" ],
+    "ownedClothes" : [ "builtin_girl_3", "builtin_girl_5", "builtin_girl_7", "builtin_girl_8", "builtin_girl_9", "builtin_girl_10", "builtin_girl_11", "builtin_girl_12", "builtin_girl_13", "builtin_girl_2", "builtin_girl_15", "builtin_girl_1", "builtin_girl_4", "builtin_girl_6", "builtin_girl_31", "builtin_girl_14", "builtin_girl_19", "builtin_girl_34", "builtin_girl_35", "builtin_girl_32", "builtin_girl_23", "builtin_girl_17", "builtin_girl_30", "builtin_girl_33", "builtin_girl_24", "builtin_girl_27", "builtin_girl_28", "builtin_girl_29", "builtin_girl_38", "builtin_girl_36", "builtin_girl_40", "builtin_girl_39", "builtin_girl_20", "builtin_girl_21", "builtin_girl_22", "builtin_girl_26", "builtin_girl_25", "builtin_girl_37", "builtin_girl_18", "builtin_girl_16", "builtin_girl_41", "builtin_girl_42", "builtin_girl_event_ga1", "builtin_girl_event_ga2", "builtin_girl_event_ga3" ],
+    "ownedLayout" : [ "builtin_pet_dec2_2", "builtin_pet_dec2_8", "builtin_pet_dec2_11", "builtin_pet_dec2_15", "builtin_pet_dec2_3", "builtin_pet_dec2_4", "builtin_pet_dec2_5", "builtin_pet_dec2_14", "builtin_pet_dec2_6", "builtin_pet_dec2_7", "builtin_pet_dec2_9", "builtin_pet_dec2_13", "builtin_pet_dec2_0", "builtin_pet_dec2_1", "builtin_pet_dec2_12", "builtin_pet_dec2_16", "builtin_pet_event_deca3" ]
+  }, {
+    "doneTasks" : [ "t_1790033873009_8x8q" ],
+    "equippedBg" : "builtin_background_21",
+    "equippedClothes" : "builtin_boy_event_ba2",
+    "gender" : "M",
+    "id" : 28,
+    "ownedBg" : [ "builtin_background_14", "builtin_background_15", "builtin_background_18", "builtin_background_19", "builtin_background_25", "builtin_background_24", "builtin_background_8", "builtin_background_9", "builtin_background_23", "builtin_background_11", "builtin_background_7", "builtin_background_16", "builtin_background_22", "builtin_background_1", "builtin_background_2", "builtin_background_3", "builtin_background_4", "builtin_background_5", "builtin_background_26", "builtin_background_20", "builtin_background_13", "builtin_background_10", "builtin_background_0", "builtin_background_6", "builtin_background_12", "builtin_background_17", "builtin_background_21" ],
+    "ownedClothes" : [ "builtin_boy_9", "builtin_boy_12", "builtin_boy_10", "builtin_boy_11", "builtin_boy_22", "builtin_boy_41", "builtin_boy_1", "builtin_boy_30", "builtin_boy_42", "builtin_boy_8", "builtin_boy_14", "builtin_boy_17", "builtin_boy_18", "builtin_boy_21", "builtin_boy_24", "builtin_boy_23", "builtin_boy_26", "builtin_boy_27", "builtin_boy_28", "builtin_boy_29", "builtin_boy_37", "builtin_boy_2", "builtin_boy_3", "builtin_boy_4", "builtin_boy_13", "builtin_boy_19", "builtin_boy_5", "builtin_boy_6", "builtin_boy_7", "builtin_boy_16", "builtin_boy_15", "builtin_boy_20", "builtin_boy_33", "builtin_boy_25", "builtin_boy_31", "builtin_boy_36", "builtin_boy_34", "builtin_boy_40", "builtin_boy_39", "builtin_boy_38", "builtin_boy_35", "builtin_boy_32", "builtin_boy_43", "builtin_boy_event_ba1", "builtin_boy_event_ba2", "builtin_boy_event_ba3" ],
+    "ownedLayout" : [ "builtin_pet_dec2_4", "builtin_pet_dec2_11", "builtin_pet_dec2_2", "builtin_pet_dec2_8", "builtin_pet_dec2_15", "builtin_pet_dec2_14", "builtin_pet_dec2_5", "builtin_pet_dec2_3", "builtin_pet_dec2_6", "builtin_pet_dec2_7", "builtin_pet_dec2_9", "builtin_pet_dec2_13", "builtin_pet_dec2_16", "builtin_pet_dec2_12", "builtin_pet_dec2_1", "builtin_pet_dec2_0", "builtin_pet_event_deca3" ]
+  } ],
+  "tasks" : [ {
+    "content" : "",
+    "id" : "t_1790033873009_8x8q",
+    "reward" : 30,
+    "title" : "交聯絡簿與作業"
+  } ]
+}
+

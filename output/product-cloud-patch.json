@@ -1,0 +1,194 @@
+{
+  "clothesM/46": {
+    "id": "builtin_boy_event_ba5",
+    "name": "男生活動服裝 5",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/boy/ba5.png"
+  },
+  "clothesM/47": {
+    "id": "builtin_boy_event_ba7",
+    "name": "男生活動服裝 7",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/boy/ba7.png"
+  },
+  "clothesM/48": {
+    "id": "builtin_boy_event_ba8",
+    "name": "男生活動服裝 8",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/boy/ba8.png"
+  },
+  "clothesM/49": {
+    "id": "builtin_boy_event_ba9",
+    "name": "男生活動服裝 9",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/boy/ba9.png"
+  },
+  "clothesF/45": {
+    "id": "builtin_girl_event_ga5",
+    "name": "女生活動服裝 5",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/girl/ga5.png"
+  },
+  "clothesF/46": {
+    "id": "builtin_girl_event_ga6",
+    "name": "女生活動服裝 6",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/girl/ga6.png"
+  },
+  "layouts/17": {
+    "id": "builtin_pet_event_decb_1",
+    "name": "十二月活動寵物 1",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(1).png"
+  },
+  "layouts/18": {
+    "id": "builtin_pet_event_decb_2",
+    "name": "十二月活動寵物 2",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(2).png"
+  },
+  "layouts/19": {
+    "id": "builtin_pet_event_decb_3",
+    "name": "十二月活動寵物 3",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(3).png"
+  },
+  "layouts/20": {
+    "id": "builtin_pet_event_decb_4",
+    "name": "十二月活動寵物 4",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(4).png"
+  },
+  "layouts/21": {
+    "id": "builtin_pet_event_decb_5",
+    "name": "十二月活動寵物 5",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(5).png"
+  },
+  "layouts/22": {
+    "id": "builtin_pet_event_decb_6",
+    "name": "十二月活動寵物 6",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(6).png"
+  },
+  "layouts/23": {
+    "id": "builtin_pet_event_decb_7",
+    "name": "十二月活動寵物 7",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(7).png"
+  },
+  "layouts/24": {
+    "id": "builtin_pet_event_decb_8",
+    "name": "十二月活動寵物 8",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(8).png"
+  },
+  "layouts/25": {
+    "id": "builtin_pet_event_decb_9",
+    "name": "十二月活動寵物 9",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(9).png"
+  },
+  "layouts/26": {
+    "id": "builtin_pet_event_decb_10",
+    "name": "十二月活動寵物 10",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(10).png"
+  },
+  "layouts/27": {
+    "id": "builtin_pet_event_decb_11",
+    "name": "十二月活動寵物 11",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(11).png"
+  },
+  "layouts/28": {
+    "id": "builtin_pet_event_decb_12",
+    "name": "十二月活動寵物 12",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(12).png"
+  },
+  "layouts/29": {
+    "id": "builtin_pet_event_decb_13",
+    "name": "十二月活動寵物 13",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(13).png"
+  },
+  "layouts/30": {
+    "id": "builtin_pet_event_decb_14",
+    "name": "十二月活動寵物 14",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(14).png"
+  },
+  "layouts/31": {
+    "id": "builtin_pet_event_decb_15",
+    "name": "十二月活動寵物 15",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(15).png"
+  },
+  "layouts/32": {
+    "id": "builtin_pet_event_decb_16",
+    "name": "十二月活動寵物 16",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(16).png"
+  },
+  "layouts/33": {
+    "id": "builtin_pet_event_decb_17",
+    "name": "十二月活動寵物 17",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(17).png"
+  },
+  "layouts/34": {
+    "id": "builtin_pet_event_decb_18",
+    "name": "十二月活動寵物 18",
+    "level": "活動贈送",
+    "price": 0,
+    "active": true,
+    "image": "/images/Dec2/decb%20(18).png"
+  }
+}
