@@ -600,6 +600,17 @@ test('restore skips drawing metadata without image data',async t=>{
     await h.w.importData(backupInput({...h.cloud,drawings:[drawingMeta(2)]}));
     assert.deepEqual(h.cloud.drawings,[]);assert.equal(h.artworkPayloads.size,0);assert.deepEqual(h.artworkReads,[]);
 });
+test('tablet CSS prevents pet interaction overflow and enlarges BOSS battle text',()=>{
+    const css=html;
+    assert.match(css,/@media \(min-width:701px\) and \(max-width:1024px\)/);
+    assert.match(css,/\.pet-display-row\{grid-template-columns:minmax\(180px,\.8fr\) minmax\(0,1\.4fr\)/);
+    assert.match(css,/\.pet-mood-side\{grid-column:1\/-1;grid-row:2\}/);
+    assert.match(css,/\.pet-mood-grid\{grid-template-columns:repeat\(6,minmax\(64px,1fr\)\);grid-template-rows:repeat\(2,minmax\(48px,1fr\)\)\}/);
+    assert.match(css,/\.boss-question-text\{padding:20px;font-size:27px;line-height:1\.5\}/);
+    assert.match(css,/\.boss-options button\{min-height:72px;padding:14px 16px;font-size:21px;line-height:1\.35\}/);
+    assert.match(css,/\.boss-battle-message\{min-height:30px;font-size:20px;line-height:1\.5\}/);
+});
+
 test('pet interaction keeps compact moods in its first row and opens a dedicated pet selector',async t=>{
     const h=page(t);h.cloud={...h.cloud,students:[{...h.cloud.students[0],ownedLayout:['pet'],equippedLayout:['pet']},h.cloud.students[1]]};await h.start();await h.run('openPetMood(1)');
     assert.match(h.w.document.querySelector('#modal h2').textContent,/寵物互動/);assert.doesNotMatch(h.w.document.querySelector('#modal h2').textContent,/寵物心情互動/);assert.equal(h.w.document.getElementById('petMoodReply').textContent,'我的主人，今天還沒和我互動呢！我好寂寞！');
