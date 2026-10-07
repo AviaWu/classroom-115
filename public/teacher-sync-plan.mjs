@@ -34,7 +34,7 @@ function publicDataFor(projections,uid){
     };
 }
 
-export function createTeacherSyncPlan({beforeProgress,afterProgress,command,result,uidByStudentId,clock}){
+export function createTeacherSyncPlan({beforeProgress,afterProgress,command,result,uidByStudentId,clock,compactProjections=false}){
     const beforeById=new Map((beforeProgress?.students||[]).map(item=>[item.id,item]));
     const afterById=new Map((afterProgress?.students||[]).map(item=>[item.id,item]));
     const projections=createStudentProjections(afterProgress,uidByStudentId);
@@ -62,6 +62,17 @@ export function createTeacherSyncPlan({beforeProgress,afterProgress,command,resu
         }
         if(!before||Object.keys(changes).length) studentPlans[uid]={uid,studentId,strategy:'changes',
             baseState:after,changes,clock,result:clone(result)};
+    }
+    if(compactProjections){
+        // Compare authoritative room definitions, not potentially stale UI data.
+        // Restore/initialize intentionally republish everything to repair projections.
+        const before=createStudentProjections(beforeProgress||{},uidByStudentId);
+        const force=['restore','initialize'].includes(command.type);
+        const petUids=Object.values(uidByStudentId||{}).filter(uid=>force||command.type==='resizeStudents'||!equal(before.studentPets[uid]||{},projections.studentPets[uid]||{}));
+        const publicKeys=['publicBosses','publicQuestionPapers'].filter(key=>force||!equal(before[key],projections[key]));
+        return {studentPlans,projectionMode:'changed',petUids,publicKeys,
+            studentPets:Object.fromEntries(petUids.map(uid=>[uid,projections.studentPets[uid]||{}])),
+            ...Object.fromEntries(publicKeys.map(key=>[key,projections[key]]))};
     }
     return {studentPlans,studentPets:projections.studentPets,publicBosses:projections.publicBosses,
         publicQuestionPapers:projections.publicQuestionPapers};

@@ -3500,19 +3500,28 @@ setInterval(syncScheduledTasks,30000);
     return auth.currentUser.getIdToken();
   };
   const restClient=createFirebaseRestClient({databaseURL:firebaseConfig.databaseURL,getToken});
-  const readTeacherRoot=async()=>{
-    const [room,studentRoster,studentStates,studentPets,publicBosses,publicQuestionPapers]=await Promise.all([
-      restClient.read("games/classroom-115"),restClient.read("studentRoster"),restClient.read("studentStates"),
-      restClient.read("studentPets"),restClient.read("publicBosses"),restClient.read("publicQuestionPapers")
+  const readTeacherRoot=async({includeRoom=true}={})=>{
+    const [room,studentRoster,studentStates]=await Promise.all([
+      includeRoom ? restClient.read("games/classroom-115") : undefined,
+      restClient.read("studentRoster"),restClient.read("studentStates")
     ]);
-    return {games:{"classroom-115":room},studentRoster:studentRoster||{},studentStates:studentStates||{},
-      studentPets:studentPets||{},publicBosses:publicBosses||{},publicQuestionPapers:publicQuestionPapers||{}};
+    return {games:includeRoom ? {"classroom-115":room} : {},studentRoster:studentRoster||{},studentStates:studentStates||{}};
+  };
+  // Gameplay does not need to download the entire pet collection or question bank.
+  // Fetch only projection targets recorded by the committed synchronization plan.
+  const readTeacherProjectionData=async({petUids,publicKeys})=>{
+    const [pets,publicEntries]=await Promise.all([
+      Promise.all(petUids.map(async uid=>[uid,(await restClient.read(`studentPets/${uid}`))||{}])),
+      Promise.all(publicKeys.map(async key=>[key,(await restClient.read(key))||{}]))
+    ]);
+    return {studentPets:Object.fromEntries(pets),...Object.fromEntries(publicEntries)};
   };
   const store=createFirebaseStore({
       databaseURL:firebaseConfig.databaseURL,
       getToken,getUid:()=>auth.currentUser.uid,
       now:()=>Date.now()+serverOffset,
       readRoot:readTeacherRoot,
+      readProjectionData:readTeacherProjectionData,
       readProgress:()=>restClient.read("games/classroom-115/progress"),
       readRoomMetadata:async()=> ({restoredAt:await restClient.read("games/classroom-115/restoredAt")}),
       readEquipmentCatalogues:async()=>{

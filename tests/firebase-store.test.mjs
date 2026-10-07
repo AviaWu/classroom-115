@@ -72,7 +72,12 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
     const dependencies={
         databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
         fetch:async()=>{throw new Error('unexpected REST request');},
-        readRoot:async()=>{readCalls++;await onReadRoot?.({root,call:readCalls});return clone(root);},
+        readRoot:async({includeRoom=true}={})=>{
+            readCalls++;await onReadRoot?.({root,call:readCalls});
+            return {games:includeRoom?clone(root.games):{},studentRoster:clone(root.studentRoster),studentStates:clone(root.studentStates)};
+        },
+        readProjectionData:async({petUids,publicKeys})=>({studentPets:Object.fromEntries(petUids.map(uid=>[uid,clone(root.studentPets[uid]||{})])),
+            ...Object.fromEntries(publicKeys.map(key=>[key,clone(root[key]||{})]))}),
         readProgress:async()=>{progressReads++;return clone(root.games['classroom-115'].progress);},
         readRoomMetadata:async()=>{metadataReads++;return {restoredAt:root.games['classroom-115'].restoredAt??null};},
         readEquipmentCatalogues:async()=>{catalogueReads++;const progress=root.games['classroom-115'].progress;return {
@@ -147,7 +152,7 @@ test('final coop click retains coordinated rewards and replay never pays twice',
     const request=job('coop-last',{type:'coopComplete',taskId:'coop',studentId:2});
     const result=await s.store.execute(request);
     assert.equal(result.result.claimed,true);
-    assert.equal(s.roomCalls,3);assert.equal(s.readCalls,4);assert.equal(s.studentCalls,4);
+    assert.equal(s.roomCalls,3);assert.equal(s.readCalls,3);assert.equal(s.studentCalls,4);
     assert.deepEqual(Object.values(s.root.studentStates).map(student=>student.tokens),[110,110]);
     await s.newStore().execute(request);
     await s.store.execute(job('coop-last-duplicate',{...request.command}));
@@ -163,7 +168,7 @@ test('ETag retry that becomes the final coop member switches back to reward proj
     }});
     const result=await s.store.execute(job('coop-race',{type:'coopComplete',taskId:'coop',studentId:1}));
     assert.equal(result.result.claimed,true);
-    assert.equal(s.roomCalls,2);assert.equal(s.readCalls,3);
+    assert.equal(s.roomCalls,2);assert.equal(s.readCalls,2);
     assert.equal(s.root.games['classroom-115']._projectionSync,undefined);
     assert.deepEqual(Object.values(s.root.studentStates).map(student=>student.tokens),[110,110]);
 });
@@ -532,6 +537,34 @@ test('teacher root transaction merges latest student state and atomically rebuil
     assert.equal(root.publicBosses.boss.attackPassword,'1234');
     assert.equal(root.publicQuestionPapers.paper.questions[0].id,'q');
 });
+test('compact reward projection never deletes untouched pets or public data',async()=>{
+    const s=coordinatedServer();
+    s.root.studentPets={'uid-one':{pet:{id:'pet',name:'retained'}}};
+    s.root.publicBosses={boss:{id:'boss',name:'retained'}};
+    s.root.publicQuestionPapers={paper:{id:'paper',questions:[{id:'q'}]}};
+    const before=clone({studentPets:s.root.studentPets,publicBosses:s.root.publicBosses,publicQuestionPapers:s.root.publicQuestionPapers});
+    await s.store.execute(job('small-reward',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.deepEqual({studentPets:s.root.studentPets,publicBosses:s.root.publicBosses,publicQuestionPapers:s.root.publicQuestionPapers},before);
+    assert.equal(s.root.studentStates['uid-one'].tokens,105);
+});
+test('new coordinator recovers an old full projection plan with no compact mode marker',async()=>{
+    let fail=true;
+    const s=coordinatedServer({onStudentTransaction:()=>{if(fail)throw new TypeError('offline');}});
+    const request=job('old-plan',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5});
+    await assert.rejects(s.store.execute(request),/offline/);
+    const plan=s.root.games['classroom-115']._projectionSync.plan;
+    delete plan.projectionMode;delete plan.petUids;delete plan.publicKeys;
+    plan.studentPets={'uid-one':{pet:{id:'pet',name:'old planned pet'}}};
+    plan.publicBosses={boss:{id:'boss'}};plan.publicQuestionPapers={paper:{id:'paper'}};
+    fail=false;
+    await s.newStore().execute(request);
+    assert.equal(s.root.studentStates['uid-one'].tokens,105);
+    assert.equal(s.root.studentPets['uid-one'].pet.name,'old planned pet');
+    assert.deepEqual(s.root.publicBosses,plan.publicBosses);
+    assert.deepEqual(s.root.publicQuestionPapers,plan.publicQuestionPapers);
+    assert.equal(s.root.games['classroom-115']._projectionSync,undefined);
+});
+
 test('unfinished teacher projection is recovered before another teacher command commits',async()=>{
     let unavailable=true;
     const server=coordinatedServer({onStudentTransaction:()=>{if(unavailable) throw Object.assign(new Error('offline'),{code:'database/disconnected'});}});
@@ -558,7 +591,7 @@ test('teacher resource delta merges a student reward that commits after the teac
 });
 test('teacher legacy-only gender change refreshes concurrent student state before finalizing legacy progress',async()=>{
     const progress={students:[studentsThrough28()[0]],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
-    const server=coordinatedServer({progress,onReadRoot:({root,call})=>{if(call===3) root.studentStates['uid-one'].tokens=110;}});
+    const server=coordinatedServer({progress,onReadRoot:({root,call})=>{if(call===2) root.studentStates['uid-one'].tokens=110;}});
     const outcome=await server.store.execute(job('gender-race',{type:'gender',studentId:1,gender:'F'}));
     assert.equal(outcome.progress.students[0].tokens,110);
     assert.equal(outcome.progress.students[0].gender,'F');
