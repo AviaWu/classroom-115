@@ -55,7 +55,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .coop-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:12px}
 .coop-member{border:3px solid #20263a;background:#fff;padding:6px;text-align:center;box-shadow:3px 3px 0 #172033}
 .coop-member.done{border-color:#7a1717;background:#8f2020;color:#fff;box-shadow:2px 2px 0 #4c0d0d}
-.coop-member.pending{border-color:#9a6500;background:#fff0c2;color:#533600;opacity:1}
 .coop-member img{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#F0ECE9}
 .coop-member span{display:block;font-weight:900;margin-top:4px}
 .close{float:right;background:#eee}
@@ -1796,20 +1795,6 @@ async function finishTask(id,tid){
 }
 
 //協力任務：只顯示已開始且未截止的任務；全員完成後發放全班獎勵。
-const pendingCoopClicks=new Set();
-function updateCoopPendingControls(){
-    document.querySelectorAll("button[data-coop-task]").forEach(button=>{
-        const taskId=button.dataset.coopTask,studentId=Number(button.dataset.coopStudent);
-        const task=state.coopTasks.find(item=>item.id===taskId);
-        const done=Boolean(task?.claimed||task?.completedBy?.includes(studentId));
-        const pending=pendingCoopClicks.has(`${taskId}:${studentId}`);
-        button.classList.toggle("pending",pending);
-        button.classList.toggle("done",done);
-        button.setAttribute("aria-busy",String(pending));
-        button.disabled=pending||done||!window.firebaseGameStore.canEdit();
-        button.querySelector("span").textContent=`${studentId}${pending?" 同步中":done?" ✓":""}`;
-    });
-}
 function activeCoopTasks(now=Date.now()){
     return state.coopTasks.filter(task=>!task.claimed && (!task.startAt || now>=task.startAt) && (!task.dueAt || now<=task.dueAt));
 }
@@ -1839,7 +1824,7 @@ function openCoopTask(taskId, taskButtons=""){
         const image = equipped?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
         const bgImage = eqBg?.image || "";
         const bgHtml = bgImage ? `<div class="bg-layer" style="background-image:url('${esc(bgImage)}')"></div>` : "";
-        return `<button class="coop-member ${done?"done":""}" data-coop-task="${esc(task.id)}" data-coop-student="${s.id}" ${done?"disabled":""} onclick="completeCoopMember('${esc(task.id)}',${s.id})">
+        return `<button class="coop-member ${done?"done":""}" ${done?"disabled":""} onclick="completeCoopMember('${esc(task.id)}',${s.id})">
             <div class="coop-avatar"><div class="avatar">${bgHtml}<div class="character" style="background-image:url('${esc(image)}')"></div></div></div>
             <span>${s.id}${done?" ✓":""}</span>
         </button>`;
@@ -1864,23 +1849,9 @@ function openCoopTask(taskId, taskButtons=""){
 }
 async function completeCoopMember(taskId,studentId){
     if(!canAccessStudent(studentId)) return;
-    const key=`${taskId}:${studentId}`;
-    const task=state.coopTasks.find(item=>item.id===taskId);
-    if(pendingCoopClicks.has(key)||task?.claimed||task?.completedBy?.includes(studentId)) return;
-    if(!window.firebaseGameStore.canEdit()) return runCommand({type:"coopComplete",taskId,studentId},`coop:${key}`);
-    pendingCoopClicks.add(key);
-    updateCoopPendingControls();
-    // Acknowledge the tap immediately; balances and completion remain server-authoritative.
-    const visual=document.querySelector(`[data-coop-task]`)?.dataset.coopTask===taskId ? document.getElementById("coopMonsterVisual") : null;
-    if(visual?.animate) visual.animate([{transform:"translateX(0)"},{transform:"translateX(-8px)"},{transform:"translateX(8px)"},{transform:"translateX(0)"}],{duration:350});
-    else visual?.classList.add("coop-hit");
-    try{
-        const result=await runCommand({type:"coopComplete",taskId,studentId},`coop:${key}`);
-        if(result?.claimed) alert(`恭喜同心協力打敗「${result.monsterName}」！每位成員獲得 ${result.reward} ${result.rewardType==="ticket"?"張樂透券":"代幣"}！`);
-    }finally{
-        pendingCoopClicks.delete(key);
-        updateCoopPendingControls();
-    }
+    const result=await runCommand({type:"coopComplete",taskId,studentId},`coop:${taskId}:${studentId}`);
+    if(result?.claimed) alert(`恭喜同心協力打敗「${result.monsterName}」！每位成員獲得 ${result.reward} ${result.rewardType==="ticket"?"張樂透券":"代幣"}！`);
+    else if(result) document.getElementById("coopMonsterVisual")?.classList.add("coop-hit");
 }
 
 //商店
@@ -3382,7 +3353,6 @@ function updateCloudControls(){
             delete el.dataset.cloudDisabled;
         }
     });
-    updateCoopPendingControls();
 }
 // 啟動只呈現快取；排程檢查另以明確操作在最新雲端資料上執行。
 render();

@@ -434,13 +434,11 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 await resumeProjection(root);
                 continue;
             }
-            const mapping=uidMap(root),clock=now();let settled,blocked=false,coopCommitted=false;
+            const mapping=uidMap(root),clock=now();let settled,blocked=false;
             mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{},mapping);
             command??=await prepareCommand(job.command,artwork);
             try{
                 const transaction=await transactObservedRoom(current=>{
-                    // An ETag conflict can run the updater again against a final-member click.
-                    settled=undefined;blocked=false;coopCommitted=false;
                     current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];
@@ -454,18 +452,6 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                     const outcome=applyOperation(before,command,clock);
                     if(!outcome.changed&&command.type!=='restore'){settled={progress:outcome.progress,result:outcome.result||{ok:true}};return;}
                     const result={ok:true,...outcome.result};
-                    // Non-final coop clicks only record completion in the room. No
-                    // personal balance or projection changes, so commit the receipt
-                    // atomically here rather than starting an empty projection cycle.
-                    if(command.type==='coopComplete'&&!result.claimed){
-                        coopCommitted=true;
-                        return {...current,
-                            progress:{...progressForStorage(outcome.progress,current.progress,mapping),lastSaved:new Date(clock).toISOString()},
-                            operations:{...retainedOperations(current.operations,pendingIds,clock),[job.id]:{
-                                id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,
-                                committedAt:{'.sv':'timestamp'},result:{json:JSON.stringify(result)}
-                            }},lastOperationId:job.id};
-                    }
                     const plan=createTeacherSyncPlan({beforeProgress:before,afterProgress:outcome.progress,command,result,
                         uidByStudentId:mapping,clock});
                     const receiptValue={id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,phase:'projecting',result:{json:JSON.stringify(result)}};
@@ -479,11 +465,6 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 if(settled?.error){await cleanupRejectedArtwork(artwork);throw settled.error;}
                 if(settled) return settled;
                 if(!transaction?.committed){if(blocked) continue;throw Object.assign(new Error('老師操作交易未完成，稍後會重試。'),{retryable:true});}
-                if(coopCommitted){
-                    const committed=transaction.value;
-                    return {progress:normalizeProgress(mergeStudentStatesIntoProgress(committed.progress,root.studentStates||{},mapping)),
-                        result:JSON.parse(committed.operations[job.id].result.json),studentStates:root.studentStates||{}};
-                }
                 root=(await readRoot())||{};
                 return await resumeProjection(root);
             }catch(error){throw markRetryable(error);}

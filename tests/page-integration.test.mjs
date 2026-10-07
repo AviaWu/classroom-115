@@ -380,48 +380,6 @@ test('startup and opening all student views never writes; task button commits li
     assert.equal(h.writes,0);await h.run("finishTask(1,'task')");
     assert.equal(h.cloud.students[0].tokens,220);assert.deepEqual(h.cloud.students[0].doneTasks,['task']);
 });
-test('coop tap responds immediately, survives snapshots, and suppresses repeat clicks while awaiting server',async t=>{
-    const h=page(t);await h.start();h.w.openCoopTasks('coop');
-    let resolve,calls=0;
-    h.w.firebaseGameStore={canEdit:()=>true,perform:()=>{calls++;return new Promise(done=>resolve=done);}};
-    const button=()=>h.w.document.querySelector('[data-coop-student="1"]');
-    const firstButton=button(),pending=h.w.completeCoopMember('coop',1);
-    assert.equal(button(),firstButton); // No full DOM rebuild for tap feedback.
-    assert.equal(button().disabled,true);assert.equal(button().getAttribute('aria-busy'),'true');
-    assert.match(button().textContent,/同步中/);
-    assert.equal(h.w.document.querySelector('[data-coop-student="2"]').disabled,false);
-    assert.ok(h.w.document.getElementById('coopMonsterVisual').classList.contains('coop-hit'));
-    await h.w.completeCoopMember('coop',1);assert.equal(calls,1);
-    h.w.applyCloudState({...h.cloud,lastSaved:'remote-update'});
-    assert.equal(button().disabled,true);assert.match(button().textContent,/同步中/);
-    h.w.closeModal();h.w.openCoopTasks('coop');
-    assert.equal(button().getAttribute('aria-busy'),'true');
-    const outcome=operations.applyOperation(h.cloud,{type:'coopComplete',taskId:'coop',studentId:1},Date.now());
-    h.w.applyCloudState(outcome.progress);resolve(outcome.result);await pending;
-    assert.equal(button().getAttribute('aria-busy'),'false');assert.equal(button().disabled,true);
-    assert.match(button().textContent,/✓/);assert.deepEqual(h.alerts,[]);
-});
-test('failed coop tap clears pending UI and permits a retry without claiming completion',async t=>{
-    const h=page(t);await h.start();h.w.openCoopTasks('coop');
-    let reject;
-    h.w.firebaseGameStore={canEdit:()=>true,perform:()=>new Promise((_,failed)=>reject=failed)};
-    const pending=h.w.completeCoopMember('coop',1);
-    reject(new Error('server rejected'));await pending;
-    const button=h.w.document.querySelector('[data-coop-student="1"]');
-    assert.equal(button.disabled,false);assert.equal(button.getAttribute('aria-busy'),'false');
-    assert.equal(button.classList.contains('done'),false);assert.deepEqual(h.alerts,['server rejected']);
-    assert.deepEqual(h.cloud.coopTasks[0].completedBy,[]);
-});
-test('coop reward alert waits for server confirmation and appears only once after duplicate taps',async t=>{
-    const h=page(t);await h.start();h.w.openCoopTasks('coop');
-    let resolve,calls=0;
-    h.w.firebaseGameStore={canEdit:()=>true,perform:()=>{calls++;return new Promise(done=>resolve=done);}};
-    const pending=h.w.completeCoopMember('coop',2);
-    await h.w.completeCoopMember('coop',2);
-    assert.equal(calls,1);assert.deepEqual(h.alerts,[]);
-    resolve({claimed:true,reward:10,rewardType:'token',monsterName:'Monster'});await pending;
-    assert.equal(h.alerts.length,1);assert.match(h.alerts[0],/10/);
-});
 test('NEW disappears when every unfinished task has expired',async t=>{
     const h=page(t);h.cloud={...h.cloud,tasks:[{id:'expired',title:'過期任務',reward:20,dueAt:Date.now()-1000}]};
     await h.start();
