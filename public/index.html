@@ -1761,7 +1761,9 @@ function generateScheduledCoopTasks(now=new Date()){
     return changed;
 }
 function syncScheduledTasks(){
-    if(currentUser?.role!=="teacher" || !window.firebaseGameStore.canEdit()) return Promise.resolve(false);
+    if(currentUser?.role!=="teacher" || !window.firebaseGameStore.canEdit() || !state?.students?.length) return Promise.resolve(false);
+    const preview=window.GameOperations.applyOperation(state,{type:"schedule"},Date.now());
+    if(!preview.changed) return Promise.resolve(false);
     return runCommand({type:"schedule"},"schedule");
 }
 function syncDailyTasks(){
@@ -3479,14 +3481,14 @@ setInterval(syncScheduledTasks,30000);
       getToken,getUid:()=>auth.currentUser.uid,
       now:()=>Date.now()+serverOffset,
       readRoot:readTeacherRoot,
-      readProgress:()=>restClient.read("games/classroom-115/progress"),
+      readProjectionData:async()=>{
+        const [studentRoster,studentStates]=await Promise.all([restClient.read("studentRoster"),restClient.read("studentStates")]);
+        return {studentRoster:studentRoster||{},studentStates:studentStates||{}};
+      },
       readRoomMetadata:async()=> ({restoredAt:await restClient.read("games/classroom-115/restoredAt")}),
-      readEquipmentCatalogues:async()=>{
-        const [clothesM,clothesF,backgrounds]=await Promise.all([
-          restClient.read("games/classroom-115/progress/clothesM"),restClient.read("games/classroom-115/progress/clothesF"),
-          restClient.read("games/classroom-115/progress/backgrounds")
-        ]);
-        return {clothesM:clothesM||[],clothesF:clothesF||[],backgrounds:backgrounds||[]};
+      readEquipmentCatalogues:async category=>{
+        if(!['clothesM','clothesF','backgrounds'].includes(category)) throw new Error("商品類別不正確");
+        return {[category]:(await restClient.read(`games/classroom-115/progress/${category}`))||[]};
       },
       writeRoot:updates=>update(ref(database),updates),
       transactRoom:updater=>restClient.transact("games/classroom-115",updater),
@@ -3498,16 +3500,6 @@ setInterval(syncScheduledTasks,30000);
   const subscribeProgress=createTeacherProgressSubscriber({database,getToken,ref,onValue});
   sync=createCloudSync({
       ...store,readRemote:store.readCompleteProgress,applyState:applyTeacherCloudState,lock:setSyncLocked,status:setSyncStatus,
-      execute:async(job,pendingIds)=>{
-        const outcome=await store.execute(job,pendingIds);
-        if(job.command.type==='equip'&&['clothes','background'].includes(job.command.kind)){
-          // Wardrobe writes stay scoped to one legacy student. Reuse the already
-          // displayed personal values, with no unrelated Firebase reads.
-          const personal=Object.fromEntries((teacherProgress?.students||[]).map(student=>[student.id,{...student,studentId:student.id}]));
-          return {...outcome,progress:mergeStudentStatesIntoProgress(outcome.progress,personal)};
-        }
-        return outcome;
-      },
       subscribeRemote:subscribeProgress,
       error:error=>{console.error("雲端操作失敗",error);if(!sync.canManage()) setSyncStatus(error.message);},
       newId:()=>crypto.randomUUID(),now:()=>Date.now()+serverOffset,

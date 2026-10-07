@@ -67,6 +67,40 @@ function subscriptionHarness(options={}) {
         emit:value=>onProgress(clone(value)),fail:error=>onSubscriptionError(error),tick:async()=>{tick();await Promise.resolve();}
     };
 }
+for(const eventOrder of ['before-ack','after-ack','newer-before-ack','lifecycle-change']) test(`equipment acknowledgement leaves display ordering to realtime events (${eventOrder})`,async t=>{
+    let emit,release,local,reads=0,applies=0;
+    const snapshot=(clothes,tokens=20)=>({students:[{id:1,equippedClothes:clothes,tokens},{id:2,tokens:77}],tasks:[]});
+    const sync=createCloudSync({
+        subscribeRemote:next=>{emit=next;return ()=>{};},
+        readRemote:async()=>{reads++;throw new Error('unexpected full read');},
+        execute:()=>new Promise(resolve=>release=()=>resolve({equipment:{studentId:1,field:'equippedClothes',value:'shirt'},result:{ok:true}})),
+        applyState:value=>{local=clone(value);applies++;},lock(){},status(){},error:assert.fail,
+        newId:()=> 'equipment',setInterval:()=>0,clearInterval(){},
+    });
+    t.after(()=>sync.dispose());sync.setConnected(true);emit(snapshot(null));
+    const pending=sync.perform({type:'equip',studentId:1,kind:'clothes',itemId:'shirt'});
+    if(eventOrder==='before-ack') emit(snapshot('shirt',89));
+    if(eventOrder==='newer-before-ack'){
+        emit(snapshot('shirt',89));emit(snapshot('newer-dress',95));
+    }
+    if(eventOrder==='lifecycle-change'){
+        sync.setActive(false);sync.setActive(true);emit(snapshot('new-session-dress',100));
+    }
+    const before=clone(local),appliesBefore=applies;
+    release();assert.deepEqual(await pending,{ok:true});
+    assert.deepEqual(local,before);assert.equal(applies,appliesBefore);
+    if(eventOrder==='after-ack'){emit(snapshot('shirt',89));assert.equal(local.students[0].equippedClothes,'shirt');}
+    assert.equal(local.students[1].tokens,77);assert.equal(reads,0);assert.equal(sync.hasPendingSave(),false);
+});
+test('equipment acknowledgement refreshes server state for integrations without realtime subscriptions',async t=>{
+    let local,reads=0;
+    const sync=createCloudSync({readRemote:async()=>{reads++;return progress(reads===1?20:89);},
+        execute:async()=>({equipment:{studentId:1,field:'equippedClothes',value:null},result:{ok:true}}),
+        applyState:value=>local=value,lock(){},status(){},newId:()=> 'no-stream',setInterval:()=>0,clearInterval(){}});
+    t.after(()=>sync.dispose());sync.setConnected(true);await sync.refresh();
+    await sync.perform({type:'equip',studentId:1,kind:'clothes',itemId:null});
+    assert.equal(local.students[0].tokens,89);assert.equal(reads,2);
+});
 test('a subscription snapshot verifies the connection and every later snapshot updates the page',async t=>{
     const h=subscriptionHarness();t.after(()=>h.sync.dispose());
     h.sync.setConnected(true);

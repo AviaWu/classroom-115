@@ -87,9 +87,13 @@ test('browser wardrobe wiring commits only student 28 through the server ETag tr
     vm.runInContext(moduleSource.replace(/^\s*import .*;$/gm,'')+'\nglobalThis.pageStore=store;',context);
     const outcome=await context.pageStore.execute({id:'page-equip-28',createdAt:Date.now(),command:{type:'equip',studentId:28,kind:'clothes',itemId:null}});
     assert.deepEqual(writes,['games/classroom-115/progress/students/27']);
-    assert.equal(outcome.progress.students[27].equippedClothes,null);
-    assert.equal(outcome.progress.students[26].equippedClothes,'shirt');
-    assert.ok(reads.every(path=>path.startsWith('games/classroom-115/progress/')||path==='games/classroom-115/progress'||path==='games/classroom-115/restoredAt'));
+    assert.deepEqual(outcome.equipment,{studentId:28,field:'equippedClothes',value:null});
+    assert.equal(root.games['classroom-115'].progress.students[26].equippedClothes,'shirt');
+    assert.deepEqual(reads,['games/classroom-115/restoredAt','games/classroom-115/progress/students/27']);
+    reads.length=0;
+    await context.pageStore.execute({id:'page-dress-28',createdAt:Date.now(),command:{type:'equip',studentId:28,kind:'clothes',itemId:'shirt'}});
+    assert.deepEqual(reads,['games/classroom-115/restoredAt','games/classroom-115/progress/students/27',
+        'games/classroom-115/progress/clothesM','games/classroom-115/restoredAt','games/classroom-115/progress/students/27']);
 });
 for(const order of ['progress-first','states-first']) test(`browser teacher wiring waits for complete personal data and backs up server values (${order})`,async t=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
@@ -137,6 +141,9 @@ for(const order of ['progress-first','states-first']) test(`browser teacher wiri
     await syncInstance.refresh();
     assert.equal(views.at(-1).students[0].tokens,89);
     await syncInstance.perform({type:'equip',studentId:1,kind:'clothes',itemId:'shirt'});
+    // Equipment acknowledgements do not replace the display with a stale REST snapshot.
+    assert.equal(views.at(-1).students[0].tokens,89);
+    sendStates();sendProgress();
     assert.equal(views.at(-1).students[0].equippedClothes,'shirt');
     assert.equal(views.at(-1).students[0].tokens,89);
     assert.deepEqual(writes,['games/classroom-115/progress/students/0']);
@@ -217,9 +224,16 @@ test('student sees only their pet view on a blank page and cannot open teacher f
     assert.equal(h.alerts.filter(message=>message==='點錯啦!這不是你的人物喔!').length,1);
     h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
 });
-test('scheduled tasks run only for the teacher session',async t=>{
+test('scheduled tasks run only for the teacher session when local preview finds due work',async t=>{
     const h=page(t),commands=[];
-    h.w.firebaseGameStore={canEdit:()=>true,perform:async command=>{commands.push(command);return {ok:true};}};
+    h.cloud={...h.cloud,dailyTaskTemplates:[{id:'daily',title:'每日任務',reward:1,appearTime:'00:00',dueTime:'23:59',enabled:true}]};
+    h.w.applyCloudState(h.cloud);
+    h.w.firebaseGameStore={canEdit:()=>true,perform:async command=>{
+        commands.push(command);
+        h.cloud=operations.applyOperation(h.cloud,command,Date.now()).progress;
+        h.w.applyCloudState(h.cloud);
+        return {ok:true};
+    }};
     h.signIn('student-28','9316');
     await h.w.syncScheduledTasks();
     assert.deepEqual(commands,[]);
@@ -228,6 +242,11 @@ test('scheduled tasks run only for the teacher session',async t=>{
     await h.w.syncScheduledTasks();
     assert.equal(commands.length,1);
     assert.equal(commands[0].type,'schedule');
+    for(let index=0;index<10;index++) await h.w.syncScheduledTasks();
+    assert.equal(commands.length,1);
+    h.cloud={...h.cloud,students:[]};h.w.applyCloudState(h.cloud);
+    assert.equal(await h.w.syncScheduledTasks(),false);
+    assert.equal(commands.length,1);
 });
 test('unassigned legacy account signs in to an otherwise blank page',async t=>{
     const h=page(t);await h.start();h.w.logout();h.signIn('student-29','5487');

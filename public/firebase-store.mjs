@@ -83,7 +83,7 @@ export function createTeacherProgressSubscriber(dependencies){
 
 // REST handles direct reads and artwork payloads. The teacher page serializes commands
 // in a room transaction and projects personal changes through per-student transactions.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readProjectionData,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -217,24 +217,38 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     async function executeLegacyEquipment(job){
         const command=job.command,info=legacyEquipmentInfo(command);
         if(now()-job.createdAt>24*60*60*1000) throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
-        let settled;
+        const catalogues={};
         try{
-            const [metadata,catalogues]=await Promise.all([readRoomMetadata(),readEquipmentCatalogues()]);
-            if(metadata?.restoredAt&&job.createdAt<=metadata.restoredAt) throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
-            const transaction=await transactProgressStudent(command.studentId,current=>{
-                if(!current || current.id!==command.studentId) throw new Error('這位學生已不存在，請重新整理成員名單');
-                if(command.itemId!==null && (typeof command.itemId!=='string' || !Array.isArray(current[info.owned]) || !current[info.owned].includes(command.itemId))) throw new Error('衣櫃尚未擁有這項商品');
-                const catalogue=command.kind==='clothes' ? (current.gender==='M'?catalogues?.clothesM:catalogues?.clothesF) : catalogues?.backgrounds;
-                if(command.itemId!==null&&(!Array.isArray(catalogue)||!catalogue.some(item=>item?.id===command.itemId))) throw new Error('這項商品已不存在');
-                settled={result:{ok:true}};
-                if(current[info.equipped]===command.itemId) return;
-                return {...current,[info.equipped]:command.itemId};
-            });
-            if(!transaction?.committed&&!settled) throw Object.assign(new Error('衣櫃裝備交易未完成，稍後會重試。'),{retryable:true});
-            const value=await readProgress();
-            const progress=normalizeStoredProgress(value);
-            if(value!==null&&!progress?.students.length) throw new Error('雲端資料格式不正確：缺少成員，已停止操作。');
-            return {progress,result:settled?.result||{ok:true}};
+            // Discover the category from the server student, never from UI gender.
+            // A no-op discovery reads only this student; ETag retries revalidate it.
+            for(let attempt=0;attempt<3;attempt++){
+                const metadata=await readRoomMetadata();
+                if(metadata?.restoredAt&&job.createdAt<=metadata.restoredAt) throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
+                let settled=false,neededCategory;
+                const transaction=await transactProgressStudent(command.studentId,current=>{
+                    settled=false;neededCategory=undefined;
+                    if(!current || current.id!==command.studentId) throw new Error('這位學生已不存在，請重新整理成員名單');
+                    if(command.itemId!==null){
+                        if(typeof command.itemId!=='string' || !Array.isArray(current[info.owned]) || !current[info.owned].includes(command.itemId)) throw new Error('衣櫃尚未擁有這項商品');
+                        const category=command.kind==='clothes' ? (current.gender==='M'?'clothesM':'clothesF') : 'backgrounds';
+                        if(!Object.hasOwn(catalogues,category)){neededCategory=category;return;}
+                        const catalogue=catalogues[category];
+                        if(!Array.isArray(catalogue)||!catalogue.some(item=>item?.id===command.itemId)) throw new Error('這項商品已不存在');
+                    }
+                    settled=true;
+                    if(current[info.equipped]===command.itemId) return;
+                    return {...current,[info.equipped]:command.itemId};
+                });
+                if(neededCategory){
+                    catalogues[neededCategory]=(await readEquipmentCatalogues(neededCategory))?.[neededCategory]||[];
+                    continue;
+                }
+                if(!transaction?.committed&&!settled) throw Object.assign(new Error('衣櫃裝備交易未完成，稍後會重試。'),{retryable:true});
+                // This is an acknowledgement, not a new classroom snapshot.
+                // The ordered realtime stream owns display updates across devices.
+                return {equipment:{studentId:command.studentId,field:info.equipped,value:command.itemId},result:{ok:true}};
+            }
+            throw Object.assign(new Error('衣櫃資料持續變更，稍後會重試。'),{retryable:true});
         }catch(error){throw markRetryable(error);}
     }
     async function readReceipt(id){
@@ -388,7 +402,9 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         const states=Object.fromEntries(applied.map(entry=>[entry.uid,entry.state]).filter(([,state])=>state));
         const updates=projectionUpdates(root,plan,syncPlan.uidByStudentId||{});
         try{if(Object.keys(updates).length) await writeRoot(updates);}catch(error){throw markRetryable(error);}
-        const latestRoot=(await readRoot())||{};
+        // Only authoritative personal state and UID mapping are needed here.
+        // The final ETag transaction itself reads the newest room.
+        const latestRoot=(await (readProjectionData||readRoot)())||{};
         const latestStates=latestRoot.studentStates||states;
         const fallbackRoom=latestRoot.games?.['classroom-115']||room;
         const conditionalResult=syncPlan.resultUid?applied.find(entry=>entry.uid===syncPlan.resultUid)?.result:null;
@@ -439,6 +455,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             command??=await prepareCommand(job.command,artwork);
             try{
                 const transaction=await transactObservedRoom(current=>{
+                    settled=undefined;blocked=false;
                     current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];
@@ -465,7 +482,8 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 if(settled?.error){await cleanupRejectedArtwork(artwork);throw settled.error;}
                 if(settled) return settled;
                 if(!transaction?.committed){if(blocked) continue;throw Object.assign(new Error('老師操作交易未完成，稍後會重試。'),{retryable:true});}
-                root=(await readRoot())||{};
+                if(!transaction.value?._projectionSync) throw Object.assign(new Error('老師操作交易回應不完整，稍後會重試。'),{retryable:true});
+                root={...root,games:{...root.games,'classroom-115':transaction.value}};
                 return await resumeProjection(root);
             }catch(error){throw markRetryable(error);}
         }
@@ -473,7 +491,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     }
     async function execute(job,pendingIds=[]){
         const artwork=preflightArtwork(job.command);
-        if(legacyEquipmentInfo(job.command)&&typeof transactProgressStudent==='function'&&typeof readProgress==='function'&&typeof readRoomMetadata==='function'&&typeof readEquipmentCatalogues==='function') return executeLegacyEquipment(job);
+        if(legacyEquipmentInfo(job.command)&&typeof transactProgressStudent==='function'&&typeof readRoomMetadata==='function'&&typeof readEquipmentCatalogues==='function') return executeLegacyEquipment(job);
         if(readRoot&&writeRoot&&transactRoom&&transactStudentState) return executeCoordinated(job,pendingIds,artwork);
         if(transactRoot||transactRoom) return executeSdkTransaction(job,pendingIds,artwork);
         let command;

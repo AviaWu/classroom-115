@@ -55,7 +55,7 @@ function sdkServer(options={}) {
         now:options.now||(()=>100000),fetch:async(...args)=>{fetchCalls.push(args);throw new Error('unexpected REST request');},transactRoom});
     return {store,get room(){return room;},set room(value){room=clone(value);},get transactions(){return transactions;},fetchCalls};
 }
-function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRoomTransaction,onStudentTransaction,afterStudentTransaction,coldRoomCalls=[]}={}){
+function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onReadProjectionData,onRoomTransaction,onProgressStudentTransaction,onStudentTransaction,afterStudentTransaction,coldRoomCalls=[]}={}){
     const defaultStudent={id:1,gender:'M',tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',doneTasks:[],
         ownedClothes:[],equippedClothes:null,ownedLayout:[],equippedLayout:[],ownedBg:[],equippedBg:null,bossProgress:[]};
     const defaultState={studentId:1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]};
@@ -63,7 +63,7 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         games:{'classroom-115':{progress:progress||{students:[defaultStudent],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]},operations:{}}},
         studentRoster:studentRoster||{'uid-one':{studentId:1,active:true}},
         studentStates:studentStates||{'uid-one':defaultState},studentPets:{},publicBosses:{},publicQuestionPapers:{},
-    },studentCalls=0,roomCalls=0,readCalls=0,progressReads=0,metadataReads=0,catalogueReads=0,progressStudentCalls=0,progressStudentIds=[],roomReady=false,roomObservationStops=0;
+    },studentCalls=0,roomCalls=0,readCalls=0,projectionReads=0,progressReads=0,metadataReads=0,catalogueReads=0,categories=[],progressStudentCalls=0,progressStudentIds=[],roomReady=false,roomObservationStops=0;
     const setPath=(path,value)=>{
         const parts=path.split('/'),last=parts.pop();let target=root;
         for(const part of parts) target=target[part]??={};
@@ -73,11 +73,10 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         databaseURL:'https://fake.test',getToken:async()=>'token',getUid:()=> 'teacher',now:()=>100000,
         fetch:async()=>{throw new Error('unexpected REST request');},
         readRoot:async()=>{readCalls++;await onReadRoot?.({root,call:readCalls});return clone(root);},
+        readProjectionData:async()=>{projectionReads++;await onReadProjectionData?.({root,call:projectionReads});return clone({studentRoster:root.studentRoster,studentStates:root.studentStates});},
         readProgress:async()=>{progressReads++;return clone(root.games['classroom-115'].progress);},
         readRoomMetadata:async()=>{metadataReads++;return {restoredAt:root.games['classroom-115'].restoredAt??null};},
-        readEquipmentCatalogues:async()=>{catalogueReads++;const progress=root.games['classroom-115'].progress;return {
-            clothesM:clone(progress.clothesM||[]),clothesF:clone(progress.clothesF||[]),backgrounds:clone(progress.backgrounds||[]),
-        };},
+        readEquipmentCatalogues:async category=>{catalogueReads++;categories.push(category);return {[category]:clone(root.games['classroom-115'].progress[category]||[])};},
         observeRoom: coldRoomCalls.length ? ready=>{
             let stopped=false;
             queueMicrotask(()=>{if(!stopped){roomReady=true;ready();}});
@@ -93,6 +92,7 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         },
         transactProgressStudent:async(studentId,update)=>{
             progressStudentCalls++;progressStudentIds.push(studentId);
+            await onProgressStudentTransaction?.({root,call:progressStudentCalls,update});
             const students=root.games['classroom-115'].progress.students;
             const current=clone(students[studentId-1]??null),next=update(current);
             if(next===undefined) return {committed:false,value:current};
@@ -109,7 +109,7 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         writeRoot:async updates=>{for(const [path,value] of Object.entries(updates)) setPath(path,value);},
     };
     return {store:createFirebaseStore(dependencies),newStore:()=>createFirebaseStore(dependencies),
-        get root(){return root;},get roomCalls(){return roomCalls;},get studentCalls(){return studentCalls;},get readCalls(){return readCalls;},
+        get root(){return root;},get roomCalls(){return roomCalls;},get studentCalls(){return studentCalls;},get readCalls(){return readCalls;},get projectionReads(){return projectionReads;},get categories(){return categories;},
         get progressReads(){return progressReads;},get metadataReads(){return metadataReads;},get catalogueReads(){return catalogueReads;},get progressStudentCalls(){return progressStudentCalls;},get progressStudentIds(){return progressStudentIds;},get roomObservationStops(){return roomObservationStops;}};
 }
 const clone=value=>structuredClone(value);
@@ -493,7 +493,7 @@ test('teacher resource delta merges a student reward that commits after the teac
 });
 test('teacher legacy-only gender change refreshes concurrent student state before finalizing legacy progress',async()=>{
     const progress={students:[studentsThrough28()[0]],clothesM:[],clothesF:[],layouts:[],backgrounds:[],bosses:[],questionPapers:[]};
-    const server=coordinatedServer({progress,onReadRoot:({root,call})=>{if(call===3) root.studentStates['uid-one'].tokens=110;}});
+    const server=coordinatedServer({progress,onReadProjectionData:({root})=>{root.studentStates['uid-one'].tokens=110;}});
     const outcome=await server.store.execute(job('gender-race',{type:'gender',studentId:1,gender:'F'}));
     assert.equal(outcome.progress.students[0].tokens,110);
     assert.equal(outcome.progress.students[0].gender,'F');
@@ -542,6 +542,41 @@ test('lost acknowledgement after student transaction resumes from marker without
     assert.equal(server.root.studentStates['uid-one'].tokens,105);
     assert.equal(server.root.studentStates['uid-one']._teacherOperation,undefined);
 });
+test('teacher rewards use one complete read and one scoped authoritative refresh without compacting the plan',async()=>{
+    let plan;
+    const server=coordinatedServer({onReadProjectionData:({root})=>{
+        plan=clone(root.games['classroom-115']._projectionSync.plan);
+        root.studentStates['uid-one'].tokens+=7;
+    }});
+    const outcome=await server.store.execute(job('read-budget',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5}));
+    assert.equal(outcome.progress.students[0].tokens,112);
+    assert.equal(server.readCalls,1);assert.equal(server.projectionReads,1);assert.equal(server.roomCalls,2);
+    assert.deepEqual(Object.keys(plan).sort(),['studentPlans','studentPets','publicBosses','publicQuestionPapers'].sort());
+    assert.equal(server.root.studentStates['uid-one']._teacherOperation,undefined);
+});
+test('equipment rechecks server gender and ownership after catalogue discovery and transaction retry',async()=>{
+    const student={...studentsThrough28()[0],ownedClothes:['shared']};
+    const server=coordinatedServer({progress:{students:[student],clothesM:[{id:'shared'}],clothesF:[{id:'shared'}]},
+        onProgressStudentTransaction:({root,call,update})=>{
+            if(call!==2)return;
+            // First updater proposes male clothing; a simulated ETag conflict
+            // then retries against the newest female record.
+            const current=root.games['classroom-115'].progress.students[0];
+            assert.equal(update(clone(current)).equippedClothes,'shared');
+            current.gender='F';
+        }});
+    const outcome=await server.store.execute(job('gender-equipment-race',{type:'equip',studentId:1,kind:'clothes',itemId:'shared'}));
+    assert.deepEqual(server.categories,['clothesM','clothesF']);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].gender,'F');
+    assert.equal(outcome.equipment.value,'shared');assert.equal(server.progressReads,0);
+});
+test('equipment refuses lost ownership after catalogue discovery without writing a stale student',async()=>{
+    const server=coordinatedServer({progress:{students:[{...studentsThrough28()[0],ownedClothes:['shirt']}],clothesM:[{id:'shirt'}]},
+        onProgressStudentTransaction:({root,call})=>{if(call===2)root.games['classroom-115'].progress.students[0].ownedClothes=[];}});
+    await assert.rejects(server.store.execute(job('lost-ownership',{type:'equip',studentId:1,kind:'clothes',itemId:'shirt'})),/衣櫃尚未擁有/);
+    assert.equal(server.root.games['classroom-115'].progress.students[0].equippedClothes,null);
+    assert.equal(server.progressReads,0);
+});
 test('teacher clothing and background equipment transact only the selected legacy student',async()=>{
     const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt',ownedBg:['bg']}),
         clothesM:[{id:'shirt',name:'服裝',level:'R',price:40,active:true}],clothesF:[],layouts:[],
@@ -552,13 +587,14 @@ test('teacher clothing and background equipment transact only the selected legac
     await server.store.execute(job('coordinated-background-28',{type:'equip',studentId:28,kind:'background',itemId:'bg'}));
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedBg,'bg');
-    assert.deepEqual(server.progressStudentIds,[28,28]);
+    assert.deepEqual(server.progressStudentIds,[28,28,28]);
     assert.equal(server.roomCalls,0);
     assert.equal(server.studentCalls,0);
     assert.equal(server.readCalls,0);
-    assert.equal(server.progressReads,2);
-    assert.equal(server.metadataReads,2);
-    assert.equal(server.catalogueReads,2);
+    assert.equal(server.progressReads,0);
+    assert.equal(server.metadataReads,3);
+    assert.equal(server.catalogueReads,1);
+    assert.deepEqual(server.categories,['backgrounds']);
     assert.equal(server.root.games['classroom-115']._projectionSync,undefined);
     assert.deepEqual(server.root.games['classroom-115'].operations,{});
 });
@@ -577,7 +613,7 @@ test('teacher direct equipment rejects an owned item removed from its catalogue'
     const server=coordinatedServer({progress});
     await assert.rejects(server.store.execute(job('removed-direct-equip',{type:'equip',studentId:1,kind:'clothes',itemId:'shirt'})),/這項商品已不存在/);
     assert.equal(server.root.games['classroom-115'].progress.students[0].equippedClothes,null);
-    assert.equal(server.progressStudentCalls,1);
+    assert.equal(server.progressStudentCalls,2);
 });
 test('student 28 equipment bypasses a cold room cache',async()=>{
     const progress={students:studentsThrough28({ownedClothes:['shirt'],equippedClothes:'shirt'}),
@@ -586,7 +622,8 @@ test('student 28 equipment bypasses a cold room cache',async()=>{
         studentStates:{'uid-28':{studentId:28,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}},
         coldRoomCalls:[1]});
     const outcome=await server.store.execute(job('cold-room-unequip-28',{type:'equip',studentId:28,kind:'clothes',itemId:null}));
-    assert.equal(outcome.progress.students[27].equippedClothes,null);
+    assert.deepEqual(outcome.equipment,{studentId:28,field:'equippedClothes',value:null});
+    assert.equal(Object.hasOwn(outcome,'progress'),false);
     assert.equal(server.root.games['classroom-115'].progress.students[27].equippedClothes,null);
     assert.equal(server.roomCalls,0);
     assert.equal(server.roomObservationStops,0);
@@ -602,6 +639,24 @@ test('cold room observation stops when the teacher transaction fails',async()=>{
     const server=coordinatedServer({coldRoomCalls:[1],onRoomTransaction:()=>{throw new Error('transaction failed');}});
     await assert.rejects(server.store.execute(job('failed-observed-room',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),/transaction failed/);
     assert.equal(server.roomObservationStops,1);
+});
+test('cooperative completion retains the full coordinator and awards the class once with fewer reads',async()=>{
+    const progress={students:studentsThrough28().slice(0,2),coopTasks:[{id:'coop',monsterName:'怪獸',reward:10,rewardType:'token',completedBy:[],claimed:false}]};
+    const studentRoster={one:{studentId:1,active:true},two:{studentId:2,active:true}};
+    const studentStates=Object.fromEntries(Object.entries(studentRoster).map(([uid,{studentId}])=>[uid,
+        {studentId,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]} ]));
+    const server=coordinatedServer({progress,studentRoster,studentStates});
+    const first=await server.store.execute(job('coop-first',{type:'coopComplete',studentId:1,taskId:'coop'}));
+    assert.equal(first.result.claimed,false);assert.equal(server.roomCalls,2);
+    assert.equal(server.readCalls,1);assert.equal(server.projectionReads,1);
+    const finalJob=job('coop-final',{type:'coopComplete',studentId:2,taskId:'coop'});
+    const last=await server.store.execute(finalJob);
+    assert.equal(last.result.claimed,true);assert.equal(server.roomCalls,4);
+    assert.equal(server.readCalls,2);assert.equal(server.projectionReads,2);
+    assert.deepEqual(last.progress.students.map(student=>student.tokens),[110,110]);
+    const replay=await server.newStore().execute(finalJob);
+    assert.deepEqual(replay.progress.students.map(student=>student.tokens),[110,110]);
+    assert.equal(server.roomCalls,4);
 });
 test('coordinated teacher flow projects purchases, lottery, and task rewards',async()=>{
     const cases=[
@@ -621,6 +676,9 @@ test('coordinated teacher flow projects purchases, lottery, and task rewards',as
         assert.equal(server.root.games['classroom-115'].progress.students[0].tokens,100,entry.id);
         assert.equal(outcome.progress.students[0].tokens,entry.tokens,entry.id);
         entry.verify(server.root);
+        assert.equal(server.readCalls,1,entry.id);
+        assert.equal(server.projectionReads,1,entry.id);
+        assert.equal(server.roomCalls,2,entry.id);
     }
 });
 test('coordinated resize deletes removed projections and preserves roster mappings',async()=>{

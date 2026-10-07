@@ -65,7 +65,15 @@ export function createCloudSync(io) {
                 try{
                     const outcome=await io.execute(job,jobs.map(item=>item.id));
                     writeEpoch++;
-                    apply(outcome.progress,outcome.studentStates);
+                    if(outcome.equipment){
+                        // REST acknowledgements and SDK events have no shared revision.
+                        // Never replace an ordered stream with an equipment response:
+                        // it may arrive after another device changed the same field.
+                        if(!io.subscribeRemote){
+                            const ticket=epoch,value=await io.readRemote();
+                            if(ticket===epoch && connected && active) apply(value);
+                        }
+                    }else apply(outcome.progress,outcome.studentStates);
                     settle(job,null,outcome.result);
                 }catch(error){
                     writeEpoch++;
