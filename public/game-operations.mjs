@@ -1,3 +1,5 @@
+import {validateCoopBatch} from './coop-batch.mjs';
+
 /** Pure domain operations. Call again with the latest transaction snapshot on every retry. */
 const RECORD_COLLECTIONS = ['students','tasks','clothesM','clothesF','layouts','backgrounds','questionPapers','bosses',
     'coopTasks','coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates'];
@@ -454,6 +456,28 @@ export function applyOperation(value,command,now = Date.now()) {
         const boss = progress.bosses.find(item=>item.id === command.bossId);
         if (!boss) throw new Error('BOSS 不存在');
         for (const student of progress.students) student.bossProgress = student.bossProgress.filter(item=>item.bossId !== boss.id);
+        break;
+    }
+    case 'coopCompleteBatch': {
+        validateCoopBatch(command);
+        // Validate ALL members before applying any. Invalid/deleted members reject
+        // the whole transaction, even when another member already completed.
+        for(const entry of command.members) member(progress,entry.studentId);
+        const task=progress.coopTasks.find(item=>item.id===command.taskId);
+        if(!task) throw new Error('這項協力任務已不存在');
+        const results=[];
+        for(const entry of command.members){
+            const latest=progress.coopTasks.find(item=>item.id===command.taskId);
+            let memberResult;
+            if(latest.claimed||latest.completedBy.includes(entry.studentId)){
+                memberResult={claimed:false,reward:rewardFor(latest),rewardType:latest.rewardType==='ticket'?'ticket':'token',monsterName:latest.monsterName||''};
+            }else{
+                const outcome=applyOperation(progress,{type:'coopComplete',taskId:command.taskId,studentId:entry.studentId},now);
+                progress=outcome.progress;memberResult=outcome.result;
+            }
+            results.push({id:entry.id,result:{ok:true,...memberResult}});
+        }
+        result={...results[0].result,claimed:results.some(entry=>entry.result.claimed),members:results};
         break;
     }
     case 'coopComplete': {

@@ -1914,6 +1914,13 @@ function refreshCoopView(){
     if(!activeCoopTasks().length && !document.querySelector(".coop-layout")) return;
     openCoopTasks(id);
 }
+const notifiedCoopResults=new WeakSet();
+function notifyCoopReward(result){
+    // A live member handler and a backend retry can share the same promise.
+    if(!result?.claimed || notifiedCoopResults.has(result)) return;
+    notifiedCoopResults.add(result);
+    alert(`恭喜同心協力打敗「${result.monsterName}」！每位成員獲得 ${result.reward} ${result.rewardType==="ticket"?"張樂透券":"代幣"}！`);
+}
 async function completeCoopMember(taskId,studentId){
     if(!requireTeacherFeature() || !canAccessStudent(studentId)) return;
     const task=state.coopTasks.find(t=>t.id===taskId),key=coopControlKey(taskId,studentId);
@@ -1930,7 +1937,7 @@ async function completeCoopMember(taskId,studentId){
     try{
         const result=await store.perform({type:"coopComplete",taskId,studentId},`coop:${taskId}:${studentId}`);
         if(!stillHere()) return;
-        if(result?.claimed && visual) alert(`恭喜同心協力打敗「${result.monsterName}」！每位成員獲得 ${result.reward} ${result.rewardType==="ticket"?"張樂透券":"代幣"}！`);
+        if(result?.claimed && visual) notifyCoopReward(result);
         else if(result && visual?.isConnected && currentView?.id===taskId) visual.classList.add("coop-hit");
     }catch(error){
         if(stillHere()) alert(error.message==="離線中"?"目前無法連線，請確認網路後重試。":error.message||"操作未完成，請確認最新資料後重試。");
@@ -3355,13 +3362,18 @@ async function importData(input){
     finally{input.value="";}
 }
 
+const pendingRetryUi=new Set();
 async function retryPendingAction(id){
-    if(!backendAuthenticated) return;
+    if(!backendAuthenticated || pendingRetryUi.has(id)) return;
     const job=window.firebaseGameStore.pendingActions().find(item=>item.id===id);
     if(!job) return;
     if(["restore","initialize"].includes(job.command.type) && !confirm("將查證並完成上次已確認的還原／初始化操作，使用上次選擇的資料。確定？")) return;
-    await runCommand(job.command,job.key);
-    refreshVisibleView();
+    pendingRetryUi.add(id);
+    try{
+        const result=await runCommand(job.command,job.key);
+        if(job.command.type==="coopComplete") notifyCoopReward(result);
+        refreshVisibleView();
+    }finally{pendingRetryUi.delete(id);}
 }
 async function initializeCloud(){
     if(!backendAuthenticated || !window.firebaseGameStore.canManage()) return;
@@ -3618,6 +3630,7 @@ setInterval(syncScheduledTasks,30000);
       pendingChanged:()=>window.updateCoopMemberControls?.(),
       recovered:(command,result)=>{
           if(command.type==="lottery" && result?.item) showLotteryResult(result.item,`上次抽獎結果：${result.item.name}${result.duplicate?"，重複商品已返還 20 代幣":""}`);
+          if(command.type==="coopComplete") notifyCoopReward(result);
       }
   });
   window.firebaseGameStore=sync;

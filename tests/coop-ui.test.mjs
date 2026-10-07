@@ -17,16 +17,16 @@ const moduleSource=scripts.find(([,attrs])=>attrs.includes('module'))[2].replace
 const clone=structuredClone,roomPath='games/classroom-115',pendingKey='classroom-pending-operations';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
-function fixture(){
+function fixture(count=3){
     const progress=operations.normalizeProgress({
-        students:[1,2,3].map(id=>({id,gender:'M',tokens:100,lotteryTickets:2,equippedClothes:'shirt',equippedBg:'bg'})),
+        students:Array.from({length:count},(_,i)=>i+1).map(id=>({id,gender:'M',tokens:100,lotteryTickets:2,equippedClothes:'shirt',equippedBg:'bg'})),
         clothesM:[{id:'shirt',name:'上衣',image:'/fixture/shirt.png',level:'R'}],
         clothesF:[{id:'shirt',name:'女裝',image:'/fixture/dress.png',level:'SSR'}],
         backgrounds:[{id:'bg',name:'背景',image:'/fixture/bg.png'}],
         tasks:[{id:'task',title:'個人任務',reward:5}],
         coopTasks:['a','b'].map(id=>({id,monsterName:'怪獸 '+id,monsterImage:'/fixture/'+id+'.png',content:'合作',reward:10,rewardType:'token',completedBy:[],claimed:false})),
     });
-    const projections=createStudentProjections(progress,{1:'uid-1',2:'uid-2',3:'uid-3'});
+    const projections=createStudentProjections(progress,Object.fromEntries(progress.students.map(s=>[s.id,`uid-${s.id}`])));
     for(const s of progress.students)for(const key of ['tokens','lotteryTickets','petAffection','lastPetMoodDate','equippedLayout','bossProgress'])delete s[key];
     return {games:{'classroom-115':{progress,operations:{}}},...projections};
 }
@@ -73,7 +73,7 @@ async function page(t,{root=fixture(),pending=[],hooks={}}={}){
         createFirebaseRestClient:config=>createFirebaseRestClient({...config,fetch:request}),
         createFirebaseStore:config=>{dependencies={...config,fetch:request};store=createFirebaseStore(dependencies);return store;},
         createCloudSync:config=>sync=createCloudSync({...config,
-            execute:job=>{executions.push(clone(job.command));return config.execute(job);},
+            execute:(job,ids)=>{executions.push(clone(job.command));return config.execute(job,ids);},
             newId:()=>`ui-${++id}`,setInterval:(fn,delay)=>{timers.push(delay);return timers.length;},clearInterval(){},error:error=>errors.push(error)}),
     });
     vm.runInContext('{\n'+moduleSource+'\n}',dom.getInternalVMContext());
@@ -339,4 +339,55 @@ test('unknown invalid-JSON committed response retains pending ID and recovers wi
     const id=h.sync.pendingActions()[0].id;assert.match(h.member(1).textContent,/待確認/);
     assert.equal(h.alerts.length,0);await h.snapshot();await operation;await h.drain();
     assert.equal(h.puts.length,1);assert.ok(h.get(roomPath).operations[id]);assert.match(h.member(1).textContent,/✓/);
+});
+
+test('five real page clicks retain every pending DOM node and send only singleton plus four-member batch',async t=>{
+    const firstGate=deferred(),batchGate=deferred();let count=0;
+    const h=await page(t,{root:fixture(6),hooks:{beforePut:async({path})=>{if(path===roomPath){count++;await (count===1?firstGate:batchGate).promise;}}}});
+    const before=nodes(h),watch=watchImages(h),timers=[...h.timers],subscriptions=[...h.subscriptions];
+    const first=h.w.completeCoopMember('a',1);assert.equal(h.executions.length,1);
+    const rest=[2,3,4,5].map(id=>h.w.completeCoopMember('a',id));
+    for(let id=1;id<=5;id++){assert.match(h.member(id).textContent,/待確認/);assert.equal(h.member(id).disabled,true);}
+    assertSameNodes(h,before);firstGate.resolve();await first;await tick();
+    assert.equal(h.executions.length,2);assert.equal(h.executions[1].type,'coopCompleteBatch');
+    for(let id=2;id<=5;id++)assert.match(h.member(id).textContent,/待確認/);
+    h.w.updateCloudControls();assertSameNodes(h,before);assert.equal(h.member(6).disabled,false);
+    batchGate.resolve();await Promise.all(rest);await h.drain();
+    assertSameNodes(h,before);assert.equal(h.reads.length,8);assert.equal(h.puts.length,2);assert.equal(h.alerts.length,0);
+    assert.deepEqual(h.timers,timers);assert.deepEqual(h.subscriptions,subscriptions);assert.deepEqual(watch.imageIntents(),[]);watch.stop();
+});
+test('final batch resolves per student and displays a single reward alert',async t=>{
+    const gate=deferred();let once=true;const h=await page(t,{root:fixture(5),hooks:{beforePut:async()=>{if(once){once=false;await gate.promise;}}}});
+    const actions=[1,2,3,4,5].map(id=>h.w.completeCoopMember('a',id));gate.resolve();await Promise.all(actions);await h.drain();
+    assert.equal(h.executions.length,2);assert.equal(h.executions[1].members.length,4);assert.equal(h.alerts.length,1);
+    assert.match(h.alerts[0],/恭喜/);for(const s of Object.values(h.root.studentStates))assert.equal(s.tokens,110);
+    await h.snapshot();assert.equal(h.alerts.length,1);
+});
+function savedBatch(){
+    const createdAt=Date.now(),members=[2,3].map(studentId=>({id:`saved-${studentId}`,key:`coop:a:${studentId}`,createdAt,command:{type:'coopComplete',taskId:'a',studentId}}));
+    return {id:members[0].id,key:members[0].key,createdAt,started:true,members,command:{type:'coopCompleteBatch',taskId:'a',members:members.map(m=>({id:m.id,createdAt:m.createdAt,studentId:m.command.studentId}))}};
+}
+test('reload frozen batch only queries transport receipt, keeps per-student pending, and recovers one alert',async t=>{
+    const saved=savedBatch(),root=fixture();root.games['classroom-115'].progress.coopTasks[0].completedBy=[1];
+    const h=await page(t,{root,pending:[saved]});assert.equal(h.executions.length,0);
+    assert.deepEqual(h.reads,[roomPath+'/operations/saved-2']);
+    for(const id of [2,3])assert.match(h.member(id).textContent,/待確認/);
+    h.w.openCoopTasks('b');h.w.openCoopTasks('a');for(const id of [2,3])assert.match(h.member(id).textContent,/待確認/);
+    await h.store.execute(saved);await h.sync.flush();await tick();
+    assert.equal(h.alerts.length,1);assert.equal(h.sync.pendingActions().length,0);assert.equal(h.executions.length,0);
+    assert.equal(h.reads.filter(path=>path.includes('/operations/')).length,2);
+    await h.sync.flush();assert.equal(h.alerts.length,1);
+});
+for(const memberId of [2,3])test(`backend retry through frozen batch member ${memberId} retries whole batch and alerts once`,async t=>{
+    const saved=savedBatch(),root=fixture();root.games['classroom-115'].progress.coopTasks[0].completedBy=[1];
+    const h=await page(t,{root,pending:[saved]});h.w.eval('backendAuthenticated=true');
+    await Promise.all([h.w.retryPendingAction(`saved-${memberId}`),h.w.retryPendingAction(`saved-${memberId}`)]);await h.drain();
+    assert.equal(h.executions.length,1);assert.deepEqual(h.executions[0],saved.command);assert.equal(h.alerts.length,1);
+    assert.equal(h.sync.pendingActions().length,0);for(const s of Object.values(h.root.studentStates))assert.equal(s.tokens,110);
+});
+test('live coop and backend handlers sharing a member result cannot display reward twice',async t=>{
+    const gate=deferred();let once=true;const root=fixture();root.games['classroom-115'].progress.coopTasks[0].completedBy=[1,2];
+    const h=await page(t,{root,hooks:{beforePut:async()=>{if(once){once=false;await gate.promise;}}}});h.w.eval('backendAuthenticated=true');
+    const live=h.w.completeCoopMember('a',3),retry=h.w.retryPendingAction(h.sync.pendingActions()[0].id);
+    gate.resolve();await Promise.all([live,retry]);await h.drain();assert.equal(h.alerts.length,1);
 });

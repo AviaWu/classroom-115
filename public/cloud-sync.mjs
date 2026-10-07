@@ -1,3 +1,5 @@
+import {batchResultFor,freezeCoopBatch,pendingMembers,queuedCoopBatch,storedJob} from './coop-batch.mjs';
+
 // The browser never uploads a local snapshot. Only explicit commands may write.
 export function createCloudSync(io) {
     let connected=false,active=true,verified=false,remote,reading=null,working=false,workPromise=null,rejections=0;
@@ -5,10 +7,10 @@ export function createCloudSync(io) {
     const receiptReads=new Map(),receiptMisses=new Map();
     const receiptClock=io.now||Date.now,receiptMissDelay=5_000;
     const resetReceipts=()=>{receiptReads.clear();receiptMisses.clear();};
-    const jobs=(io.loadPending?.()||[]).map(job=>({...job,restored:true}));
+    const jobs=(io.loadPending?.()||[]).map(job=>({...job,restored:true,started:true}));
     const canManage=()=>connected && active && verified;
     const canEdit=()=>canManage() && remote!==null;
-    const persist=()=>io.persistPending?.(jobs.map(({id,key,command,createdAt})=>({id,key,command,createdAt})));
+    const persist=()=>io.persistPending?.(jobs.map(storedJob));
     // Optional synchronous UI notification; never part of persistence or queue success.
     const pendingChanged=()=>{try{io.pendingChanged?.();}catch(error){io.error?.(error);}};
     const lock=()=>io.lock(!canEdit());
@@ -57,12 +59,33 @@ export function createCloudSync(io) {
         }).finally(()=>{artworkCleanup=null;});
         return artworkCleanup;
     }
-    function settle(job,error,result){
+    function settle(job,error,result,recovered=false){
         const index=jobs.indexOf(job);if(index<0) return;
+        // Validate the complete response before removing any pending member.
+        const members=pendingMembers(job),results=error?[]:members.map(member=>batchResultFor(job,member,result));
         jobs.splice(index,1);receiptMisses.delete(job);
         try{persist();}catch(storageError){io.error?.(storageError);}
-        if(error){rejections++;job.reject?.(error);}else job.resolve?.(result);
+        if(error) rejections++;
+        members.forEach((member,index)=>{
+            if(error) member.reject?.(error);
+            else if(member.resolve) member.resolve(results[index]);
+            else if(recovered||job.members){try{io.recovered?.(member.command,results[index]);}catch(error){io.error?.(error);}}
+        });
         pendingChanged();
+    }
+    function prepareJob(job){
+        const members=queuedCoopBatch(jobs,job);
+        if(members.length>1){
+            const batch=freezeCoopBatch(members);
+            jobs.splice(jobs.indexOf(job),members.length,batch);
+            try{persist();}catch(error){settle(batch,error);return null;}
+            return batch;
+        }
+        if(!job.started){
+            job.started=true;
+            try{persist();}catch(error){settle(job,error);return null;}
+        }
+        return job;
     }
     function work(){
         if(working) return workPromise;
@@ -71,8 +94,10 @@ export function createCloudSync(io) {
         workPromise=(async()=>{
             try{
                 while(canManage()){
-                    const job=jobs.find(item=>!item.restored);
-                    if(!job) break;
+                    const next=jobs.find(item=>!item.restored);
+                    if(!next) break;
+                    const job=prepareJob(next);
+                    if(!job) continue;
                     const ticket=epoch;
                     writeEpoch++;
                     try{
@@ -115,8 +140,7 @@ export function createCloudSync(io) {
             }).then(receipt=>{
                 if(!current()) return;
                 if(receipt){
-                    settle(job,null,receipt.result);
-                    io.recovered?.(job.command,receipt.result);
+                    settle(job,null,receipt.result,true);
                 }else{
                     // Absence also covers a still-projecting receipt, never a
                     // failed command. Only snapshot-driven negative reads cool down.
@@ -165,30 +189,45 @@ export function createCloudSync(io) {
         return JSON.stringify(a)===JSON.stringify(b);
     }
     function perform(command,key=JSON.stringify(command)){
-        const sameControl=jobs.filter(job=>job.key===key);
-        const existing=sameControl.find(job=>equivalent(job.command,command));
-        if(!existing && sameControl.some(job=>job.restored)){
+        const controls=jobs.flatMap(job=>pendingMembers(job).map(member=>({job,member})));
+        const sameControl=controls.filter(({member})=>member.key===key);
+        const match=sameControl.find(({member})=>equivalent(member.command,command));
+        const existing=match?.member;
+        if(!existing && sameControl.some(({job})=>job.restored||job.members)){
             return Promise.reject(new Error('這個功能還有一筆未確認操作，請先到老師後台的備份頁確認上次操作，再送出新內容。'));
         }
         if(existing?.promise) return existing.promise;
         if(!canManage() || (remote===null && !['initialize','restore'].includes(command.type))) {
             return Promise.reject(new Error(connected && verified ? '雲端尚無資料，請由老師初始化或還原備份。' : '離線中'));
         }
-        const job=existing || {id:io.newId(),createdAt:io.now?.()??Date.now(),key,command:structuredClone(command)};
+        const member=existing || {id:io.newId(),createdAt:io.now?.()??Date.now(),key,command:structuredClone(command)};
+        const job=match?.job||member,wasRestored=job.restored;
         job.restored=false;receiptMisses.delete(job);
-        job.promise=new Promise((resolve,reject)=>{job.resolve=resolve;job.reject=reject;});
-        if(!existing) jobs.push(job);
-        try{persist();}catch(error){settle(job,error);return job.promise;}
+        member.promise=new Promise((resolve,reject)=>{member.resolve=resolve;member.reject=reject;});
+        if(!existing){
+            // The idle worker starts synchronously below, with no debounce.
+            if(!working) job.started=true;
+            jobs.push(job);
+        }
+        try{persist();}catch(error){
+            const promise=member.promise;
+            if(existing){
+                // Never discard an unknown sent operation because retry storage failed.
+                job.restored=wasRestored;member.reject(error);
+                delete member.promise;delete member.resolve;delete member.reject;
+            }else settle(job,error);
+            return promise;
+        }
         pendingChanged();
         void work();
-        return job.promise;
+        return member.promise;
     }
     const timer=(io.setInterval||globalThis.setInterval)(()=>{if(!io.subscribeRemote)void refresh();},60_000);
     return {
         available:true,canEdit,canManage,perform,refresh,cleanupEvictedArtworks,
         editToken:()=>epoch,
         hasPendingSave:()=>jobs.length>0,
-        pendingActions:()=>jobs.map(({id,key,command,createdAt})=>({id,key,command,createdAt})),
+        pendingActions:()=>jobs.flatMap(job=>pendingMembers(job).map(({id,key,command,createdAt})=>({id,key,command:structuredClone(command),createdAt}))),
         async flush(){
             const ticket=epoch,rejectionTicket=rejections;
             try{

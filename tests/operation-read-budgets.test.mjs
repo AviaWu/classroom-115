@@ -9,6 +9,7 @@ import {createTeacherSyncPlan,applyTeacherStudentPlan,teacherProjectionScope,cre
 import {mergeStudentStatesIntoProgress} from '../public/teacher-projections.mjs';
 import {createFirebaseStore,createTeacherProgressSubscriber} from '../public/firebase-store.mjs';
 import {createFirebaseRestClient} from '../public/firebase-rest-client.mjs';
+import {createCloudSync} from '../public/cloud-sync.mjs';
 
 const clone=structuredClone,bytes=value=>Buffer.byteLength(JSON.stringify(value));
 const roomPath='games/classroom-115';
@@ -29,7 +30,7 @@ function fixture(){
     return {games:{'classroom-115':{progress,operations:{}}},...projections};
 }
 function harness(root=fixture(),hooks={}){
-    const reads=[],puts=[],patches=[],transactions=[],putAttempts=[];
+    const reads=[],puts=[],patches=[],transactions=[],putAttempts=[],responses=[];
     const get=path=>path.split('/').reduce((value,key)=>value?.[key],root)??null;
     const etag=path=>'"'+createHash('sha256').update(JSON.stringify(get(path))).digest('hex')+'"';
     const resolve=value=>{
@@ -59,6 +60,7 @@ function harness(root=fixture(),hooks={}){
             reads.push({path,bytes:bytes(get(path))});
         }
         const response=Response.json(get(path),{headers:{ETag:etag(path)}});
+        responses.push({path,method:options.method||'GET',bytes:Buffer.byteLength(await response.clone().text())});
         return await hooks.response?.({path,options,response,root,set})||response;
     };
     const context=vm.createContext({
@@ -73,7 +75,7 @@ function harness(root=fixture(),hooks={}){
         createCloudSync:()=>({setConnected(){},setActive(){}}),window:{addEventListener(){}},document:{addEventListener(){},hidden:false},navigator:{onLine:false},console,setSyncLocked(){},setSyncStatus(){},currentUser:null,
     });
     vm.runInContext(moduleSource.replace(/^\s*import .*;$/gm,'')+'\nglobalThis.storeUnderTest=store;',context);
-    return {root,reads,puts,patches,transactions,putAttempts,set,get,store:context.storeUnderTest,dependencies:context.dependencies};
+    return {root,reads,puts,patches,transactions,putAttempts,responses,set,get,store:context.storeUnderTest,dependencies:context.dependencies};
 }
 const job=(command,id='budget-operation')=>({id,createdAt:Date.now(),command});
 const commands={
@@ -582,4 +584,127 @@ test('coop eligibility rejects personal/projection/other domain changes even wit
     ])assert.equal(createCoopSharedProgress({...args,...change}),null);
     const changed=clone(outcome.progress);changed.students[0].tokens++;
     assert.equal(createCoopSharedProgress({...args,afterProgress:changed}),null,'even an unmapped personal change must not be skipped');
+});
+
+const batchJob=(ids=[1,2],id='batch',createdAt=Date.now())=>({id,createdAt,command:{type:'coopCompleteBatch',taskId:'coop',members:ids.map((studentId,i)=>({studentId,id:i?`${id}-${i}`:id,createdAt}))}});
+const totalTraffic=h=>({download:h.responses.reduce((sum,r)=>sum+r.bytes,0),upload:h.puts.reduce((sum,r)=>sum+r.bytes,0)+h.patches.reduce((sum,r)=>sum+bytes(r),0)});
+test('real browser REST queue: immediate first click plus four queued members uses 8 GET + 2 PUT versus 20 GET + 5 PUT, including PUT response bytes',async t=>{
+    let release,emit,id=0;const gate=new Promise(resolve=>release=resolve),h=harness(coopFixture()),executions=[];
+    const sync=createCloudSync({subscribeRemote:next=>{emit=next;return ()=>{};},execute:(request,ids)=>{
+        executions.push(clone(request.command));return (async()=>{if(executions.length===1)await gate;return h.store.execute(request,ids);})();
+    },persistPending(){},applyState(){},lock(){},status(){},newId:()=>`click-${++id}`,now:()=>1700000000000,setInterval:()=>0,clearInterval(){}});
+    h.store=createFirebaseStore({...h.dependencies,now:()=>1700000000000});
+    t.after(()=>sync.dispose());sync.setConnected(true);emit(h.get(roomPath).progress);
+    const first=sync.perform(coopCommand(1));assert.equal(executions.length,1);
+    const rest=[2,3,4,5].map(i=>sync.perform(coopCommand(i)));release();await Promise.all([first,...rest]);
+    assert.deepEqual(executions.map(c=>c.type),['coopComplete','coopCompleteBatch']);
+    assert.equal(h.reads.length,8);assert.equal(h.puts.length,2);assert.equal(h.responses.length,10);assertNoProjection(h);
+    const baseline=harness(coopFixture()),old=createFirebaseStore({...baseline.dependencies,now:()=>1700000000000});
+    for(let i=1;i<=5;i++)await old.execute({id:`click-${i}`,createdAt:1700000000000,command:coopCommand(i)});
+    assert.equal(baseline.reads.length,20);assert.equal(baseline.puts.length,5);assert.equal(baseline.responses.length,25);
+    const actual=totalTraffic(h),previous=totalTraffic(baseline);
+    assert.ok(actual.download<previous.download*0.45);assert.ok(actual.upload<previous.upload*0.45);
+    assert.ok(actual.download<170000);assert.ok(actual.upload<55000);
+    assert.deepEqual(h.get(roomPath).progress,baseline.get(roomPath).progress);
+    const single=harness(coopFixture());await createFirebaseStore({...single.dependencies,now:()=>1700000000000}).execute({id:'click-1',createdAt:1700000000000,command:coopCommand(1)});
+    assert.equal(h.responses.slice(0,5).reduce((n,r)=>n+r.bytes,0),totalTraffic(single).download);
+    assert.equal(h.puts[0].bytes,totalTraffic(single).upload);
+    t.diagnostic(JSON.stringify({batch:actual,sequential:previous,singleton:totalTraffic(single)}));
+});
+for(const direction of ['nonfinal-final','final-nonfinal'])test(`batch real ETag retry clears closure ${direction}`,async()=>{
+    const base=Array.from({length:25},(_,i)=>i+1),final=direction==='nonfinal-final';let once=true;
+    const h=harness(coopFixture(final?base:[...base,26]),{conflict:({path,value,root})=>{
+        if(path!==roomPath||!once)return false;once=false;assert.equal(Boolean(value._projectionSync),!final);
+        root.games['classroom-115'].progress.coopTasks[0].completedBy=final?[...base,26]:base;
+        root.studentStates['uid-1'].tokens=700;return true;
+    }});
+    const outcome=await h.store.execute(batchJob([27,28]));
+    assert.equal(outcome.result.claimed,final);assert.equal(outcome.result.members.filter(m=>m.result.claimed).length,final?1:0);
+    assert.equal(h.root.studentStates['uid-1'].tokens,final?710:700);
+    assert.equal(h.puts.filter(p=>p.path===roomPath).length,final?2:1);if(!final)assertNoProjection(h);
+});
+for(const change of ['member-removed','task-deleted','deadline','restore','expired'])test(`batch atomically rejects latest ${change} after 412`,async()=>{
+    let once=true,clock=Date.now();const request=batchJob([1,2],'invalid',clock);
+    const h=harness(coopFixture(),{conflict:({path,root})=>{
+        if(path!==roomPath||!once)return false;once=false;const room=root.games['classroom-115'];
+        if(change==='member-removed')room.progress.students=room.progress.students.filter(s=>s.id!==2);
+        if(change==='task-deleted')room.progress.coopTasks=[];
+        if(change==='deadline')room.progress.coopTasks[0].dueAt=clock-1;
+        if(change==='restore')room.restoredAt=clock;
+        if(change==='expired')clock+=86400001;
+        return true;
+    }});
+    await assert.rejects(createFirebaseStore({...h.dependencies,now:()=>clock}).execute(request),/不存在|截止|還原|超過一天/);
+    assert.equal(h.puts.length,0);assert.equal(h.get(roomPath).operations.invalid,undefined);assertNoProjection(h);
+});
+for(const loss of ['nonfinal','plan','personal','final'])test(`batch unknown ${loss} acknowledgement replays one receipt without duplicate rewards`,async()=>{
+    let once=true;const final=loss!=='nonfinal';
+    const h=harness(coopFixture(final?Array.from({length:26},(_,i)=>i+1):[]),{response:({path,options,root})=>{
+        if(!once||options.method!=='PUT')return;const room=root.games['classroom-115'];
+        if((loss==='nonfinal'&&path===roomPath)||(loss==='plan'&&path===roomPath&&room._projectionSync)||
+            (loss==='personal'&&path==='studentStates/uid-1')||(loss==='final'&&path===roomPath&&!room._projectionSync)){
+            once=false;throw new TypeError('lost batch ack');
+        }
+    }});
+    const request=batchJob(final?[27,28]:[1,2]);await assert.rejects(h.store.execute(request),/lost batch ack/);
+    if(h.get(roomPath)._projectionSync){const sync=h.get(roomPath)._projectionSync;assert.deepEqual(legacyProjectionUpdates(h.root,sync.plan,sync.uidByStudentId),{});}
+    const recovered=await createFirebaseStore(h.dependencies).execute(request);assert.equal(recovered.result.members.length,2);
+    for(const state of Object.values(h.root.studentStates)){assert.equal(state.tokens,final?110:100);assert.equal(state._teacherOperation,undefined);}
+    const count=h.puts.length;await h.store.execute(request);assert.equal(h.puts.length,count);
+    assert.equal(h.reads.filter(r=>r.path.includes('/operations/')).length,0);
+});
+test('two devices with overlapping final batches serialize real ETags and claim only once',async()=>{
+    const h=harness(coopFixture(Array.from({length:25},(_,i)=>i+1)));
+    const outcomes=await Promise.all([h.store.execute(batchJob([26,27],'device-a')),createFirebaseStore(h.dependencies).execute(batchJob([27,28],'device-b'))]);
+    assert.equal(outcomes.flatMap(o=>o.result.members).filter(m=>m.result.claimed).length,1);
+    assert.ok(h.putAttempts.length>h.puts.length);assert.equal(h.puts.filter(p=>p.value._projectionSync).length,1);
+    for(const state of Object.values(h.root.studentStates))assert.equal(state.tokens,110);
+});
+test('batch zero reward still persists full old-client-compatible plan and final receipt',async()=>{
+    const root=coopFixture(Array.from({length:26},(_,i)=>i+1));root.games['classroom-115'].progress.coopTasks[0].reward=0;
+    const h=harness(root),outcome=await h.store.execute(batchJob([27,28]));assert.equal(outcome.result.members.filter(m=>m.result.claimed).length,1);
+    assert.deepEqual(h.transactions,[roomPath,roomPath]);assert.equal(h.puts.length,2);
+    const plan=h.puts[0].value._projectionSync.plan;
+    for(const key of ['studentPlans','studentPets','publicBosses','publicQuestionPapers'])assert.ok(Object.hasOwn(plan,key));
+});
+test('batch validates original member ages and restore cutoff, but old committed receipt remains recoverable',async()=>{
+    const clock=Date.now(),request=batchJob([1,2],'age',clock);request.command.members[1].createdAt=clock-86400001;request.createdAt=clock-86400001;
+    const h=harness(coopFixture());await assert.rejects(h.store.execute(request),/超過一天/);assert.equal(h.puts.length,0);
+    request.command.members[1].createdAt=clock-100;request.createdAt=clock-100;h.get(roomPath).restoredAt=clock-50;
+    await assert.rejects(h.store.execute(request),/還原/);assert.equal(h.puts.length,0);
+    delete h.get(roomPath).restoredAt;await h.store.execute(request);const count=h.puts.length;
+    const result=await createFirebaseStore({...h.dependencies,now:()=>clock+172800000}).execute(request);
+    assert.equal(result.result.members.length,2);assert.equal(h.puts.length,count);
+});
+test('old pending complete plan recovers before a new batch proceeds',async()=>{
+    let once=true;const h=harness(coopFixture(),{afterPut:({path,value})=>{if(once&&path===roomPath&&value._projectionSync){once=false;throw new TypeError('lost old plan');}}});
+    await assert.rejects((await preCStore(h.dependencies)).execute(job(commands.pet,'old-pet')),/lost old plan/);
+    await h.store.execute(batchJob());assert.equal(h.root.studentStates['uid-1'].tokens,90);assert.equal(h.root.studentPets['uid-1'].dog.id,'dog');
+    assert.deepEqual(h.get(roomPath).progress.coopTasks[0].completedBy,[1,2]);assert.equal(h.get(roomPath)._projectionSync,undefined);
+    assert.ok(h.reads.some(r=>r.path==='publicQuestionPapers'));
+});
+for(const legacy of [false,true])test(`batch preserves latest raw ${legacy?'legacy':'compact'} non-coop fields after real 412`,async()=>{
+    const root=coopFixture();let once=true,expected;
+    if(legacy)for(const s of root.games['classroom-115'].progress.students)Object.assign(s,clone(root.studentStates[`uid-${s.id}`]));
+    const h=harness(root,{conflict:({path,root})=>{
+        if(!once||path!==roomPath)return false;once=false;const p=root.games['classroom-115'].progress;
+        p.globalBgImage='new-background';p.tasks.push({id:'new-task',reward:9});p.students[0].customLegacy='preserve';
+        if(legacy)p.students[0].tokens=777;root.studentStates['uid-1'].tokens=900;
+        expected=clone(p);return true;
+    }});
+    await h.store.execute(batchJob());const saved=h.get(roomPath).progress;
+    for(const key of Object.keys(expected).filter(key=>!['coopTasks','lastSaved'].includes(key)))assert.deepEqual(saved[key],expected[key]);
+    assert.equal(h.root.studentStates['uid-1'].tokens,900);assertNoProjection(h);
+});
+test('pending restore winning ETag race recovers fully and rejects entire older batch',async()=>{
+    let once=true;const producer=harness(coopFixture(),{afterPut:({path,value})=>{
+        if(once&&path===roomPath&&value._projectionSync){once=false;throw new TypeError('lost restore');}
+    }});
+    const backup=await producer.store.readCompleteProgress();backup.students[0].tokens=700;
+    await assert.rejects(producer.store.execute(job({type:'restore',value:backup},'restore-batch-race')),/lost restore/);
+    const pending=clone(producer.get(roomPath)),request=batchJob([1,2],'old-batch',pending.restoredAt-1);let conflict=true;
+    const h=harness(coopFixture(),{conflict:({path,set})=>{if(!conflict||path!==roomPath)return false;conflict=false;set(roomPath,pending);return true;}});
+    await assert.rejects(h.store.execute(request),/還原/);assert.equal(h.root.studentStates['uid-1'].tokens,700);
+    assert.equal(h.get(roomPath)._projectionSync,undefined);assert.deepEqual(h.get(roomPath).progress.coopTasks[0].completedBy,[]);
+    assert.equal(h.get(roomPath).operations['old-batch'],undefined);
 });

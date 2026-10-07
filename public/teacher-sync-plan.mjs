@@ -1,10 +1,11 @@
 import {normalizeProgress} from './game-operations.mjs';
 import {applyStudentOperation} from './student-operations.mjs';
 import {createStudentProjections} from './student-projections.mjs';
+import {isCoopCommand} from './coop-batch.mjs';
 
 const PERSONAL_FIELDS=['tokens','lotteryTickets','petAffection','lastPetMoodDate','equippedLayout','bossProgress'];
 const CONDITIONAL_COMMANDS=new Set(['petMood','bossAttack']);
-const ADDITIVE_COMMANDS=new Set(['completeTask','purchase','lottery','coopComplete']);
+const ADDITIVE_COMMANDS=new Set(['completeTask','purchase','lottery','coopComplete','coopCompleteBatch']);
 const clone=value=>value===undefined?undefined:structuredClone(value);
 const equal=(left,right)=>JSON.stringify(left??null)===JSON.stringify(right??null);
 
@@ -39,7 +40,7 @@ function publicDataFor(projections,uid){
 // plan. Old tabs must still see complete projection payloads when recovering.
 // Unknown/administrative commands and every recovered plan use full repair.
 export function teacherProjectionScope({beforeProgress,afterProgress,command,uidByStudentId}){
-    const ordinary=['completeTask','purchase','lottery','resources','petMood','bossAttack','equip','coopComplete'];
+    const ordinary=['completeTask','purchase','lottery','resources','petMood','bossAttack','equip','coopComplete','coopCompleteBatch'];
     if(!ordinary.includes(command.type)) return {pets:'all',public:true};
     const before=createStudentProjections(beforeProgress,uidByStudentId);
     const after=createStudentProjections(afterProgress,uidByStudentId);
@@ -52,7 +53,7 @@ export function teacherProjectionScope({beforeProgress,afterProgress,command,uid
 // A deliberately narrow, local-only shortcut. Recompute with each room ETag;
 // neither an empty personal plan nor claimed:false alone proves shared-only.
 export function createCoopSharedProgress({currentProgress,beforeProgress,afterProgress,command,result,plan,scope}){
-    if(command.type!=='coopComplete'||result?.claimed!==false||Object.keys(plan.studentPlans).length||
+    if(!isCoopCommand(command)||result?.claimed!==false||Object.keys(plan.studentPlans).length||
         scope.public||!Array.isArray(scope.pets)||scope.pets.length) return null;
     const before=normalizeProgress(beforeProgress);
     const task=afterProgress.coopTasks.find(item=>item.id===command.taskId);

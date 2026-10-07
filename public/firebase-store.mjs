@@ -2,6 +2,7 @@ import {applyOperation,normalizeProgress} from './game-operations.mjs';
 import {createStudentProjections} from './student-projections.mjs';
 import {mergeStudentStatesIntoProgress,normalizeStoredProgress,progressForStorage} from './teacher-projections.mjs';
 import {applyTeacherStudentPlan,createCoopSharedProgress,createTeacherSyncPlan,stripTeacherOperationMarker,teacherProjectionScope} from './teacher-sync-plan.mjs';
+import {isCoopCommand,operationTimes,validateBatchJob} from './coop-batch.mjs';
 
 const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','questionPapers','coopTasks',
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
@@ -460,7 +461,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     }
     async function executeCoordinated(job,pendingIds,artwork){
         if(readOperationData&&!readPublicProjectionData) throw new Error('縮減操作讀取必須搭配完整的投影讀取器。');
-        if(now()-job.createdAt>24*60*60*1000){
+        if(job.command.type!=='coopCompleteBatch'&&operationTimes(job).some(createdAt=>now()-createdAt>24*60*60*1000)){
             await cleanupRejectedArtwork(artwork);
             throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
         }
@@ -482,30 +483,35 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             try{
                 const transaction=await transactObservedRoom(current=>{
                     settled=undefined;blocked=false;scope=undefined;sharedOnly=false;
-                    if(command.type==='coopComplete'&&current==null) throw new Error('房間資料已不存在，請重新整理後再操作。');
-                    const clock=command.type==='coopComplete'?now():initialClock;
+                    if(isCoopCommand(command)&&current==null) throw new Error('房間資料已不存在，請重新整理後再操作。');
+                    const clock=isCoopCommand(command)?now():initialClock;
                     current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];
                     if(receipt&&receipt.phase!=='projecting'){
                         settled={progress:normalizeProgress(mergeStudentStatesIntoProgress(current.progress??null,root.studentStates||{},mapping)),result:JSON.parse(receipt.result.json)};return;
                     }
-                    if(current.restoredAt&&job.createdAt<=current.restoredAt&&!['restore','initialize'].includes(command.type)){
+                    if(isCoopCommand(command)&&operationTimes(job).some(createdAt=>clock-createdAt>24*60*60*1000)){
+                        settled={error:new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。')};return;
+                    }
+                    if(current.restoredAt&&operationTimes(job).some(createdAt=>createdAt<=current.restoredAt)&&!['restore','initialize'].includes(command.type)){
                         settled={error:new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。')};return;
                     }
-                    if(command.type==='coopComplete'&&Object.values(current.operations||{}).some(value=>value?.phase==='projecting')){
+                    if(isCoopCommand(command)&&Object.values(current.operations||{}).some(value=>value?.phase==='projecting')){
                         throw Object.assign(new Error('老師操作仍在同步但缺少同步計畫，請確認後重試。'),{retryable:true});
                     }
                     const before=mergeStudentStatesIntoProgress(current.progress??null,root.studentStates||{},mapping);
                     const outcome=applyOperation(before,command,clock);
-                    if(!outcome.changed&&command.type!=='restore'){settled={progress:outcome.progress,result:outcome.result||{ok:true}};return;}
+                    if(!outcome.changed&&!['restore','coopCompleteBatch'].includes(command.type)){settled={progress:outcome.progress,result:outcome.result||{ok:true}};return;}
                     const result={ok:true,...outcome.result};
                     const plan=createTeacherSyncPlan({beforeProgress:before,afterProgress:outcome.progress,command,result,
                         uidByStudentId:mapping,clock});
                     scope=teacherProjectionScope({beforeProgress:before,afterProgress:outcome.progress,command,uidByStudentId:mapping});
                     const sharedProgress=createCoopSharedProgress({currentProgress:current.progress,beforeProgress:before,
                         afterProgress:outcome.progress,command,result,plan,scope});
-                    const receiptValue={id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,phase:'projecting',result:{json:JSON.stringify(result)}};
+                    // Keep the existing wire receipt type; old recovery consumes
+                    // the complete plan/result without interpreting a new command.
+                    const receiptValue={id:job.id,uid:getUid(),type:isCoopCommand(command)?'coopComplete':command.type,createdAt:job.createdAt,phase:'projecting',result:{json:JSON.stringify(result)}};
                     if(sharedProgress){
                         sharedOnly=true;
                         const {phase,...finalReceipt}=receiptValue;
@@ -539,6 +545,12 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         throw Object.assign(new Error('另一筆老師操作仍在同步，稍後會重試。'),{retryable:true});
     }
     async function execute(job,pendingIds=[]){
+        validateBatchJob(job);
+        // Batch receipts and projection recovery require the coordinated path.
+        // Never let an older room-only adapter write a projecting receipt as final.
+        if(job.command?.type==='coopCompleteBatch'&&!(readRoot&&writeRoot&&transactRoom&&transactStudentState)){
+            throw new Error('協力批次需要完整同步協調器，已停止操作。');
+        }
         const artwork=preflightArtwork(job.command);
         if(legacyEquipmentInfo(job.command)&&typeof transactProgressStudent==='function'&&typeof readRoomMetadata==='function'&&typeof readEquipmentCatalogues==='function') return executeLegacyEquipment(job);
         if(readRoot&&writeRoot&&transactRoom&&transactStudentState) return executeCoordinated(job,pendingIds,artwork);
