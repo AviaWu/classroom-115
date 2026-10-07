@@ -91,45 +91,6 @@ test('browser wardrobe wiring commits only student 28 through the server ETag tr
     assert.equal(outcome.progress.students[26].equippedClothes,'shirt');
     assert.ok(reads.every(path=>path.startsWith('games/classroom-115/progress/')||path==='games/classroom-115/progress'||path==='games/classroom-115/restoredAt'));
 });
-test('browser coop transport avoids unrelated projections and redundant full-room downloads',async()=>{
-    const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
-    const progress=fixture();
-    const root={games:{'classroom-115':{progress}},studentRoster:{one:{studentId:1,active:true},two:{studentId:2,active:true}},
-        studentStates:Object.fromEntries(['one','two'].map((uid,index)=>[uid,{studentId:index+1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]}]))};
-    const reads=[],writes=[],plans=[];
-    const request=async(input,options)=>{
-        const path=new URL(input).pathname.slice(1,-5),parts=path.split('/');
-        assert.ok(!/^(studentPets|publicBosses|publicQuestionPapers)(\/|$)/.test(path),`unexpected projection download: ${path}`);
-        if(options.method==='PUT'){
-            assert.equal(options.headers['if-match'],'"etag"');writes.push(path);
-            const parent=parts.slice(0,-1).reduce((value,key)=>value[key],root);
-            parent[parts.at(-1)]=JSON.parse(options.body);
-            if(path==='games/classroom-115'&&parent[parts.at(-1)]._projectionSync) plans.push(parent[parts.at(-1)]._projectionSync.plan);
-        }else reads.push(path);
-        return Response.json(parts.reduce((value,key)=>value?.[key],root)??null,{headers:{ETag:'"etag"'}});
-    };
-    const context=vm.createContext({
-        initializeApp:()=>({}),getAuth:()=>({currentUser:{uid:'teacher',getIdToken:async()=>'token'}}),getDatabase:()=>({}),
-        onAuthStateChanged(){},ref:(_,path)=>path,onValue:()=>()=>{},update(){throw new Error('unexpected projection write');},
-        GameOperations:operations,createFirebaseStore,createTeacherProgressSubscriber,
-        createFirebaseRestClient:config=>createFirebaseRestClient({...config,fetch:request}),
-        createCloudSync:()=>({setConnected(){},setActive(){}}),window:{addEventListener(){}},
-        document:{addEventListener(){},hidden:false},navigator:{onLine:false},currentUser:null,setSyncLocked(){},setSyncStatus(){},console,
-    });
-    vm.runInContext(moduleSource.replace(/^\s*import .*;$/gm,'')+'\nglobalThis.pageStore=store;',context);
-    const execute=studentId=>context.pageStore.execute({id:`coop-${studentId}`,createdAt:Date.now(),command:{type:'coopComplete',taskId:'coop',studentId}});
-    await execute(1);
-    assert.equal(reads.filter(path=>path==='games/classroom-115').length,2); // initial read + ETag GET
-    assert.equal(reads.length,4);assert.equal(writes.length,1);
-    reads.length=0;writes.length=0;
-    const final=await execute(2);
-    assert.equal(final.result.claimed,true);
-    assert.equal(reads.filter(path=>path==='games/classroom-115').length,3); // initial + two ETag GETs, no post-write reread
-    assert.equal(reads.filter(path=>path==='studentStates').length,2);
-    assert.deepEqual(plans[0].publicKeys,[]);assert.deepEqual(plans[0].petUids,[]);
-    assert.equal(plans[0].publicQuestionPapers,undefined);
-    assert.deepEqual(Object.values(root.studentStates).map(state=>state.tokens),[110,110]);
-});
 for(const order of ['progress-first','states-first']) test(`browser teacher wiring waits for complete personal data and backs up server values (${order})`,async t=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
     const progress={...fixture(),students:[{id:1,gender:'M',ownedClothes:['shirt']}],questionPapers:[{id:'paper',name:'試卷',questions:[{id:'q',text:'題目',options:['對','錯'],answerIndex:0}]}]};

@@ -83,7 +83,7 @@ export function createTeacherProgressSubscriber(dependencies){
 
 // REST handles direct reads and artwork payloads. The teacher page serializes commands
 // in a room transaction and projects personal changes through per-student transactions.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readProjectionData,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -343,15 +343,13 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             return await transactRoom(update);
         }finally{stop();}
     }
-    const petTargets=(plan,mapping)=>plan.projectionMode==='changed' ? (plan.petUids||[]) : Object.values(mapping);
-    const publicTargets=plan=>plan.projectionMode==='changed' ? (plan.publicKeys||[]) : ['publicBosses','publicQuestionPapers'];
     function projectionUpdates(root,plan,mapping){
         const updates={};
-        for(const uid of petTargets(plan,mapping)){
+        for(const uid of Object.values(mapping)){
             const desired=plan.studentPets?.[uid]||{},current=root.studentPets?.[uid]||{};
             if(JSON.stringify(current)!==JSON.stringify(desired)) updates[`studentPets/${uid}`]=Object.keys(desired).length?desired:null;
         }
-        for(const key of publicTargets(plan)){
+        for(const key of ['publicBosses','publicQuestionPapers']){
             const desired=plan[key]||{};
             if(JSON.stringify(root[key]||{})!==JSON.stringify(desired)) updates[key]=desired;
         }
@@ -359,7 +357,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
     }
     function requiredPetUpdates(root,plan,mapping){
         const updates={};
-        for(const uid of petTargets(plan,mapping)){
+        for(const uid of Object.values(mapping)){
             const desired=plan.studentPets?.[uid]||{},current=root.studentPets?.[uid]||{};
             const retained={...current,...desired};
             if(JSON.stringify(current)!==JSON.stringify(retained)) updates[`studentPets/${uid}`]=retained;
@@ -384,19 +382,13 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         const room=root.games?.['classroom-115']||{},syncPlan=room._projectionSync;
         if(!syncPlan?.operationId||!syncPlan.plan) return null;
         const operationId=syncPlan.operationId,plan=syncPlan.plan;
-        if(typeof readProjectionData==='function'){
-            const projectionData=await readProjectionData({petUids:petTargets(plan,syncPlan.uidByStudentId||{}),publicKeys:publicTargets(plan)});
-            root={...root,...projectionData};
-        }
         const requiredPets=requiredPetUpdates(root,plan,syncPlan.uidByStudentId||{});
         try{if(Object.keys(requiredPets).length) await writeRoot(requiredPets);}catch(error){throw markRetryable(error);}
         const applied=await Promise.all(Object.values(plan.studentPlans||{}).map(studentPlan=>applyStudentProjection(operationId,studentPlan)));
         const states=Object.fromEntries(applied.map(entry=>[entry.uid,entry.state]).filter(([,state])=>state));
         const updates=projectionUpdates(root,plan,syncPlan.uidByStudentId||{});
         try{if(Object.keys(updates).length) await writeRoot(updates);}catch(error){throw markRetryable(error);}
-        // Only personal values and roster need refreshing here. The final ETag
-        // transaction already reads the latest room, including its lock/receipt.
-        const latestRoot=(await readRoot({includeRoom:false}))||{};
+        const latestRoot=(await readRoot())||{};
         const latestStates=latestRoot.studentStates||states;
         const fallbackRoom=latestRoot.games?.['classroom-115']||room;
         const conditionalResult=syncPlan.resultUid?applied.find(entry=>entry.uid===syncPlan.resultUid)?.result:null;
@@ -475,7 +467,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                             }},lastOperationId:job.id};
                     }
                     const plan=createTeacherSyncPlan({beforeProgress:before,afterProgress:outcome.progress,command,result,
-                        uidByStudentId:mapping,clock,compactProjections:true});
+                        uidByStudentId:mapping,clock});
                     const receiptValue={id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,phase:'projecting',result:{json:JSON.stringify(result)}};
                     const next={...current,progress:{...progressForStorage(outcome.progress,current.progress,mapping),lastSaved:new Date(clock).toISOString()},
                         operations:{...retainedOperations(current.operations,pendingIds,clock),[job.id]:receiptValue},lastOperationId:job.id,
@@ -492,9 +484,7 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                     return {progress:normalizeProgress(mergeStudentStatesIntoProgress(committed.progress,root.studentStates||{},mapping)),
                         result:JSON.parse(committed.operations[job.id].result.json),studentStates:root.studentStates||{}};
                 }
-                // The successful conditional write returns the committed room.
-                // Re-reading that entire room (and every projection) is redundant.
-                root={...root,games:{...root.games,'classroom-115':transaction.value}};
+                root=(await readRoot())||{};
                 return await resumeProjection(root);
             }catch(error){throw markRetryable(error);}
         }

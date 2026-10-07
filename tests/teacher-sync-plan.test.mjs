@@ -20,31 +20,6 @@ const planFor=(before,after,command,result={ok:true})=>createTeacherSyncPlan({
     command,result,uidByStudentId:{1:'uid-one'},clock:100000,
 }).studentPlans['uid-one'];
 
-test('compact reward plan excludes unchanged large pets and public question banks',()=>{
-    const boss={id:'boss',name:'boss',paperId:'paper',active:true};
-    const before={students:[student({ownedLayout:['pet']})],layouts:[{id:'pet',name:'pet',level:'R',image:'x'.repeat(100000)}],
-        bosses:[boss],questionPapers:[{id:'paper',questions:[{id:'q',text:'y'.repeat(100000)}]}]};
-    const after={...before,students:[{...before.students[0],tokens:110}]};
-    const input={beforeProgress:before,afterProgress:after,command:{type:'coopComplete'},result:{claimed:true},uidByStudentId:{1:'uid-one'},clock:100000};
-    const full=createTeacherSyncPlan(input),compact=createTeacherSyncPlan({...input,compactProjections:true});
-    assert.deepEqual(compact.studentPlans,full.studentPlans);
-    assert.deepEqual(compact.petUids,[]);assert.deepEqual(compact.publicKeys,[]);
-    assert.equal(compact.publicQuestionPapers,undefined);
-    assert.ok(JSON.stringify(compact).length<JSON.stringify(full).length/100);
-});
-test('compact plans preserve explicit projection deletion targets and full restore repair',()=>{
-    const before={students:[student({ownedLayout:['pet']})],layouts:[{id:'pet',name:'pet',image:'/pet.png',level:'R'}],
-        bosses:[{id:'boss',paperId:'paper',active:true}],questionPapers:[{id:'paper',questions:[]}]};
-    const input={beforeProgress:before,afterProgress:{...before,students:[student()],bosses:[]},command:{type:'deleteBoss'},result:{},uidByStudentId:{1:'uid-one'},clock:100000,compactProjections:true};
-    const removed=createTeacherSyncPlan(input);
-    assert.deepEqual(removed.petUids,['uid-one']);assert.deepEqual(removed.studentPets,{'uid-one':{}});
-    assert.deepEqual(removed.publicKeys,['publicBosses','publicQuestionPapers']);
-    assert.deepEqual(removed.publicBosses,{});assert.deepEqual(removed.publicQuestionPapers,{});
-    const restored=createTeacherSyncPlan({...input,afterProgress:before,command:{type:'restore'}});
-    assert.deepEqual(restored.petUids,['uid-one']);assert.deepEqual(restored.publicKeys,['publicBosses','publicQuestionPapers']);
-    assert.equal(restored.studentPets['uid-one'].pet.id,'pet');
-});
-
 test('additive teacher resources apply to the latest concurrent student value',()=>{
     const plan=planFor(student(),student({tokens:105}),{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5});
     const applied=applyTeacherStudentPlan(state({tokens:110}),plan,'teacher-add');
