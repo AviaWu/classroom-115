@@ -1,0 +1,530 @@
+{
+  "backgrounds/27": {
+    "id": "builtin_background_bgmnew1_jpg_1",
+    "name": "新背景 1",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(1).jpg"
+  },
+  "backgrounds/28": {
+    "id": "builtin_background_bgmnew1_jpg_2",
+    "name": "新背景 2",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(2).jpg"
+  },
+  "backgrounds/29": {
+    "id": "builtin_background_bgmnew1_jpg_3",
+    "name": "新背景 3",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(3).jpg"
+  },
+  "backgrounds/30": {
+    "id": "builtin_background_bgmnew1_jpg_4",
+    "name": "新背景 4",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(4).jpg"
+  },
+  "backgrounds/31": {
+    "id": "builtin_background_bgmnew1_jpg_5",
+    "name": "新背景 5",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(5).jpg"
+  },
+  "backgrounds/32": {
+    "id": "builtin_background_bgmnew1_jpg_6",
+    "name": "新背景 6",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(6).jpg"
+  },
+  "backgrounds/33": {
+    "id": "builtin_background_bgmnew1_jpg_7",
+    "name": "新背景 7",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(7).jpg"
+  },
+  "backgrounds/34": {
+    "id": "builtin_background_bgmnew1_jpg_8",
+    "name": "新背景 8",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(8).jpg"
+  },
+  "backgrounds/35": {
+    "id": "builtin_background_bgmnew1_jpg_9",
+    "name": "新背景 9",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(9).jpg"
+  },
+  "backgrounds/36": {
+    "id": "builtin_background_bgmnew1_jpg_10",
+    "name": "新背景 10",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(10).jpg"
+  },
+  "backgrounds/37": {
+    "id": "builtin_background_bgmnew1_jpg_11",
+    "name": "新背景 11",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(11).jpg"
+  },
+  "backgrounds/38": {
+    "id": "builtin_background_bgmnew1_jpg_12",
+    "name": "新背景 12",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(12).jpg"
+  },
+  "backgrounds/39": {
+    "id": "builtin_background_bgmnew1_jpg_13",
+    "name": "新背景 13",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(13).jpg"
+  },
+  "backgrounds/40": {
+    "id": "builtin_background_bgmnew1_jpg_14",
+    "name": "新背景 14",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(14).jpg"
+  },
+  "backgrounds/41": {
+    "id": "builtin_background_bgmnew1_jpg_15",
+    "name": "新背景 15",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(15).jpg"
+  },
+  "backgrounds/42": {
+    "id": "builtin_background_bgmnew1_jpg_16",
+    "name": "新背景 16",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(16).jpg"
+  },
+  "backgrounds/43": {
+    "id": "builtin_background_bgmnew1_jpg_17",
+    "name": "新背景 17",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(17).jpg"
+  },
+  "backgrounds/44": {
+    "id": "builtin_background_bgmnew1_jpg_18",
+    "name": "新背景 18",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(18).jpg"
+  },
+  "backgrounds/45": {
+    "id": "builtin_background_bgmnew1_jpg_19",
+    "name": "新背景 19",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(19).jpg"
+  },
+  "backgrounds/46": {
+    "id": "builtin_background_bgmnew1_jpg_20",
+    "name": "新背景 20",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(20).jpg"
+  },
+  "backgrounds/47": {
+    "id": "builtin_background_bgmnew1_jpg_21",
+    "name": "新背景 21",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(21).jpg"
+  },
+  "backgrounds/48": {
+    "id": "builtin_background_bgmnew1_jpg_22",
+    "name": "新背景 22",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(22).jpg"
+  },
+  "backgrounds/49": {
+    "id": "builtin_background_bgmnew1_jpg_23",
+    "name": "新背景 23",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(23).jpg"
+  },
+  "backgrounds/50": {
+    "id": "builtin_background_bgmnew1_jpg_24",
+    "name": "新背景 24",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(24).jpg"
+  },
+  "backgrounds/51": {
+    "id": "builtin_background_bgmnew1_jpg_25",
+    "name": "新背景 25",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(25).jpg"
+  },
+  "backgrounds/52": {
+    "id": "builtin_background_bgmnew1_jpg_26",
+    "name": "新背景 26",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(26).jpg"
+  },
+  "backgrounds/53": {
+    "id": "builtin_background_bgmnew1_jpg_27",
+    "name": "新背景 27",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(27).jpg"
+  },
+  "backgrounds/54": {
+    "id": "builtin_background_bgmnew1_jpg_28",
+    "name": "新背景 28",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(28).jpg"
+  },
+  "backgrounds/55": {
+    "id": "builtin_background_bgmnew1_jpg_29",
+    "name": "新背景 29",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(29).jpg"
+  },
+  "backgrounds/56": {
+    "id": "builtin_background_bgmnew1_jpg_30",
+    "name": "新背景 30",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(30).jpg"
+  },
+  "backgrounds/57": {
+    "id": "builtin_background_bgmnew1_jpg_31",
+    "name": "新背景 31",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(31).jpg"
+  },
+  "backgrounds/58": {
+    "id": "builtin_background_bgmnew1_jpg_32",
+    "name": "新背景 32",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(32).jpg"
+  },
+  "backgrounds/59": {
+    "id": "builtin_background_bgmnew1_jpg_33",
+    "name": "新背景 33",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(33).jpg"
+  },
+  "backgrounds/60": {
+    "id": "builtin_background_bgmnew1_jpg_34",
+    "name": "新背景 34",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(34).jpg"
+  },
+  "backgrounds/61": {
+    "id": "builtin_background_bgmnew1_jpg_35",
+    "name": "新背景 35",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(35).jpg"
+  },
+  "backgrounds/62": {
+    "id": "builtin_background_bgmnew1_jpg_36",
+    "name": "新背景 36",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(36).jpg"
+  },
+  "backgrounds/63": {
+    "id": "builtin_background_bgmnew1_jpg_37",
+    "name": "新背景 37",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(37).jpg"
+  },
+  "backgrounds/64": {
+    "id": "builtin_background_bgmnew1_jpg_38",
+    "name": "新背景 38",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(38).jpg"
+  },
+  "backgrounds/65": {
+    "id": "builtin_background_bgmnew1_jpg_39",
+    "name": "新背景 39",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(39).jpg"
+  },
+  "backgrounds/66": {
+    "id": "builtin_background_bgmnew1_jpg_40",
+    "name": "新背景 40",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(40).jpg"
+  },
+  "backgrounds/67": {
+    "id": "builtin_background_bgmnew1_jpg_41",
+    "name": "新背景 41",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(41).jpg"
+  },
+  "backgrounds/68": {
+    "id": "builtin_background_bgmnew1_jpg_42",
+    "name": "新背景 42",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(42).jpg"
+  },
+  "backgrounds/69": {
+    "id": "builtin_background_bgmnew1_jpg_43",
+    "name": "新背景 43",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(43).jpg"
+  },
+  "backgrounds/70": {
+    "id": "builtin_background_bgmnew1_jpg_44",
+    "name": "新背景 44",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(44).jpg"
+  },
+  "backgrounds/71": {
+    "id": "builtin_background_bgmnew1_jpg_45",
+    "name": "新背景 45",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(45).jpg"
+  },
+  "backgrounds/72": {
+    "id": "builtin_background_bgmnew1_jpg_46",
+    "name": "新背景 46",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(46).jpg"
+  },
+  "backgrounds/73": {
+    "id": "builtin_background_bgmnew1_jpg_47",
+    "name": "新背景 47",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(47).jpg"
+  },
+  "backgrounds/74": {
+    "id": "builtin_background_bgmnew1_jpg_48",
+    "name": "新背景 48",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(48).jpg"
+  },
+  "backgrounds/75": {
+    "id": "builtin_background_bgmnew1_jpg_49",
+    "name": "新背景 49",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(49).jpg"
+  },
+  "backgrounds/76": {
+    "id": "builtin_background_bgmnew1_jpg_50",
+    "name": "新背景 50",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(50).jpg"
+  },
+  "backgrounds/77": {
+    "id": "builtin_background_bgmnew1_jpg_51",
+    "name": "新背景 51",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(51).jpg"
+  },
+  "backgrounds/78": {
+    "id": "builtin_background_bgmnew1_jpg_52",
+    "name": "新背景 52",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(52).jpg"
+  },
+  "backgrounds/79": {
+    "id": "builtin_background_bgmnew1_jpg_53",
+    "name": "新背景 53",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(53).jpg"
+  },
+  "backgrounds/80": {
+    "id": "builtin_background_bgmnew1_jpg_54",
+    "name": "新背景 54",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(54).jpg"
+  },
+  "backgrounds/81": {
+    "id": "builtin_background_bgmnew1_jpg_55",
+    "name": "新背景 55",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(55).jpg"
+  },
+  "backgrounds/82": {
+    "id": "builtin_background_bgmnew1_jpg_56",
+    "name": "新背景 56",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(56).jpg"
+  },
+  "backgrounds/83": {
+    "id": "builtin_background_bgmnew1_jpg_57",
+    "name": "新背景 57",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(57).jpg"
+  },
+  "backgrounds/84": {
+    "id": "builtin_background_bgmnew1_jpg_58",
+    "name": "新背景 58",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(58).jpg"
+  },
+  "backgrounds/85": {
+    "id": "builtin_background_bgmnew1_jpg_59",
+    "name": "新背景 59",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(59).jpg"
+  },
+  "backgrounds/86": {
+    "id": "builtin_background_bgmnew1_jpg_60",
+    "name": "新背景 60",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(60).jpg"
+  },
+  "backgrounds/87": {
+    "id": "builtin_background_bgmnew1_jpg_61",
+    "name": "新背景 61",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(61).jpg"
+  },
+  "backgrounds/88": {
+    "id": "builtin_background_bgmnew1_jpg_62",
+    "name": "新背景 62",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(62).jpg"
+  },
+  "backgrounds/89": {
+    "id": "builtin_background_bgmnew1_jpg_63",
+    "name": "新背景 63",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(63).jpg"
+  },
+  "backgrounds/90": {
+    "id": "builtin_background_bgmnew1_jpg_64",
+    "name": "新背景 64",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(64).jpg"
+  },
+  "backgrounds/91": {
+    "id": "builtin_background_bgmnew1_jpg_65",
+    "name": "新背景 65",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(65).jpg"
+  },
+  "backgrounds/92": {
+    "id": "builtin_background_bgmnew1_png_1",
+    "name": "新背景 1 PNG",
+    "level": "R",
+    "price": 50,
+    "active": true,
+    "image": "/images/bgm/bgmnew1/bgmnew1%20(1).png"
+  }
+}

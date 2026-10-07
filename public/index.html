@@ -971,9 +971,17 @@ function seedBuiltinLayouts(persist=true){
 }
 
 
-// 內建背景商品：直接使用 public/images/bgm/ 的全部 JPG 圖片，避免重複建立商品
+// 內建背景商品：使用 public/images/bgm/ 與 bgmnew1/ 的圖片，避免重複建立商品
 function seedBuiltinBackgrounds(persist=true){
     const filenames = Array.from({length:27}, (_,index)=>`bg (${index+1}).jpg`);
+    const newProducts = [
+        ...Array.from({length:65},(_,index)=>({
+            filename:`bgmnew1 (${index+1}).jpg`,
+            id:`builtin_background_bgmnew1_jpg_${index+1}`,
+            name:`新背景 ${index+1}`
+        })),
+        {filename:"bgmnew1 (1).png",id:"builtin_background_bgmnew1_png_1",name:"新背景 1 PNG"}
+    ];
     const removedItems = state.backgrounds.filter(item=>/^\/images\/bgm\/ba%20\(\d+\)\.png$/i.test(item.image||""));
     const removedIds = removedItems.map(item=>item.id);
     let changed = removedIds.length>0;
@@ -996,6 +1004,20 @@ function seedBuiltinBackgrounds(persist=true){
                 image
             });
             changed = true;
+        }
+    });
+    newProducts.forEach(product=>{
+        const image = `/images/bgm/bgmnew1/${encodeURIComponent(product.filename)}`;
+        if(!state.backgrounds.some(item=>item.image===image)){
+            state.backgrounds.push({
+                id:product.id,
+                name:product.name,
+                level:"R",
+                price:priceForLevel("R"),
+                active:true,
+                image
+            });
+            changed=true;
         }
     });
     if(changed && persist) save();
@@ -2150,6 +2172,28 @@ function missingBuiltinProductChanges(){
                     image:`/images/Dec2/${encodeURIComponent(`decb (${number}).png`)}`
                 }))
             ]
+        },
+        {
+            collection:"backgrounds",
+            hasBuiltIns:list=>list.some(item=>/^builtin_background_\d+$/.test(item.id||"")),
+            products:[
+                ...Array.from({length:65},(_,index)=>index+1).map(number=>({
+                    id:`builtin_background_bgmnew1_jpg_${number}`,
+                    name:`新背景 ${number}`,
+                    level:"R",
+                    price:priceForLevel("R"),
+                    active:true,
+                    image:`/images/bgm/bgmnew1/${encodeURIComponent(`bgmnew1 (${number}).jpg`)}`
+                })),
+                {
+                    id:"builtin_background_bgmnew1_png_1",
+                    name:"新背景 1 PNG",
+                    level:"R",
+                    price:priceForLevel("R"),
+                    active:true,
+                    image:`/images/bgm/bgmnew1/${encodeURIComponent("bgmnew1 (1).png")}`
+                }
+            ]
         }
     ];
     return catalogues.flatMap(({collection,hasBuiltIns,products})=>{
@@ -2164,7 +2208,7 @@ async function backend(){
     if(currentUser?.role!=="teacher" || !backendAuthenticated) return;
     const productChanges=missingBuiltinProductChanges();
     if(productChanges.length){
-        await runCommand({type:"edit",changes:productChanges},"seed:builtin-products-v3");
+        await runCommand({type:"edit",changes:productChanges},"seed:builtin-products-v4");
     }
     currentView={type:"backend"};
     const used = getStorageUsage();
