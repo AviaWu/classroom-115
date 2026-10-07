@@ -9,6 +9,8 @@ export function createCloudSync(io) {
     const canManage=()=>connected && active && verified;
     const canEdit=()=>canManage() && remote!==null;
     const persist=()=>io.persistPending?.(jobs.map(({id,key,command,createdAt})=>({id,key,command,createdAt})));
+    // Optional synchronous UI notification; never part of persistence or queue success.
+    const pendingChanged=()=>{try{io.pendingChanged?.();}catch(error){io.error?.(error);}};
     const lock=()=>io.lock(!canEdit());
     const apply=(value,studentStates)=>{remote=structuredClone(value);io.applyState(structuredClone(value),studentStates&&structuredClone(studentStates));void cleanupEvictedArtworks();};
     const notify=()=>{lock();io.status(connected && verified ? '' : '離線中');};
@@ -60,6 +62,7 @@ export function createCloudSync(io) {
         jobs.splice(index,1);receiptMisses.delete(job);
         try{persist();}catch(storageError){io.error?.(storageError);}
         if(error){rejections++;job.reject?.(error);}else job.resolve?.(result);
+        pendingChanged();
     }
     function work(){
         if(working) return workPromise;
@@ -176,6 +179,7 @@ export function createCloudSync(io) {
         job.promise=new Promise((resolve,reject)=>{job.resolve=resolve;job.reject=reject;});
         if(!existing) jobs.push(job);
         try{persist();}catch(error){settle(job,error);return job.promise;}
+        pendingChanged();
         void work();
         return job.promise;
     }
