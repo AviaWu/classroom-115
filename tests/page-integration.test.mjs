@@ -93,7 +93,7 @@ test('browser wardrobe wiring commits only student 28 through the server ETag tr
     reads.length=0;
     await context.pageStore.execute({id:'page-dress-28',createdAt:Date.now(),command:{type:'equip',studentId:28,kind:'clothes',itemId:'shirt'}});
     assert.deepEqual(reads,['games/classroom-115/restoredAt','games/classroom-115/progress/students/27',
-        'games/classroom-115/progress/clothesM','games/classroom-115/restoredAt','games/classroom-115/progress/students/27']);
+        'games/classroom-115/progress/clothesM','games/classroom-115/restoredAt']);
 });
 for(const order of ['progress-first','states-first']) test(`browser teacher wiring waits for complete personal data and backs up server values (${order})`,async t=>{
     const moduleSource=scripts.find(([_,attributes])=>attributes.includes('module'))[2];
@@ -360,7 +360,9 @@ test('event gifts remain free and omit the level wording in shop and closet',asy
     await h.run("buyCloth(1,'event')");assert.equal(h.cloud.students[0].tokens,200);
     await h.run('closet(1)');const closet=h.w.document.getElementById('closetTabContent').textContent;
     assert.match(closet,/活動贈送/);assert.doesNotMatch(closet,/活動贈送\s*等級/);
-    await h.run("equipClothes(1,'event')");h.w.closeModal();
+    await h.run("equipClothes(1,'event')");
+    assert.equal(h.w.document.querySelector('.card').dataset.clothingLevel,'default');
+    await h.run('closeVisibleModal()');
     const memberCard=h.w.document.querySelector('.card');
     assert.equal(memberCard.dataset.clothingLevel,'活動贈送');
     assert.equal(memberCard.style.getPropertyValue('--member-level-color'),'#d05c78');
@@ -369,7 +371,11 @@ test('member card border follows every equipped clothing level',async t=>{
     const h=page(t);h.cloud={...h.cloud,clothesM:['R','SR','SSR','UR'].map(level=>({id:`cloth-${level}`,name:level,level,price:0,active:true,image:`/${level}.png`})),students:[{...h.cloud.students[0],ownedClothes:['cloth-R','cloth-SR','cloth-SSR','cloth-UR']},h.cloud.students[1]]};
     await h.start();
     for(const [level,color] of Object.entries({R:'#687386',SR:'#27868c',SSR:'#8960b5',UR:'#c18418'})){
+        await h.run('closet(1)');
+        const before=h.cloud.students[0].equippedClothes;
         await h.run(`equipClothes(1,'cloth-${level}')`);
+        assert.equal(h.cloud.students[0].equippedClothes,before);
+        await h.run('closeVisibleModal()');
         const card=h.w.document.querySelector('.card');
         assert.equal(card.dataset.clothingLevel,level);assert.equal(card.style.getPropertyValue('--member-level-color'),color);
     }
@@ -414,12 +420,18 @@ test('NEW disappears when every unfinished task has expired',async t=>{
     await h.run('tasks(1)');
     assert.match(h.w.document.getElementById('modal').textContent,/全部任務已完成/);
 });
-test('purchase, wardrobe and pet controls commit immediately without processing UI',async t=>{
+test('purchases and pets commit immediately while clothing and background wait for closet close',async t=>{
     const h=page(t);await h.start();await h.run('shop(1)');await h.run("buyCloth(1,'shirt')");
-    await h.run("buyLayout(1,'pet')");await h.run("buyBg(1,'bg')");await h.run('closet(1)');
+    await h.run("buyLayout(1,'pet')");await h.run("buyBg(1,'bg')");
+    assert.equal(h.cloud.students[0].tokens,50);assert.equal(h.writes,3);
+    await h.run('closet(1)');
     await h.run("equipClothes(1,'shirt')");await h.run("toggleEquipLayout(1,'pet')");await h.run("equipBg(1,'bg')");
+    assert.equal(h.cloud.students[0].equippedClothes,null);assert.equal(h.cloud.students[0].equippedBg,null);
+    assert.deepEqual(h.cloud.students[0].equippedLayout,['pet']);assert.equal(h.writes,4);
+    await h.run('closeVisibleModal()');
     assert.equal(h.cloud.students[0].tokens,50);assert.equal(h.cloud.students[0].equippedClothes,'shirt');
     assert.deepEqual(h.cloud.students[0].equippedLayout,['pet']);assert.equal(h.cloud.students[0].equippedBg,'bg');
+    assert.equal(h.writes,6);
     await h.run('equipDefaultPet(1)');assert.deepEqual(h.cloud.students[0].equippedLayout,[]);
     assert.equal(h.w.document.getElementById('saveStatus'),null);assert.deepEqual(h.alerts,[]);
 });

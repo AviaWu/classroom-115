@@ -74,6 +74,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .closet-pet-preview{width:100%;max-width:130px;aspect-ratio:1;margin:12px auto 0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff8e8;border:3px solid #20263a;box-shadow:5px 5px 0 #172033}
 .closet-pet-preview img{display:block;width:92%;height:92%;object-fit:contain}
 .closet-pet-empty{padding:10px;color:#777;font-size:12px;font-weight:700}
+#closetTabContent .pic img{width:100%;height:100%;object-fit:contain}
+#closetTabContent .closet-selected{border-color:#9b6824}
 @media(max-width:700px){.closet-layout{grid-template-columns:1fr}.closet-preview-wrap{position:static;order:-1}.closet-preview,.closet-pet-preview{max-width:90px}}
 
 /* 已移除棋盤格，背景設透明 */
@@ -354,7 +356,7 @@ input[type="number"]{width:85px}
 
 <div id="modal" class="modal">
 <div class="panel">
-<button class="close" onclick="closeModal()">關閉</button>
+<button class="close" onclick="closeVisibleModal()">關閉</button>
 <div id="body"></div>
 </div>
 </div>
@@ -473,6 +475,8 @@ let currentUser = null;
 let backendAuthenticated = false;
 let syncUiEpoch = 0;
 let syncLocked = true;
+// 衣櫃草稿只存在當次視窗記憶體，不進入進度、快取或備份。
+let closetDraft=null;
 // UI only: never serialized with confirmed progress, edits or backups.
 const coopPendingUi = new Map();
 let coopUiEpoch = 0;
@@ -526,6 +530,7 @@ function clearSavedLogin(){
     try { localStorage.removeItem(LOGIN_SESSION_KEY); } catch {}
 }
 function applyAuthenticatedSession(account){
+    if(closetDraft) closeModal("session");
     coopUiEpoch++;
     currentUser=account;saveLogin();backendAuthenticated=false;
     document.getElementById("loginScreen").hidden=true;
@@ -565,7 +570,7 @@ function logout(){
     currentUser=null;
     clearSavedLogin();
     backendAuthenticated=false;
-    closeModal();
+    closeModal("session");
     void window.firebaseLogout?.();
     initializeLogin();
 }
@@ -1056,7 +1061,7 @@ function seedBuiltinBackgrounds(persist=true){
 
 function markChanged(){ unsavedChange = true; }
 window.addEventListener("beforeunload",event=>{
-    if(window.firebaseGameStore.hasPendingSave()){
+    if(window.firebaseGameStore.hasPendingSave() || closetHasChanges()){
         event.preventDefault();event.returnValue="";
     }
 });
@@ -1216,7 +1221,8 @@ function render(){
     updateCloudControls();
 }
 
-function openModal(content){
+function openModal(content,retainedCloset=null){
+    if(closetDraft && retainedCloset!==closetDraft && !leaveCloset()) return false;
     if(currentView?.type!=="coop") coopUiEpoch++;
     const body=document.getElementById("body");
     const preserved=new Map();
@@ -1250,13 +1256,20 @@ function openModal(content){
     updateCloudControls();
 }
 
-function closeModal(){
+function closeVisibleModal(){
+    if(closetDraft && currentView?.type==="closet") return submitClosetClose();
+    return closeModal();
+}
+function closeModal(reason="discard"){
+    if(closetDraft && !leaveCloset(["session","removed","saved"].includes(reason),reason)) return false;
     coopUiEpoch++;
     if(currentView?.type==="backend") backendAuthenticated=false;
     currentView=null;
     draftFields.clear();
     document.getElementById("body").innerHTML = "";
     document.getElementById("modal").classList.remove("open");
+    updateClosetControls();
+    return true;
 }
 
 document.addEventListener("keydown",event=>{
@@ -2104,12 +2117,155 @@ async function buyBg(id,pid){
     await runCommand({type:"purchase",studentId:id,kind:"background",itemId:pid},`purchase:${id}:${pid}`);
 }
 
-//衣櫃
+//衣櫃：只有明確的「關閉衣櫃」提交，其他關閉／替換均不自動儲存。
+function closetHasChanges(draft=closetDraft){
+    return !!draft && Object.values(draft.fields).some(field=>!field.ack);
+}
+function closetPending(draft=closetDraft){
+    return draft ? draft.store.pendingActions().filter(job=>job.command.type==="equip" && job.command.studentId===draft.id && ["clothes","background"].includes(job.command.kind)) : [];
+}
+function leaveCloset(force=false,reason="discard"){
+    const draft=closetDraft;
+    if(!draft) return true;
+    const pending=draft.saving || closetPending(draft).length>0;
+    const message=pending
+        ? "衣櫃仍有已送出、結果未確認的操作；離開不會取消它。尚未送出的試穿將捨棄，原操作仍由既有佇列確認。"
+        : "衣櫃試穿尚未儲存；離開將捨棄這次試穿，不會套用。";
+    if(reason!=="saved" && (closetHasChanges(draft)||pending)){
+        if(force) alert(message);
+        else if(!confirm(message+"確定離開？")){currentView=draft.view;return false;}
+    }
+    closetDraft=null;
+    if(currentView===draft.view) currentView=null;
+    return true;
+}
+function closetCurrent(draft){
+    return closetDraft===draft && currentView?.type==="closet" && currentView.id===draft.id
+        && currentUser===draft.user && window.firebaseGameStore===draft.store;
+}
+function reconcileClosetDraft(student){
+    const draft=closetDraft;
+    if(!draft || draft.id!==student.id) return;
+    const genderChanged=draft.gender!==student.gender;
+    draft.gender=student.gender;
+    for(const [key,field] of Object.entries(draft.fields)){
+        const clothes=key==="equippedClothes";
+        const pool=clothes ? (student.gender==="M"?state.clothesM:state.clothesF) : state.backgrounds;
+        const owned=clothes?student.ownedClothes:student.ownedBg;
+        if((clothes && genderChanged) || (field.value!==null && (!owned.includes(field.value)||!pool.some(item=>item.id===field.value)))){
+            delete draft.fields[key];draft.revision++;
+            draft.message="性別、持有權或商品資料已變更，無效的試穿已取消；請檢查預覽後再關閉衣櫃。";
+        }else if(field.ack && student[key]===field.value) delete draft.fields[key];
+    }
+}
+function closetSelection(student){
+    const selection={...student};
+    for(const [key,field] of Object.entries(closetDraft?.fields||{})) selection[key]=field.value;
+    return selection;
+}
+function previewClosetItem(id,key,pid){
+    const draft=closetDraft;
+    if(!draft || !closetCurrent(draft) || draft.id!==id || currentUser?.role!=="teacher" || draft.saving || closetPending(draft).length) return;
+    const student=state.students.find(item=>item.id===id);
+    if(!student) return closeModal("removed");
+    reconcileClosetDraft(student);
+    const clothes=key==="equippedClothes",pool=clothes?(student.gender==="M"?state.clothesM:state.clothesF):state.backgrounds;
+    if(!(clothes?student.ownedClothes:student.ownedBg).includes(pid) || !pool.some(item=>item.id===pid)) return;
+    const previous=draft.fields[key],base=previous?.ack?previous.value:previous?previous.base:student[key];
+    const value=closetSelection(student)[key]===pid?null:pid;
+    const baseAck=!!(previous?.ack || previous?.baseAck);
+    if(value===base){
+        if(baseAck) draft.fields[key]={base,value,ack:true};
+        else delete draft.fields[key];
+    }else draft.fields[key]={base,value,ack:false,baseAck};
+    draft.message="";
+    refreshClosetView();
+}
+function updateClosetControls(){
+    const draft=closetDraft,visible=draft && currentView?.type==="closet";
+    const close=document.querySelector("#modal .close");
+    if(close){close.textContent=visible?"關閉衣櫃":"關閉";close.disabled=!!(visible&&draft.saving);}
+    if(!visible) return;
+    const pending=closetPending(draft),blocked=draft.saving||pending.length>0;
+    document.querySelectorAll("#closetTabContent button").forEach(button=>{
+        delete button.dataset.cloudDisabled;button.disabled=blocked;
+    });
+    const status=document.getElementById("closetStatus"),retry=document.getElementById("closetRetry");
+    if(status){
+        status.textContent=draft.saving
+            ? (draft.store.canEdit()?"正在儲存衣櫃，請等候確認…":"連線中斷，已送出的結果尚未確認；保留試穿並等待原操作確認，請勿重複送出。")
+            : pending.length?"仍有上次裝備操作未確認；請先確認原操作，不可送出新的選擇。"
+            : draft.message || (!draft.store.canEdit()?"離線中：可繼續試穿，尚未儲存；連線恢復後請按關閉衣櫃。":closetHasChanges(draft)?"試穿尚未儲存；按「關閉衣櫃」才會提交最後選擇。":"點選服裝或背景可試穿；按「關閉衣櫃」才會提交變更。");
+        status.setAttribute("aria-busy",String(draft.saving));
+    }
+    if(retry){retry.hidden=!pending.length||draft.saving;retry.disabled=!draft.store.canEdit();}
+}
+async function retryClosetPending(){
+    const draft=closetDraft;
+    if(!draft || !closetCurrent(draft) || draft.saving || !draft.store.canEdit()) return;
+    const job=closetPending(draft)[0];
+    if(!job) return;
+    draft.saving=true;updateClosetControls();
+    try{
+        await draft.store.perform(job.command,job.key);
+        if(!closetCurrent(draft)) return;
+        const key=job.command.kind==="clothes"?"equippedClothes":"equippedBg";
+        draft.fields[key]={base:job.command.itemId,value:job.command.itemId,ack:true};
+        draft.message="上次操作已確認；請檢查預覽，再按關閉衣櫃。";
+    }catch(error){if(closetCurrent(draft)) draft.message="上次操作未完成："+(error.message||"請稍後重試。");}
+    finally{if(closetCurrent(draft)){draft.saving=false;refreshClosetView();}}
+}
+async function submitClosetClose(){
+    const draft=closetDraft;
+    if(!draft || !closetCurrent(draft) || draft.saving || currentUser?.role!=="teacher") return;
+    const student=state.students.find(item=>item.id===draft.id);
+    if(!student) return closeModal("removed");
+    const revision=draft.revision;
+    reconcileClosetDraft(student);
+    if(draft.revision!==revision){refreshClosetView();return;}
+    if(closetPending(draft).length){updateClosetControls();return;}
+    if(!closetHasChanges(draft)) return closeModal("saved");
+    if(!draft.store.canEdit()){draft.message="目前離線，試穿尚未儲存；請連線後再按關閉衣櫃。";updateClosetControls();return;}
+    draft.saving=true;draft.message="";updateClosetControls();
+    try{
+        for(const [key,kind] of [["equippedClothes","clothes"],["equippedBg","background"]]){
+            if(!closetCurrent(draft)) return;
+            const latest=state.students.find(item=>item.id===draft.id);
+            if(!latest){closeModal("removed");return;}
+            reconcileClosetDraft(latest);
+            if(draft.revision!==revision) return;
+            const field=draft.fields[key];
+            if(!field || field.ack) continue;
+            if(field.value!==latest[key]){
+                // Await the rejecting API, not runCommand (which swallows errors).
+                await draft.store.perform({type:"equip",studentId:draft.id,kind,itemId:field.value},`equip:${draft.id}:${kind}`,{equipmentIntentAt:draft.intentAt});
+                if(!closetCurrent(draft)) return;
+            }
+            // An acknowledgement is local submission bookkeeping, NOT stream state.
+            if(draft.fields[key]===field) field.ack=true;
+        }
+        if(closetCurrent(draft) && draft.revision===revision) closeModal("saved");
+    }catch(error){
+        if(closetCurrent(draft)){
+            const guidance=/還原|超過一天/.test(error.message||"")
+                ? " 這次試穿已過期；請按 Esc 確認捨棄後，重開衣櫃依最新資料重新選擇。"
+                : " 已確認的項目不會重送；其餘試穿保留，請檢查後再按關閉衣櫃。";
+            draft.message=(draft.message?draft.message+" ":"")+"衣櫃未全部儲存："+(error.message||"請稍後重試。")+guidance;
+        }
+    }finally{if(closetCurrent(draft)){draft.saving=false;refreshClosetView();}}
+}
 function closet(id,initialTab="clothes"){
     if(!requireTeacherFeature()) return;
     if(!canAccessStudent(id)) return;
     if(initialTab==="layouts") return openPetSelector(id);
-    currentView={type:"closet",id,tab:initialTab};
+    const student=state.students.find(item=>item.id===id);
+    if(!student) return;
+    if(!["clothes","bgs"].includes(initialTab)) initialTab="clothes";
+    if(closetDraft && (closetDraft.id!==id || closetDraft.user!==currentUser || closetDraft.store!==window.firebaseGameStore) && !leaveCloset()) return;
+    if(!closetDraft) closetDraft={id,user:currentUser,store:window.firebaseGameStore,gender:student.gender,fields:{},saving:false,message:"",revision:0,intentAt:window.firebaseGameStore.equipmentIntentTime?.()??Date.now()};
+    reconcileClosetDraft(student);
+    currentView={type:"closet",id,tab:initialTab,signature:closetStructureSignature(student)};
+    closetDraft.view=currentView;
     openModal(`<h2>${id}號｜衣櫃</h2>
     <div class="closet-layout">
         <div>
@@ -2123,7 +2279,7 @@ function closet(id,initialTab="clothes"){
             <h3>穿搭預覽</h3>
             <div id="closetPreview"></div>
         </aside>
-    </div>`);
+    </div><p id="closetStatus" role="status" aria-live="polite"></p><button id="closetRetry" onclick="retryClosetPending()" hidden>確認上次操作</button>`,closetDraft);
     switchClosetTab(id,initialTab);
 }
 function openPetSelector(id){
@@ -2136,23 +2292,36 @@ function openPetSelector(id){
     const petCards=groupedClosetCards(pets,pet=>`<div class="product"><div class="pic">${pet.image?`<img src="${esc(pet.image)}" alt="${esc(pet.name)}">`:"🐾"}</div><b>${esc(pet.name)}</b><div><button onclick="toggleEquipLayout(${id},'${esc(pet.id)}')">${student.equippedLayout.includes(pet.id)?"卸下":"使用"}</button></div></div>`,"還沒有其他寵物");
     openModal(`<h2>${id}號｜更換寵物</h2><button onclick="openPetMood(${id})">← 返回寵物互動</button><div class="pet-selector">${defaultPetCard}${petCards}</div>`);
 }
-function closetPreviewHtml(id){
-    const s = state.students[id-1];
-    const clothPool = s.gender==="M" ? state.clothesM : state.clothesF;
-    const cloth = clothPool.find(item=>item.id===s.equippedClothes);
-    const background = state.backgrounds.find(item=>item.id===s.equippedBg);
-    const pet = state.layouts.find(item=>s.equippedLayout.includes(item.id)) || {
-        name:DEFAULT_PET_NAME,
-        image:DEFAULT_PET_IMAGE
+function closetStructureSignature(student){
+    return JSON.stringify([student.id,student.gender,currentUser]);
+}
+// 僅供顯示的裝備覆寫，不修改權威狀態。
+function closetPreviewModel(student,equipment=student){
+    const clothPool=student.gender==="M" ? state.clothesM : state.clothesF;
+    const cloth=clothPool.find(item=>item.id===equipment.equippedClothes);
+    const background=state.backgrounds.find(item=>item.id===equipment.equippedBg);
+    const pet=state.layouts.find(item=>equipment.equippedLayout.includes(item.id));
+    return {
+        character:cloth?.image || (student.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png"),
+        background:background?.image || "",
+        petImage:pet?.image || DEFAULT_PET_IMAGE,
+        petName:pet?.name || DEFAULT_PET_NAME
     };
-    const characterImage = cloth?.image || (s.gender==="M" ? "/images/boy/b0.png" : "/images/girl/g0.png");
-    return `<div class="closet-preview">
-        ${background?`<div class="bg-layer" style="background-image:url('${esc(background.image)}')"></div>`:""}
-        <div class="character" style="background-image:url('${esc(characterImage)}')"></div>
-    </div>
-    <div class="closet-pet-preview">
-        ${pet?`<img src="${esc(pet.image)}" alt="${esc(pet.name)}">`:`<div class="closet-pet-empty">尚未裝備寵物</div>`}
-    </div>`;
+}
+function refreshClosetPreview(student,equipment){
+    const host=document.getElementById("closetPreview");
+    if(!host.firstElementChild){
+        host.innerHTML=`<div class="closet-preview"><div class="bg-layer"></div><div class="character"></div></div>
+            <div class="closet-pet-preview"><img alt="" decoding="async"></div>`;
+        host.closetModel=null;
+    }
+    const next=closetPreviewModel(student,equipment),previous=host.closetModel;
+    if(previous?.character!==next.character) host.querySelector(".character").style.backgroundImage=`url(${JSON.stringify(next.character)})`;
+    if(previous?.background!==next.background) host.querySelector(".bg-layer").style.backgroundImage=next.background ? `url(${JSON.stringify(next.background)})` : "";
+    const pet=host.querySelector("img");
+    if(previous?.petImage!==next.petImage) pet.setAttribute("src",next.petImage);
+    if(previous?.petName!==next.petName) pet.alt=next.petName;
+    host.closetModel=next;
 }
 function groupedClosetCards(list,card,emptyText){
     if(!list.length) return `<div class="empty">${emptyText}</div>`;
@@ -2166,37 +2335,61 @@ function groupedClosetCards(list,card,emptyText){
 }
 function switchClosetTab(id,tab){
     if(!canAccessStudent(id)) return;
-    if(currentView?.type==="closet") currentView.tab=tab;
-    const s = state.students[id-1];
-    const clothPool = s.gender==="M"?state.clothesM:state.clothesF;
-    let html="";
-    if(tab==="clothes"){
-        const list = clothPool.filter(x=>s.ownedClothes.includes(x.id));
-        html = groupedClosetCards(list,p=>`<div class="product">
-            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"👗"}</div>
-            <b>${esc(p.name)}</b>
-            <div><button onclick="equipClothes(${id},'${esc(p.id)}')">${s.equippedClothes===p.id?"脫下":"穿上"}</button></div>
-        </div>`,"還沒有服裝");
-    }
-    if(tab==="bgs"){
-        const list = state.backgrounds.filter(x=>s.ownedBg.includes(x.id));
-        html = groupedClosetCards(list,p=>`<div class="product">
-            <div class="pic">${p.image?`<img src="${esc(p.image)}">`:"🖼"}</div>
-            <b>${esc(p.name)}</b>
-            <div><button onclick="equipBg(${id},'${esc(p.id)}')">${s.equippedBg===p.id?"移除":"設為背景"}</button></div>
-        </div>`,"還沒有背景");
-    }
-    document.getElementById("closetTabContent").innerHTML = html;
-    document.getElementById("closetPreview").innerHTML = closetPreviewHtml(id);
-    document.querySelectorAll("#modal .tabs .tab").forEach((el,i)=>{
-        el.classList.toggle("active", ["clothes","bgs"][i]===tab);
-    });
+    if(currentView?.type!=="closet" || currentView.id!==id || !["clothes","bgs"].includes(tab)) return;
+    currentView.tab=tab;
+    refreshClosetView();
 }
-async function equipClothes(id,pid){
-    if(!canAccessStudent(id)) return;
-    const student=state.students.find(s=>s.id===id);
-    if(!student) return;
-    await runCommand({type:"equip",studentId:id,kind:"clothes",itemId:student.equippedClothes===pid?null:pid},`equip:${id}:clothes`);
+function refreshClosetView(equipment=null){
+    const view=currentView;
+    if(view?.type!=="closet" || !requireTeacherFeature() || !canAccessStudent(view.id)) return;
+    const student=state.students.find(item=>item.id===view.id);
+    if(!student){closeModal("removed");return;}
+    reconcileClosetDraft(student);
+    const host=document.getElementById("closetTabContent");
+    if(!host || view.signature!==closetStructureSignature(student)) return closet(view.id,view.tab);
+    // Optional overrides affect rendering only, never state, commands, cache or backups.
+    const selection=equipment ? {...student,...equipment} : closetSelection(student);
+    for(const tab of ["clothes","bgs"]){
+        const clothes=tab==="clothes";
+        const pool=clothes ? (student.gender==="M" ? state.clothesM : state.clothesF) : state.backgrounds;
+        const owned=clothes ? student.ownedClothes : student.ownedBg;
+        const list=pool.filter(item=>owned.includes(item.id));
+        // Only rendered catalogue fields matter; unrelated metadata/resources do not.
+        const signature=JSON.stringify(list.map(item=>[item.id,item.name,item.image||"",item.level||"R"]));
+        let panel=host.querySelector(`[data-closet-tab="${tab}"]`);
+        if(panel && panel.closetSignature!==signature){panel.remove();panel=null;}
+        // Do not instantiate images in an unvisited/inactive invalidated tab.
+        if(!panel && view.tab===tab){
+            panel=document.createElement("div");
+            panel.dataset.closetTab=tab;
+            panel.closetSignature=signature;
+            panel.innerHTML=groupedClosetCards(list,p=>`<div class="product" data-closet-item="${esc(p.id)}">
+                <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" decoding="async">`:clothes?"👗":"🖼"}</div>
+                <b>${esc(p.name)}</b>
+                <div><button onclick="${clothes?"equipClothes":"equipBg"}(${view.id},'${esc(p.id)}')"></button></div>
+            </div>`,clothes?"還沒有服裝":"還沒有背景");
+            host.appendChild(panel);
+        }
+        if(!panel) continue;
+        if(panel.hidden!==(view.tab!==tab)) panel.hidden=view.tab!==tab;
+        const equipped=clothes ? selection.equippedClothes : selection.equippedBg;
+        panel.querySelectorAll("[data-closet-item]").forEach(card=>{
+            const selected=card.dataset.closetItem===equipped,button=card.querySelector("button");
+            const label=clothes ? (selected?"脫下":"穿上") : (selected?"移除":"設為背景");
+            if(button.textContent!==label) button.textContent=label;
+            if(button.getAttribute("aria-pressed")!==String(selected)) button.setAttribute("aria-pressed",String(selected));
+            if(card.classList.contains("closet-selected")!==selected) card.classList.toggle("closet-selected",selected);
+        });
+    }
+    refreshClosetPreview(student,selection);
+    document.querySelectorAll("#modal .tabs .tab").forEach((el,i)=>{
+        const active=["clothes","bgs"][i]===view.tab;
+        if(el.classList.contains("active")!==active) el.classList.toggle("active",active);
+    });
+    updateCloudControls();
+}
+function equipClothes(id,pid){
+    previewClosetItem(id,"equippedClothes",pid);
 }
 async function toggleEquipLayout(id,pid){
     if(!canAccessStudent(id)) return;
@@ -2213,11 +2406,8 @@ async function equipDefaultPet(id){
     if(currentUser?.role==="student") {await runCommand({type:"equipPet",petId:null},"equip-pet:default");return;}
     await runCommand({type:"equip",studentId:id,kind:"layout",itemId:null},`equip:${id}:layout`);
 }
-async function equipBg(id,pid){
-    if(!canAccessStudent(id)) return;
-    const student=state.students.find(s=>s.id===id);
-    if(!student) return;
-    await runCommand({type:"equip",studentId:id,kind:"background",itemId:student.equippedBg===pid?null:pid},`equip:${id}:background`);
+function equipBg(id,pid){
+    previewClosetItem(id,"equippedBg",pid);
 }
 
 //後台
@@ -3393,7 +3583,7 @@ function refreshVisibleView(){
     }
     if(view.type==="login") return;
     if(view.id && ["tasks","shop","closet","pet","pet-selector"].includes(view.type) && !state.students.some(s=>s.id===view.id)){
-        closeModal();return;
+        closeModal("removed");return;
     }
     const panel=document.querySelector("#modal .panel"),scroll=panel?.scrollTop||0;
     const page=document.querySelector(".backend-page.active")?.id;
@@ -3402,7 +3592,7 @@ function refreshVisibleView(){
     try{
         if(view.type==="tasks") tasks(view.id);
         if(view.type==="shop"){shop(view.id);switchShopTab(view.id,view.tab);}
-        if(view.type==="closet") closet(view.id,view.tab);
+        if(view.type==="closet") refreshClosetView();
         if(view.type==="pet-selector") openPetSelector(view.id);
         if(view.type==="pet"){
             openPetMood(view.id);
@@ -3452,6 +3642,15 @@ function updateCloudControls(){
         }
     });
     updateCoopMemberControls();
+    updateClosetControls();
+}
+// 在其他視窗入口的任何副作用前確認捨棄，避免 currentView 已換而 DOM 仍是衣櫃。
+for(const name of ["openDrawingBoard","openPetMood","renderBossBattle","tasks","openCoopTasks","openCoopTask","shop","openPetSelector","openBackend","backend"]){
+    const original=window[name];
+    window[name]=function(...args){
+        if(closetDraft && !leaveCloset()) return;
+        return original(...args);
+    };
 }
 // 啟動只呈現快取；排程檢查另以明確操作在最新雲端資料上執行。
 render();
@@ -3562,6 +3761,7 @@ setInterval(syncScheduledTasks,30000);
       return;
     }
     if(authTransition) return;
+    if(closetDraft) closeModal("session");
     currentUser=null;clearSavedLogin();backendAuthenticated=false;stopStudentMode();stopTeacherProjectionMode();sync?.setConnected(false);initializeLogin();
   });
   const getToken=async()=>{
@@ -3612,6 +3812,17 @@ setInterval(syncScheduledTasks,30000);
         if(!['clothesM','clothesF','backgrounds'].includes(category)) throw new Error("商品類別不正確");
         return {[category]:(await restClient.read(`games/classroom-115/progress/${category}`))||[]};
       },
+      getEquipmentCatalogueHint:(category,itemId)=>{
+        const catalogue=typeof state==='undefined'?null:state?.[category];
+        return Array.isArray(catalogue)?catalogue.findIndex(item=>item?.id===itemId):-1;
+      },
+      readEquipmentItemId:async(category,index)=>{
+        if(!['clothesM','clothesF','backgrounds'].includes(category)||!Number.isSafeInteger(index)||index<0) throw new Error("商品索引不正確");
+        return restClient.read(`games/classroom-115/progress/${category}/${index}/id`);
+      },
+      transactPreparedProgressStudent:typeof restClient.transactPrepared==='function'
+        ? (studentId,prepare)=>restClient.transactPrepared(`games/classroom-115/progress/students/${studentId-1}`,prepare)
+        : undefined,
       writeRoot:updates=>update(ref(database),updates),
       transactRoom:updater=>restClient.transact("games/classroom-115",updater),
       transactProgressStudent:(studentId,updater)=>restClient.transact(`games/classroom-115/progress/students/${studentId-1}`,updater),
@@ -3627,7 +3838,7 @@ setInterval(syncScheduledTasks,30000);
       newId:()=>crypto.randomUUID(),now:()=>Date.now()+serverOffset,
       loadPending:()=>{try{return JSON.parse(sessionStorage.getItem(pendingKey)||"[]");}catch{return [];}},
       persistPending:jobs=>sessionStorage.setItem(pendingKey,JSON.stringify(jobs)),
-      pendingChanged:()=>window.updateCoopMemberControls?.(),
+      pendingChanged:()=>{window.updateCoopMemberControls?.();window.updateClosetControls?.();},
       recovered:(command,result)=>{
           if(command.type==="lottery" && result?.item) showLotteryResult(result.item,`上次抽獎結果：${result.item.name}${result.duplicate?"，重複商品已返還 20 代幣":""}`);
           if(command.type==="coopComplete") notifyCoopReward(result);

@@ -44,5 +44,20 @@ export function createFirebaseRestClient({databaseURL,getToken,fetch:request=glo
             }
             throw Object.assign(new Error('資料持續被更新，稍後會重試。'),{retryable:true});
         },
+        // Separate API: preparation may read other server nodes, but the PUT
+        // always uses this attempt's student snapshot and server-issued ETag.
+        // A 412 discards BOTH the snapshot and the asynchronous validation.
+        async transactPrepared(path,prepare){
+            for(let attempt=0;attempt<20;attempt++){
+                const current=await send(path,{headers:{'X-Firebase-ETag':'true'}});
+                if(!current.etag) throw new Error('雲端回應缺少 ETag，已停止寫入。');
+                const next=await prepare(structuredClone(current.value));
+                if(next===undefined) return {committed:false,value:current.value};
+                const saved=await send(path,{method:'PUT',headers:{'Content-Type':'application/json','if-match':current.etag},body:JSON.stringify(next)});
+                if(saved.status===412) continue;
+                return {committed:true,value:saved.value};
+            }
+            throw Object.assign(new Error('資料持續被更新，稍後會重試。'),{retryable:true});
+        },
     };
 }

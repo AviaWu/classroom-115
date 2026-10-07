@@ -188,7 +188,7 @@ export function createCloudSync(io) {
         if(a.type==='saveDrawing') return a.drawing.data===b.drawing.data;
         return JSON.stringify(a)===JSON.stringify(b);
     }
-    function perform(command,key=JSON.stringify(command)){
+    function perform(command,key=JSON.stringify(command),options={}){
         const controls=jobs.flatMap(job=>pendingMembers(job).map(member=>({job,member})));
         const sameControl=controls.filter(({member})=>member.key===key);
         const match=sameControl.find(({member})=>equivalent(member.command,command));
@@ -200,7 +200,13 @@ export function createCloudSync(io) {
         if(!canManage() || (remote===null && !['initialize','restore'].includes(command.type))) {
             return Promise.reject(new Error(connected && verified ? '雲端尚無資料，請由老師初始化或還原備份。' : '離線中'));
         }
-        const member=existing || {id:io.newId(),createdAt:io.now?.()??Date.now(),key,command:structuredClone(command)};
+        const now=io.now?.()??Date.now();
+        // Closet intent predates its delayed submission. Keep the original restore
+        // barrier/expiry semantics; retries must never replace a queued timestamp.
+        const intent=options.equipmentIntentAt;
+        const createdAt=command.type==='equip' && ['clothes','background'].includes(command.kind)
+            && Number.isFinite(intent) && intent>0 ? Math.min(intent,now) : now;
+        const member=existing || {id:io.newId(),createdAt,key,command:structuredClone(command)};
         const job=match?.job||member,wasRestored=job.restored;
         job.restored=false;receiptMisses.delete(job);
         member.promise=new Promise((resolve,reject)=>{member.resolve=resolve;member.reject=reject;});
@@ -226,6 +232,7 @@ export function createCloudSync(io) {
     return {
         available:true,canEdit,canManage,perform,refresh,cleanupEvictedArtworks,
         editToken:()=>epoch,
+        equipmentIntentTime:()=>io.now?.()??Date.now(),
         hasPendingSave:()=>jobs.length>0,
         pendingActions:()=>jobs.flatMap(job=>pendingMembers(job).map(({id,key,command,createdAt})=>({id,key,command:structuredClone(command),createdAt}))),
         async flush(){

@@ -84,7 +84,7 @@ export function createTeacherProgressSubscriber(dependencies){
 
 // REST handles direct reads and artwork payloads. The teacher page serializes commands
 // in a room transaction and projects personal changes through per-student transactions.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readOperationData,readPublicProjectionData,readCompleteProgressData,readProjectionData,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readOperationData,readPublicProjectionData,readCompleteProgressData,readProjectionData,readProgress,readRoomMetadata,readEquipmentCatalogues,getEquipmentCatalogueHint,readEquipmentItemId,transactPreparedProgressStudent,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -218,9 +218,47 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         if(command.kind==='background') return {owned:'ownedBg',equipped:'equippedBg'};
         return null;
     };
+    async function executePreparedEquipment(job,info){
+        const command=job.command;
+        const checkRestore=async()=>{
+            const metadata=await readRoomMetadata();
+            if(metadata?.restoredAt&&job.createdAt<=metadata.restoredAt) throw new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。');
+        };
+        try{
+            await checkRestore();
+            let settled=false;
+            const transaction=await transactPreparedProgressStudent(command.studentId,async current=>{
+                settled=false;
+                if(!current || current.id!==command.studentId) throw new Error('這位學生已不存在，請重新整理成員名單');
+                if(typeof command.itemId!=='string' || !Array.isArray(current[info.owned]) || !current[info.owned].includes(command.itemId)) throw new Error('衣櫃尚未擁有這項商品');
+                const category=command.kind==='clothes' ? (current.gender==='M'?'clothesM':'clothesF') : 'backgrounds';
+                // The local index is only a hint. Verify the scalar ID on the
+                // server in the category derived from THIS student snapshot.
+                const index=typeof getEquipmentCatalogueHint==='function'?getEquipmentCatalogueHint(category,command.itemId):undefined;
+                let found=false;
+                if(Number.isSafeInteger(index)&&index>=0&&typeof readEquipmentItemId==='function'){
+                    found=(await readEquipmentItemId(category,index))===command.itemId;
+                }
+                if(!found){
+                    const catalogue=(await readEquipmentCatalogues(category))?.[category];
+                    if(!Array.isArray(catalogue)||!catalogue.some(item=>item?.id===command.itemId)) throw new Error('這項商品已不存在');
+                }
+                // Preserve the second restore barrier after catalogue validation.
+                // These separate nodes are NOT a globally atomic snapshot.
+                await checkRestore();
+                settled=true;
+                if(current[info.equipped]===command.itemId) return;
+                return {...current,[info.equipped]:command.itemId};
+            });
+            if(!transaction?.committed&&!settled) throw Object.assign(new Error('衣櫃裝備交易未完成，稍後會重試。'),{retryable:true});
+            return {equipment:{studentId:command.studentId,field:info.equipped,value:command.itemId},result:{ok:true}};
+        }catch(error){throw markRetryable(error);}
+    }
     async function executeLegacyEquipment(job){
         const command=job.command,info=legacyEquipmentInfo(command);
         if(now()-job.createdAt>24*60*60*1000) throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
+        // Unequip and adapters without async preparation retain their old flow.
+        if(command.itemId!==null&&typeof transactPreparedProgressStudent==='function') return executePreparedEquipment(job,info);
         const catalogues={};
         try{
             // Discover the category from the server student, never from UI gender.
