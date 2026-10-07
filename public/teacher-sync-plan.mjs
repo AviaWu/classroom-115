@@ -1,3 +1,4 @@
+import {normalizeProgress} from './game-operations.mjs';
 import {applyStudentOperation} from './student-operations.mjs';
 import {createStudentProjections} from './student-projections.mjs';
 
@@ -32,6 +33,37 @@ function publicDataFor(projections,uid){
         publicBosses:clone(projections.publicBosses||{}),
         publicQuestionPapers:clone(projections.publicQuestionPapers||{}),
     };
+}
+
+// This scope is LOCAL to a successful room transaction, never a compact wire
+// plan. Old tabs must still see complete projection payloads when recovering.
+// Unknown/administrative commands and every recovered plan use full repair.
+export function teacherProjectionScope({beforeProgress,afterProgress,command,uidByStudentId}){
+    const ordinary=['completeTask','purchase','lottery','resources','petMood','bossAttack','equip','coopComplete'];
+    if(!ordinary.includes(command.type)) return {pets:'all',public:true};
+    const before=createStudentProjections(beforeProgress,uidByStudentId);
+    const after=createStudentProjections(afterProgress,uidByStudentId);
+    return {
+        pets:Object.values(uidByStudentId||{}).filter(uid=>!equal(before.studentPets[uid],after.studentPets[uid])),
+        public:!equal(before.publicBosses,after.publicBosses)||!equal(before.publicQuestionPapers,after.publicQuestionPapers),
+    };
+}
+
+// A deliberately narrow, local-only shortcut. Recompute with each room ETag;
+// neither an empty personal plan nor claimed:false alone proves shared-only.
+export function createCoopSharedProgress({currentProgress,beforeProgress,afterProgress,command,result,plan,scope}){
+    if(command.type!=='coopComplete'||result?.claimed!==false||Object.keys(plan.studentPlans).length||
+        scope.public||!Array.isArray(scope.pets)||scope.pets.length) return null;
+    const before=normalizeProgress(beforeProgress);
+    const task=afterProgress.coopTasks.find(item=>item.id===command.taskId);
+    if(!task||task.claimed||afterProgress.students.every(student=>task.completedBy.includes(student.id))) return null;
+    const expected={...before,coopTasks:before.coopTasks.map(item=>item.id===task.id?{...item,completedBy:task.completedBy}:item)};
+    // Includes unmapped legacy students and every non-coop field, not only the
+    // mapped personal plans. Any extra domain change needs the coordinator.
+    if(!equal(expected,afterProgress)) return null;
+    // Never serialize the hydrated view here: its personal states were read
+    // before this ETag. Preserve ALL latest legacy/compact and non-coop fields.
+    return {...currentProgress,coopTasks:currentProgress.coopTasks.map(item=>item?.id===task.id?{...item,completedBy:clone(task.completedBy)}:item)};
 }
 
 export function createTeacherSyncPlan({beforeProgress,afterProgress,command,result,uidByStudentId,clock}){

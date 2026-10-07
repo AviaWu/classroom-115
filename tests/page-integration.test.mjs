@@ -100,7 +100,7 @@ for(const order of ['progress-first','states-first']) test(`browser teacher wiri
     const progress={...fixture(),students:[{id:1,gender:'M',ownedClothes:['shirt']}],questionPapers:[{id:'paper',name:'試卷',questions:[{id:'q',text:'題目',options:['對','錯'],answerIndex:0}]}]};
     const root={games:{'classroom-115':{progress}},studentRoster:{one:{studentId:1,active:true}},
         studentStates:{one:{studentId:1,tokens:67,lotteryTickets:2,petAffection:4,lastPetMoodDate:''}}};
-    const callbacks=new Map(),views=[],errors=[],writes=[];let authCallback,syncInstance;
+    const callbacks=new Map(),views=[],errors=[],writes=[],reads=[];let authCallback,syncInstance;
     const request=async(input,options)=>{
         const path=new URL(input).pathname.slice(1,-5),parts=path.split('/');
         if(options.method==='PUT'){
@@ -109,6 +109,7 @@ for(const order of ['progress-first','states-first']) test(`browser teacher wiri
             const parent=parts.slice(0,-1).reduce((value,key)=>value[key],root);
             parent[parts.at(-1)]=JSON.parse(options.body);
         }
+        if(!options.method) {assert.equal(options.cache,'no-store');reads.push(path);}
         const value=parts.reduce((value,key)=>value?.[key],root);
         return Response.json(value??null,{headers:{ETag:'"page-etag"'}});
     };
@@ -135,11 +136,22 @@ for(const order of ['progress-first','states-first']) test(`browser teacher wiri
     (order==='progress-first'?sendStates:sendProgress)();
     assert.equal(syncInstance.canEdit(),true);assert.equal(views.at(-1).students[0].tokens,67);
     assert.equal(views.at(-1).questionPapers[0]?.id,'paper');
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(await syncInstance.flush(),true);assert.deepEqual(reads,[]);
     root.studentStates.one.tokens=89; // Server reward not yet seen in the subscription.
     const backup=await context.window.readLatestProgress();
+    const budget=['games/classroom-115','studentRoster','studentStates'];
+    assert.deepEqual(reads,budget);reads.length=0;
     assert.equal(backup.students[0].tokens,89);assert.equal(Object.hasOwn(progress.students[0],'tokens'),false);
     await syncInstance.refresh();
+    assert.deepEqual(reads,budget);reads.length=0;
     assert.equal(views.at(-1).students[0].tokens,89);
+    for(const barrier of [{_projectionSync:{operationId:'pending'}},{operations:{pending:{phase:'projecting'}}}]){
+        Object.assign(root.games['classroom-115'],barrier);
+        await assert.rejects(context.window.readLatestProgress(),/同步.*備份/);
+        assert.deepEqual(reads,budget);reads.length=0;
+        delete root.games['classroom-115']._projectionSync;delete root.games['classroom-115'].operations;
+    }
     await syncInstance.perform({type:'equip',studentId:1,kind:'clothes',itemId:'shirt'});
     // Equipment acknowledgements do not replace the display with a stale REST snapshot.
     assert.equal(views.at(-1).students[0].tokens,89);

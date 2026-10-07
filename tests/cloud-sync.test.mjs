@@ -218,6 +218,128 @@ test('poll ticks during a slow server read coalesce without keeping refresh aliv
 });
 
 const settleBackground = () => new Promise(resolve=>setImmediate(resolve));
+const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
+function receiptHarness(t,{pending=true}={}){
+    let clock=1000,reads=0,local,receiptHook=()=>null,executeHook=()=>({progress:progress(25),result:{ok:true}}),readHook=()=>progress(20);
+    const callbacks=[],queries=[],executions=[],recovered=[],stored=[],errors=[];
+    const command={type:'resources',amount:5},old={id:'old',key:'old-control',createdAt:500,command};
+    const sync=createCloudSync({
+        subscribeRemote:(next,error)=>{callbacks.push({next,error});return ()=>{};},
+        readRemote:async()=>{reads++;return readHook();},
+        readReceipt:async id=>{queries.push(id);return receiptHook(id);},
+        execute:async job=>{executions.push(clone(job.command));return executeHook(job);},
+        loadPending:()=>pending?[old]:[],persistPending:jobs=>stored.push(clone(jobs)),
+        recovered:(command,result)=>recovered.push({command,result}),applyState:value=>local=clone(value),
+        lock(){},status(){},error:error=>errors.push(error),now:()=>clock,newId:()=> 'new',setInterval:()=>0,clearInterval(){},
+    });
+    t.after(()=>sync.dispose());sync.setConnected(true);
+    return {sync,queries,executions,recovered,stored,errors,command,callbacks,
+        get reads(){return reads;},get local(){return local;},advance:ms=>clock+=ms,
+        emit:(value=progress(20))=>callbacks.at(-1).next(value),
+        receipt:fn=>receiptHook=fn,execute:fn=>executeHook=fn,read:fn=>readHook=fn};
+}
+test('receipt budget shares in-flight queries across snapshot bursts, refresh and flush',async t=>{
+    const h=receiptHarness(t),gate=deferred();h.receipt(()=>gate.promise);
+    for(let i=0;i<30;i++) h.emit();
+    const refresh=h.sync.refresh(),flush=h.sync.flush();await settleBackground();
+    assert.deepEqual(h.queries,['old']);assert.equal(h.reads,1);
+    gate.resolve({result:{ok:true}});assert.equal(await refresh,true);assert.equal(await flush,true);
+    assert.equal(h.recovered.length,1);assert.equal(h.stored.length,1);assert.equal(h.sync.hasPendingSave(),false);
+    assert.equal(h.executions.length,0);
+});
+test('negative receipt budget cools down snapshots only and never cancels an unresolved operation',async t=>{
+    const h=receiptHarness(t);h.emit();await settleBackground();
+    for(let i=0;i<30;i++){h.emit();await settleBackground();}
+    assert.equal(h.queries.length,1);assert.equal(h.sync.hasPendingSave(),true);assert.equal(h.sync.canManage(),true);
+    h.advance(4999);h.emit();await settleBackground();assert.equal(h.queries.length,1);
+    h.advance(1);h.emit();await settleBackground();assert.equal(h.queries.length,2);
+    await h.sync.refresh();assert.equal(h.queries.length,3);
+    assert.equal(await h.sync.flush(),false);assert.equal(h.queries.length,4);assert.equal(h.reads,1);
+    assert.equal(h.stored.length,0);assert.equal(h.executions.length,0);assert.deepEqual(h.errors,[]);
+    h.sync.setConnected(false);h.sync.setConnected(true);h.emit();await settleBackground();assert.equal(h.queries.length,5);
+    h.sync.setActive(false);h.sync.setActive(true);h.receipt(()=>({result:{ok:true}}));h.emit();await settleBackground();
+    assert.equal(h.queries.length,6);assert.equal(h.recovered.length,1);assert.equal(h.sync.hasPendingSave(),false);
+});
+for(const transition of ['reconnect','reactivate','dispose']) for(const response of ['success','failure']) test(`stale receipt ${response} cannot affect ${transition}`,async t=>{
+    const h=receiptHarness(t),old=deferred(),fresh=deferred();h.receipt(()=>old.promise);h.emit();await settleBackground();
+    if(transition==='reconnect'){h.sync.setConnected(false);h.sync.setConnected(true);}
+    if(transition==='reactivate'){h.sync.setActive(false);h.sync.setActive(true);}
+    if(transition==='dispose') h.sync.dispose();
+    else {h.receipt(()=>fresh.promise);h.emit(progress(70));await settleBackground();}
+    if(response==='success') old.resolve({result:{old:true}});else old.reject(new TypeError('old request'));
+    await settleBackground();
+    assert.equal(h.recovered.length,0);assert.equal(h.stored.length,0);assert.equal(h.sync.hasPendingSave(),true);assert.deepEqual(h.errors,[]);
+    if(transition==='dispose'){
+        h.sync.setActive(true);h.sync.setConnected(true);h.emit(progress(999));
+        assert.equal(h.sync.canManage(),false);assert.equal(h.local.students[0].tokens,20);assert.equal(h.queries.length,1);
+    }else{
+        assert.equal(h.sync.canManage(),true);h.emit();await settleBackground();assert.equal(h.queries.length,2);
+        fresh.resolve({result:{fresh:true}});await settleBackground();assert.equal(h.recovered.length,1);
+        assert.deepEqual(h.recovered[0].result,{fresh:true});
+    }
+});
+for(const response of ['success','failure']) test(`explicit retry owns settlement instead of its older receipt ${response}`,async t=>{
+    const h=receiptHarness(t),receipt=deferred(),execute=deferred();h.receipt(()=>receipt.promise);h.execute(()=>execute.promise);
+    h.emit();await settleBackground();const pending=h.sync.perform(h.command,'old-control');
+    if(response==='success') receipt.resolve({result:{stale:true}});else receipt.reject(new TypeError('stale failure'));
+    await settleBackground();assert.equal(h.sync.hasPendingSave(),true);assert.equal(h.recovered.length,0);assert.equal(h.sync.canManage(),true);
+    execute.resolve({progress:progress(25),result:{ok:true}});assert.deepEqual(await pending,{ok:true});
+    assert.equal(h.executions.length,1);assert.equal(h.sync.hasPendingSave(),false);assert.deepEqual(h.errors,[]);
+});
+test('receipt request failure can be explicitly refreshed without negative caching',async t=>{
+    const h=receiptHarness(t);h.receipt(()=>{throw new TypeError('offline');});h.emit();await settleBackground();
+    assert.equal(h.sync.canManage(),false);assert.equal(h.sync.hasPendingSave(),true);
+    h.receipt(()=>({result:{ok:true}}));assert.equal(await h.sync.refresh(),true);
+    assert.equal(h.queries.length,2);assert.equal(h.recovered.length,1);
+});
+test('verified realtime queue drain has zero full reads and still waits for every queued command',async t=>{
+    const h=receiptHarness(t,{pending:false}),gate=deferred();h.emit();await settleBackground();
+    assert.equal(await h.sync.flush(),true);assert.equal(h.reads,0);
+    h.execute(async()=>{await gate.promise;return {progress:progress(30),result:{ok:true}};});
+    const a=h.sync.perform(h.command,'a'),b=h.sync.perform({...h.command,amount:7},'b');
+    let drained=false;const flush=h.sync.flush().then(value=>{drained=true;return value;});await settleBackground();
+    assert.equal(drained,false);assert.equal(h.reads,0);gate.resolve();
+    assert.equal(await flush,true);await Promise.all([a,b]);assert.equal(h.executions.length,2);assert.equal(h.reads,0);
+});
+for(const transition of ['disconnect','hide','dispose']) test(`queue drain cannot report success after ${transition}`,async t=>{
+    const h=receiptHarness(t,{pending:false}),gate=deferred();h.emit();await settleBackground();h.execute(()=>gate.promise);
+    const pending=h.sync.perform(h.command),flush=h.sync.flush();await settleBackground();
+    if(transition==='disconnect') h.sync.setConnected(false);
+    if(transition==='hide') h.sync.setActive(false);
+    if(transition==='dispose') h.sync.dispose();
+    gate.resolve({progress:progress(99),result:{ok:true}});await pending;
+    assert.equal(await flush,false);assert.equal(h.local.students[0].tokens,20);assert.equal(await h.sync.flush(),false);assert.equal(h.reads,0);
+});
+test('flush refreshes unverified connections and returns false on uncertain writes without waiting forever',async t=>{
+    const h=receiptHarness(t,{pending:false});assert.equal(await h.sync.flush(),true);assert.equal(h.reads,1);
+    h.execute(()=>{throw new TypeError('ack lost');});const pending=h.sync.perform(h.command);
+    assert.equal(await h.sync.flush(),false);assert.equal(h.sync.hasPendingSave(),true);assert.equal(h.sync.canManage(),false);
+    h.execute(()=>({progress:progress(25),result:{ok:true}}));assert.equal(await h.sync.flush(),true);await pending;
+    assert.equal(h.reads,2);assert.equal(h.sync.hasPendingSave(),false);
+});
+test('a command queued immediately after an acknowledgement cannot be stranded behind a finishing worker',async t=>{
+    const h=receiptHarness(t,{pending:false});h.emit();await settleBackground();
+    await h.sync.perform(h.command,'first');
+    const second=h.sync.perform({...h.command,amount:7},'second');
+    await settleBackground();assert.equal(h.executions.length,2);await second;
+    assert.equal(await h.sync.flush(),true);
+});
+test('flush reports a domain rejection during drain rather than an empty-queue success',async t=>{
+    const h=receiptHarness(t,{pending:false}),gate=deferred();h.emit();await settleBackground();h.execute(()=>gate.promise);
+    const pending=h.sync.perform(h.command),rejected=assert.rejects(pending,/denied/),flush=h.sync.flush();await settleBackground();
+    gate.reject(new Error('denied'));await rejected;
+    assert.equal(await flush,false);assert.equal(h.sync.hasPendingSave(),false);
+});
+test('polling-only flush retains a fresh server read even with an empty verified queue',async()=>{
+    const h=harness();await h.start();const before=h.reads;h.remote=progress(88);
+    assert.equal(await h.sync.flush(),true);assert.equal(h.reads,before+1);assert.equal(h.local.students[0].tokens,88);
+});
+for(const response of ['success','failure']) test(`refresh ignores old lifecycle ${response} and reads the new server state`,async t=>{
+    const h=receiptHarness(t,{pending:false}),gate=deferred();h.read(()=>gate.promise);
+    const reading=h.sync.refresh();h.sync.setActive(false);h.sync.setActive(true);h.read(()=>progress(77));
+    if(response==='success') gate.resolve(progress(999));else gate.reject(new TypeError('old read'));
+    assert.equal(await reading,true);assert.equal(h.local.students[0].tokens,77);assert.equal(h.reads,2);assert.deepEqual(h.errors,[]);
+});
 function cleanupHarness(t,options={}) {
     let remote=normalizeProgress({students:[{id:1}],drawings:options.drawings||[],pendingArtworkDeletes:options.pending||['drawing_old']}),counter=0;
     const events=[],errors=[];

@@ -4,6 +4,12 @@
 
 全班共用路徑為 `/games/classroom-115`。`progress` 只保存一份最新遊戲進度；`operations` 保存已成功寫入操作的收據，供連線中斷後確認結果與避免重複執行。
 
+## 下載優化 B／C 相容性補充
+
+本輪未新增資料庫欄位或修改安全規則。[教師同步計畫](../public/teacher-sync-plan.mjs:69) 仍保留完整投影，讓舊分頁恢復操作時不會把省略欄位當空而清除資料。[依操作的讀取／更新範圍](../public/teacher-sync-plan.mjs:41) 僅存在成功交易的記憶體中；重新載入及 legacy 未完成計畫恢復一律完整讀取。不得將範圍用來產生缺欄位的線上計畫。完整限制與 fixture 預算見[下載優化說明](download-reduction.md)。
+
+C 的[協力未達標短流程](../public/teacher-sync-plan.mjs:54) 在同一次房間 ETag 交易保存完成名單及既有格式的最終收據，不建立同步計畫；只修改該協力完成名單，保留最新非協力及 legacy／compact 學生欄位。最後達標仍使用完整獎勵 coordinator，舊版未完成計畫仍完整恢復。未新增資料欄位，詳見[安全條件及預算](download-reduction.md#c協力未達標短流程)。
+
 ## 實際節點
 
 ```text

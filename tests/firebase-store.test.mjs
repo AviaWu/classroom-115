@@ -4,6 +4,7 @@ import {createFirebaseStore,createProgressSubscriber,createStudentProjectionSubs
 import * as storeModule from '../public/firebase-store.mjs';
 import {createCloudSync} from '../public/cloud-sync.mjs';
 import {mergeStudentStatesIntoProgress} from '../public/teacher-projections.mjs';
+import {createFirebaseRestClient} from '../public/firebase-rest-client.mjs';
 const initial=()=>({progress:{students:[{id:1,tokens:100,lotteryTickets:1}],clothesM:[{id:'shirt',name:'服裝',level:'R',price:50,active:true}],revision:9,syncVersion:3,commitId:'legacy'},operations:{}});
 const studentsThrough28=(student28={})=>Array.from({length:28},(_,index)=>({
     id:index+1,gender:'M',tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',doneTasks:[],
@@ -184,6 +185,52 @@ test('complete backup reads current student states without modifying stored prog
     assert.deepEqual(s.root,before);
     s.root.games['classroom-115']._projectionSync={operationId:'pending'};
     await assert.rejects(s.store.readCompleteProgress(),/同步.*備份/);
+});
+
+test('dedicated complete-progress reader prefers fresh minimal data and fails closed without root fallback',async()=>{
+    const s=coordinatedServer({progress:compactProgress(initial().progress)});let reads=0;
+    const store=createFirebaseStore({readRoot:()=>assert.fail('unexpected broad read'),readCompleteProgressData:async()=>{
+        reads++;return clone({games:s.root.games,studentRoster:s.root.studentRoster,studentStates:s.root.studentStates});
+    }});
+    assert.equal((await store.readCompleteProgress()).students[0].tokens,100);
+    s.root.studentStates['uid-one'].tokens=321;
+    assert.equal((await store.readCompleteProgress()).students[0].tokens,321);assert.equal(reads,2);
+    s.root.games['classroom-115'].operations.pending={phase:'projecting'};
+    await assert.rejects(store.readCompleteProgress(),/同步.*備份/);
+    delete s.root.games['classroom-115'].operations.pending;
+    s.root.studentStates={};await assert.rejects(store.readCompleteProgress(),/個人資料/);
+    const failed=createFirebaseStore({readRoot:()=>assert.fail('must not silently fall back'),readCompleteProgressData:async()=>{throw new TypeError('offline');}});
+    await assert.rejects(failed.readCompleteProgress(),/offline/);
+});
+for(const marker of ['missing','matching','newer','deleted','conflict']) test(`receipt replay cleanup request budget for ${marker} marker`,async()=>{
+    const s=coordinatedServer(),request=job('cleanup-budget',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5});
+    await s.store.execute(request);assert.equal(s.root.studentStates['uid-one'].tokens,105);
+    let state=clone(s.root.studentStates['uid-one']),reads=0,puts=0;
+    if(marker==='matching'||marker==='conflict') state._teacherOperation={id:request.id};
+    if(marker==='newer') state._teacherOperation={id:'newer'};
+    if(marker==='deleted') state=null;
+    const transport=createFirebaseRestClient({databaseURL:'https://fake.test',getToken:async()=>'token',fetch:async(url,options)=>{
+        assert.equal(new URL(url).pathname,'/studentStates/uid-one.json');
+        if(options.method==='PUT'){
+            puts++;
+            if(marker==='conflict'){
+                state={...state,tokens:112,_teacherOperation:{id:'newer'}};
+                return Response.json(null,{status:412});
+            }
+            state=JSON.parse(options.body);
+        }else reads++;
+        return Response.json(state,{headers:{etag:'"etag"'}});
+    }});
+    const store=createFirebaseStore({now:()=>100000,readRoot:async()=>clone(s.root),writeRoot:assert.fail,transactRoom:assert.fail,
+        transactStudentState:(uid,updater)=>transport.transact(`studentStates/${uid}`,updater)});
+    const result=await store.execute(request);
+    assert.equal(result.progress.students[0].tokens,105); // Reward is never applied again.
+    assert.equal(puts,['matching','conflict'].includes(marker)?1:0);
+    assert.equal(reads,marker==='conflict'?2:1);
+    if(marker==='conflict'){assert.equal(state.tokens,112);assert.equal(state._teacherOperation.id,'newer');}
+    if(marker==='newer') assert.equal(state._teacherOperation.id,'newer');
+    if(marker==='matching') assert.equal(state._teacherOperation,undefined);
+    if(marker==='deleted') assert.equal(state,null);
 });
 
 test('restore writes personal backup values to student states and keeps compact progress compact',async()=>{
@@ -640,23 +687,25 @@ test('cold room observation stops when the teacher transaction fails',async()=>{
     await assert.rejects(server.store.execute(job('failed-observed-room',{type:'resources',studentId:1,field:'tokens',mode:'add',amount:5})),/transaction failed/);
     assert.equal(server.roomObservationStops,1);
 });
-test('cooperative completion retains the full coordinator and awards the class once with fewer reads',async()=>{
+test('nonfinal cooperative completion skips projection; final completion retains the coordinator and awards once',async()=>{
     const progress={students:studentsThrough28().slice(0,2),coopTasks:[{id:'coop',monsterName:'怪獸',reward:10,rewardType:'token',completedBy:[],claimed:false}]};
     const studentRoster={one:{studentId:1,active:true},two:{studentId:2,active:true}};
     const studentStates=Object.fromEntries(Object.entries(studentRoster).map(([uid,{studentId}])=>[uid,
         {studentId,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]} ]));
     const server=coordinatedServer({progress,studentRoster,studentStates});
     const first=await server.store.execute(job('coop-first',{type:'coopComplete',studentId:1,taskId:'coop'}));
-    assert.equal(first.result.claimed,false);assert.equal(server.roomCalls,2);
-    assert.equal(server.readCalls,1);assert.equal(server.projectionReads,1);
+    assert.equal(first.result.claimed,false);assert.equal(server.roomCalls,1);
+    assert.equal(server.readCalls,1);assert.equal(server.projectionReads,0);
+    assert.equal(server.studentCalls,0);
+    assert.equal(server.root.games['classroom-115']._projectionSync,undefined);
     const finalJob=job('coop-final',{type:'coopComplete',studentId:2,taskId:'coop'});
     const last=await server.store.execute(finalJob);
-    assert.equal(last.result.claimed,true);assert.equal(server.roomCalls,4);
-    assert.equal(server.readCalls,2);assert.equal(server.projectionReads,2);
+    assert.equal(last.result.claimed,true);assert.equal(server.roomCalls,3);
+    assert.equal(server.readCalls,2);assert.equal(server.projectionReads,1);
     assert.deepEqual(last.progress.students.map(student=>student.tokens),[110,110]);
     const replay=await server.newStore().execute(finalJob);
     assert.deepEqual(replay.progress.students.map(student=>student.tokens),[110,110]);
-    assert.equal(server.roomCalls,4);
+    assert.equal(server.roomCalls,3);
 });
 test('coordinated teacher flow projects purchases, lottery, and task rewards',async()=>{
     const cases=[

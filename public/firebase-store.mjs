@@ -1,7 +1,7 @@
 import {applyOperation,normalizeProgress} from './game-operations.mjs';
 import {createStudentProjections} from './student-projections.mjs';
 import {mergeStudentStatesIntoProgress,normalizeStoredProgress,progressForStorage} from './teacher-projections.mjs';
-import {applyTeacherStudentPlan,createTeacherSyncPlan,stripTeacherOperationMarker} from './teacher-sync-plan.mjs';
+import {applyTeacherStudentPlan,createCoopSharedProgress,createTeacherSyncPlan,stripTeacherOperationMarker,teacherProjectionScope} from './teacher-sync-plan.mjs';
 
 const PROGRESS_FIELDS=['students','tasks','clothesM','clothesF','layouts','backgrounds','boss','bosses','questionPapers','coopTasks',
     'coopTaskTemplates','dailyTaskTemplates','weeklyTaskTemplates','deletedTaskIds','deletedCoopTaskIds',
@@ -83,7 +83,7 @@ export function createTeacherProgressSubscriber(dependencies){
 
 // REST handles direct reads and artwork payloads. The teacher page serializes commands
 // in a room transaction and projects personal changes through per-student transactions.
-export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readProjectionData,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
+export function createFirebaseStore({databaseURL,path='games/classroom-115',getToken,getUid,now=Date.now,fetch:request=globalThis.fetch,transactRoom,transactRoot,readRoot,readOperationData,readPublicProjectionData,readCompleteProgressData,readProjectionData,readProgress,readRoomMetadata,readEquipmentCatalogues,writeRoot,transactStudentState,transactProgressStudent,observeRoom}) {
     function assertArtworkId(id) {
         if(typeof id !== 'string' || id.length < 8 || id.length > 128 || !/^drawing_[A-Za-z0-9_-]+$/.test(id)) throw new Error('畫作編號格式不正確');
         return id;
@@ -200,8 +200,11 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         return normalized;
     }
     async function readCompleteProgress(){
-        if(typeof readRoot!=='function') return normalizeProgress(mergeStudentStatesIntoProgress(await readRemote(),{}));
-        const root=(await readRoot())||{},room=root.games?.['classroom-115']||{};
+        // Backups/refreshes need no pet or public projection payloads. Keep the
+        // root-shaped compatibility reader and the same projection barrier.
+        const reader=readCompleteProgressData||readRoot;
+        if(typeof reader!=='function') return normalizeProgress(mergeStudentStatesIntoProgress(await readRemote(),{}));
+        const root=(await reader())||{},room=root.games?.['classroom-115']||{};
         if(room._projectionSync||Object.values(room.operations||{}).some(receipt=>receipt?.phase==='projecting')) throw new Error('老師操作仍在同步，請完成後再下載備份。');
         const progress=mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{},uidMap(root));
         const normalized=normalizeProgress(progress);
@@ -357,21 +360,22 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
             return await transactRoom(update);
         }finally{stop();}
     }
-    function projectionUpdates(root,plan,mapping){
+    const projectionUids=(scope,mapping)=>scope.pets==='all'?Object.values(mapping):scope.pets;
+    function projectionUpdates(root,plan,mapping,scope){
         const updates={};
-        for(const uid of Object.values(mapping)){
+        for(const uid of projectionUids(scope,mapping)){
             const desired=plan.studentPets?.[uid]||{},current=root.studentPets?.[uid]||{};
             if(JSON.stringify(current)!==JSON.stringify(desired)) updates[`studentPets/${uid}`]=Object.keys(desired).length?desired:null;
         }
-        for(const key of ['publicBosses','publicQuestionPapers']){
+        for(const key of scope.public?['publicBosses','publicQuestionPapers']:[]){
             const desired=plan[key]||{};
             if(JSON.stringify(root[key]||{})!==JSON.stringify(desired)) updates[key]=desired;
         }
         return updates;
     }
-    function requiredPetUpdates(root,plan,mapping){
+    function requiredPetUpdates(root,plan,mapping,scope){
         const updates={};
-        for(const uid of Object.values(mapping)){
+        for(const uid of projectionUids(scope,mapping)){
             const desired=plan.studentPets?.[uid]||{},current=root.studentPets?.[uid]||{};
             const retained={...current,...desired};
             if(JSON.stringify(current)!==JSON.stringify(retained)) updates[`studentPets/${uid}`]=retained;
@@ -390,17 +394,38 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         }catch(error){throw markRetryable(error);}
     }
     async function cleanupStudentMarkers(operationId,uids){
-        await Promise.allSettled((uids||[]).map(uid=>transactStudentState(uid,current=>stripTeacherOperationMarker(current,operationId))));
+        await Promise.allSettled((uids||[]).map(uid=>transactStudentState(uid,current=>{
+            // Replays and ETag retries may find it already cleared (or replaced
+            // by a newer operation). Abort rather than PUT an unchanged state.
+            if(current?._teacherOperation?.id!==operationId) return;
+            return stripTeacherOperationMarker(current,operationId);
+        })));
     }
-    async function resumeProjection(root){
+    async function resumeProjection(root,scope={pets:'all',public:true}){
         const room=root.games?.['classroom-115']||{},syncPlan=room._projectionSync;
         if(!syncPlan?.operationId||!syncPlan.plan) return null;
         const operationId=syncPlan.operationId,plan=syncPlan.plan;
-        const requiredPets=requiredPetUpdates(root,plan,syncPlan.uidByStudentId||{});
+        // A scope only survives the current successful transaction. Recovery
+        // (including legacy pending plans) always reads/repairs all projections.
+        const mapping=syncPlan.uidByStudentId||{};
+        if(readPublicProjectionData){
+            const data=await readPublicProjectionData(scope);
+            // Missing transport data is not an empty database node. A reader
+            // must explicitly return null/{} for requested, absent projections.
+            if(!data || (scope.pets==='all'&&!Object.hasOwn(data,'studentPets')) ||
+                (scope.pets!=='all'&&scope.pets.some(uid=>!Object.hasOwn(data.studentPets||{},uid))) ||
+                (scope.public&&['publicBosses','publicQuestionPapers'].some(key=>!Object.hasOwn(data,key)))){
+                throw new Error('投影讀取不完整，已停止同步；請重新整理後重試。');
+            }
+            root={...root,...data};
+        }else if(readOperationData){
+            throw new Error('縮減操作讀取必須搭配完整的投影讀取器。');
+        }
+        const requiredPets=requiredPetUpdates(root,plan,mapping,scope);
         try{if(Object.keys(requiredPets).length) await writeRoot(requiredPets);}catch(error){throw markRetryable(error);}
         const applied=await Promise.all(Object.values(plan.studentPlans||{}).map(studentPlan=>applyStudentProjection(operationId,studentPlan)));
         const states=Object.fromEntries(applied.map(entry=>[entry.uid,entry.state]).filter(([,state])=>state));
-        const updates=projectionUpdates(root,plan,syncPlan.uidByStudentId||{});
+        const updates=projectionUpdates(root,plan,mapping,scope);
         try{if(Object.keys(updates).length) await writeRoot(updates);}catch(error){throw markRetryable(error);}
         // Only authoritative personal state and UID mapping are needed here.
         // The final ETag transaction itself reads the newest room.
@@ -434,13 +459,14 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
         return {...settled,studentStates:latestStates};
     }
     async function executeCoordinated(job,pendingIds,artwork){
+        if(readOperationData&&!readPublicProjectionData) throw new Error('縮減操作讀取必須搭配完整的投影讀取器。');
         if(now()-job.createdAt>24*60*60*1000){
             await cleanupRejectedArtwork(artwork);
             throw new Error('這筆未確認操作已超過一天，請先確認最新進度再重新操作。');
         }
         let command;
         for(let attempt=0;attempt<20;attempt++){
-            let root=(await readRoot())||{},room=root.games?.['classroom-115']||{};
+            let root=(await (readOperationData||readRoot)())||{},room=root.games?.['classroom-115']||{};
             const existing=room.operations?.[job.id];
             if(existing&&existing.phase!=='projecting'){
                 await cleanupStudentMarkers(job.id,existing.projectionUids||[]);
@@ -450,12 +476,14 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 await resumeProjection(root);
                 continue;
             }
-            const mapping=uidMap(root),clock=now();let settled,blocked=false;
+            const mapping=uidMap(root),initialClock=now();let settled,blocked=false,scope,sharedOnly=false;
             mergeStudentStatesIntoProgress(room.progress??null,root.studentStates||{},mapping);
             command??=await prepareCommand(job.command,artwork);
             try{
                 const transaction=await transactObservedRoom(current=>{
-                    settled=undefined;blocked=false;
+                    settled=undefined;blocked=false;scope=undefined;sharedOnly=false;
+                    if(command.type==='coopComplete'&&current==null) throw new Error('房間資料已不存在，請重新整理後再操作。');
+                    const clock=command.type==='coopComplete'?now():initialClock;
                     current=current??room;
                     if(current._projectionSync){blocked=true;return;}
                     const receipt=current.operations?.[job.id];
@@ -465,13 +493,26 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                     if(current.restoredAt&&job.createdAt<=current.restoredAt&&!['restore','initialize'].includes(command.type)){
                         settled={error:new Error('老師已還原資料；這筆較早的操作已取消，請依最新進度重新操作。')};return;
                     }
+                    if(command.type==='coopComplete'&&Object.values(current.operations||{}).some(value=>value?.phase==='projecting')){
+                        throw Object.assign(new Error('老師操作仍在同步但缺少同步計畫，請確認後重試。'),{retryable:true});
+                    }
                     const before=mergeStudentStatesIntoProgress(current.progress??null,root.studentStates||{},mapping);
                     const outcome=applyOperation(before,command,clock);
                     if(!outcome.changed&&command.type!=='restore'){settled={progress:outcome.progress,result:outcome.result||{ok:true}};return;}
                     const result={ok:true,...outcome.result};
                     const plan=createTeacherSyncPlan({beforeProgress:before,afterProgress:outcome.progress,command,result,
                         uidByStudentId:mapping,clock});
+                    scope=teacherProjectionScope({beforeProgress:before,afterProgress:outcome.progress,command,uidByStudentId:mapping});
+                    const sharedProgress=createCoopSharedProgress({currentProgress:current.progress,beforeProgress:before,
+                        afterProgress:outcome.progress,command,result,plan,scope});
                     const receiptValue={id:job.id,uid:getUid(),type:command.type,createdAt:job.createdAt,phase:'projecting',result:{json:JSON.stringify(result)}};
+                    if(sharedProgress){
+                        sharedOnly=true;
+                        const {phase,...finalReceipt}=receiptValue;
+                        return {...current,progress:{...sharedProgress,lastSaved:new Date(clock).toISOString()},
+                            operations:{...retainedOperations(current.operations,pendingIds,clock),[job.id]:{
+                                ...finalReceipt,committedAt:{'.sv':'timestamp'}}},lastOperationId:job.id};
+                    }
                     const next={...current,progress:{...progressForStorage(outcome.progress,current.progress,mapping),lastSaved:new Date(clock).toISOString()},
                         operations:{...retainedOperations(current.operations,pendingIds,clock),[job.id]:receiptValue},lastOperationId:job.id,
                         _projectionSync:{operationId:job.id,createdAt:clock,uidByStudentId:mapping,
@@ -482,9 +523,17 @@ export function createFirebaseStore({databaseURL,path='games/classroom-115',getT
                 if(settled?.error){await cleanupRejectedArtwork(artwork);throw settled.error;}
                 if(settled) return settled;
                 if(!transaction?.committed){if(blocked) continue;throw Object.assign(new Error('老師操作交易未完成，稍後會重試。'),{retryable:true});}
+                if(sharedOnly){
+                    const saved=transaction.value,receipt=saved?.operations?.[job.id];
+                    if(saved?._projectionSync||!saved?.progress||!receipt?.result?.json||receipt.phase==='projecting'){
+                        throw Object.assign(new Error('老師操作交易回應不完整，稍後會重試。'),{retryable:true});
+                    }
+                    return {progress:normalizeProgress(mergeStudentStatesIntoProgress(saved.progress,root.studentStates||{},mapping)),
+                        result:JSON.parse(receipt.result.json),studentStates:root.studentStates||{}};
+                }
                 if(!transaction.value?._projectionSync) throw Object.assign(new Error('老師操作交易回應不完整，稍後會重試。'),{retryable:true});
                 root={...root,games:{...root.games,'classroom-115':transaction.value}};
-                return await resumeProjection(root);
+                return await resumeProjection(root,scope);
             }catch(error){throw markRetryable(error);}
         }
         throw Object.assign(new Error('另一筆老師操作仍在同步，稍後會重試。'),{retryable:true});

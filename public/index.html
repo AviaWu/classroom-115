@@ -3468,6 +3468,12 @@ setInterval(syncScheduledTasks,30000);
     return auth.currentUser.getIdToken();
   };
   const restClient=createFirebaseRestClient({databaseURL:firebaseConfig.databaseURL,getToken});
+  const readTeacherOperationData=async()=>{
+    const [room,studentRoster,studentStates]=await Promise.all([
+      restClient.read("games/classroom-115"),restClient.read("studentRoster"),restClient.read("studentStates")
+    ]);
+    return {games:{"classroom-115":room},studentRoster:studentRoster||{},studentStates:studentStates||{}};
+  };
   const readTeacherRoot=async()=>{
     const [room,studentRoster,studentStates,studentPets,publicBosses,publicQuestionPapers]=await Promise.all([
       restClient.read("games/classroom-115"),restClient.read("studentRoster"),restClient.read("studentStates"),
@@ -3481,6 +3487,21 @@ setInterval(syncScheduledTasks,30000);
       getToken,getUid:()=>auth.currentUser.uid,
       now:()=>Date.now()+serverOffset,
       readRoot:readTeacherRoot,
+      readOperationData:readTeacherOperationData,
+      readCompleteProgressData:readTeacherOperationData,
+      readPublicProjectionData:async scope=>{
+        const data={};
+        await Promise.all([
+          scope.pets==='all'
+            ? restClient.read("studentPets").then(value=>{data.studentPets=value||{};})
+            : Promise.all(scope.pets.map(async uid=>{
+                const value=await restClient.read(`studentPets/${uid}`);
+                (data.studentPets??={})[uid]=value||{};
+              })),
+          ...(scope.public?['publicBosses','publicQuestionPapers'].map(async key=>{data[key]=(await restClient.read(key))||{};}):[])
+        ]);
+        return data;
+      },
       readProjectionData:async()=>{
         const [studentRoster,studentStates]=await Promise.all([restClient.read("studentRoster"),restClient.read("studentStates")]);
         return {studentRoster:studentRoster||{},studentStates:studentStates||{}};
