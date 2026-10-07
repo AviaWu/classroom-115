@@ -86,7 +86,7 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
         transactRoom:async update=>{
             roomCalls++;
             if(coldRoomCalls.includes(roomCalls)&&!roomReady) throw Object.assign(new Error('maxretry'),{code:'database/maxretry'});
-            await onRoomTransaction?.({root,call:roomCalls});
+            await onRoomTransaction?.({root,call:roomCalls,update});
             const current=clone(root.games['classroom-115']),next=update(current);
             if(next===undefined) return {committed:false,value:current};
             root.games['classroom-115']=resolveServerValues(next);return {committed:true,value:clone(root.games['classroom-115'])};
@@ -115,6 +115,71 @@ function coordinatedServer({progress,studentRoster,studentStates,onReadRoot,onRo
 const clone=value=>structuredClone(value);
 const job=(id,command)=>({id,createdAt:90000,command});
 const compactProgress=progress=>({...progress,students:progress.students.map(({tokens,lotteryTickets,petAffection,lastPetMoodDate,equippedLayout,bossProgress,...student})=>student)});
+
+function coopServer(options={}){
+    return coordinatedServer({
+        progress:compactProgress({students:studentsThrough28().slice(0,2),coopTasks:[{id:'coop',monsterName:'Monster',reward:10,rewardType:'token',completedBy:[],claimed:false}]}),
+        studentRoster:{one:{studentId:1,active:true},two:{studentId:2,active:true}},
+        studentStates:Object.fromEntries(['one','two'].map((uid,index)=>[uid,{
+            studentId:index+1,tokens:100,lotteryTickets:1,petAffection:0,lastPetMoodDate:'',equippedLayout:[],bossProgress:[]
+        }])),
+        ...options
+    });
+}
+test('non-final coop click commits in one room transaction without projection reads or writes',async()=>{
+    const s=coopServer();
+    const request=job('coop-first',{type:'coopComplete',taskId:'coop',studentId:1});
+    const result=await s.store.execute(request);
+    assert.equal(result.result.claimed,false);
+    assert.equal(s.readCalls,1);assert.equal(s.roomCalls,1);assert.equal(s.studentCalls,0);
+    assert.deepEqual(s.root.games['classroom-115'].progress.coopTasks[0].completedBy,[1]);
+    assert.equal(s.root.games['classroom-115']._projectionSync,undefined);
+    assert.equal(s.root.studentStates.one.tokens,100);
+    // A lost acknowledgement can safely replay the original operation ID.
+    const replay=await s.newStore().execute(request);
+    assert.equal(replay.result.claimed,false);assert.equal(s.roomCalls,1);
+    await s.store.execute(job('coop-duplicate',{...request.command}));
+    assert.deepEqual(s.root.games['classroom-115'].progress.coopTasks[0].completedBy,[1]);
+});
+test('final coop click retains coordinated rewards and replay never pays twice',async()=>{
+    const s=coopServer();
+    await s.store.execute(job('coop-first',{type:'coopComplete',taskId:'coop',studentId:1}));
+    const request=job('coop-last',{type:'coopComplete',taskId:'coop',studentId:2});
+    const result=await s.store.execute(request);
+    assert.equal(result.result.claimed,true);
+    assert.equal(s.roomCalls,3);assert.equal(s.readCalls,4);assert.equal(s.studentCalls,4);
+    assert.deepEqual(Object.values(s.root.studentStates).map(student=>student.tokens),[110,110]);
+    await s.newStore().execute(request);
+    await s.store.execute(job('coop-last-duplicate',{...request.command}));
+    assert.deepEqual(Object.values(s.root.studentStates).map(student=>student.tokens),[110,110]);
+});
+test('ETag retry that becomes the final coop member switches back to reward projection',async()=>{
+    const s=coopServer({onRoomTransaction:({root,call,update})=>{
+        if(call!==1) return;
+        const tentative=update(clone(root.games['classroom-115']));
+        assert.equal(tentative._projectionSync,undefined);
+        // Another teacher completed member 2 before the conditional PUT succeeded.
+        root.games['classroom-115'].progress.coopTasks[0].completedBy=[2];
+    }});
+    const result=await s.store.execute(job('coop-race',{type:'coopComplete',taskId:'coop',studentId:1}));
+    assert.equal(result.result.claimed,true);
+    assert.equal(s.roomCalls,2);assert.equal(s.readCalls,3);
+    assert.equal(s.root.games['classroom-115']._projectionSync,undefined);
+    assert.deepEqual(Object.values(s.root.studentStates).map(student=>student.tokens),[110,110]);
+});
+test('interrupted final coop rewards recover without duplicating already-applied rewards',async()=>{
+    let fail=true;
+    const s=coopServer({afterStudentTransaction:({uid})=>{
+        if(uid==='one'&&fail){fail=false;throw new TypeError('lost acknowledgement');}
+    }});
+    await s.store.execute(job('coop-first',{type:'coopComplete',taskId:'coop',studentId:1}));
+    const request=job('coop-last',{type:'coopComplete',taskId:'coop',studentId:2});
+    await assert.rejects(s.store.execute(request),/lost acknowledgement/);
+    const result=await s.newStore().execute(request);
+    assert.equal(result.result.claimed,true);
+    assert.deepEqual(Object.values(s.root.studentStates).map(student=>student.tokens),[110,110]);
+    assert.equal(s.root.games['classroom-115']._projectionSync,undefined);
+});
 
 for(const order of ['progress-first','states-first']) test(`teacher stays locked until both streams load (${order})`,async t=>{
     assert.equal(typeof storeModule.createTeacherProgressSubscriber,'function');
