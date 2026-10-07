@@ -1,0 +1,282 @@
+[
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_0",
+    "image": "/images/Dec2/1000095479-removebg-preview.png",
+    "level": "UR",
+    "name": "森森",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_1",
+    "image": "/images/Dec2/1000095481-removebg-preview.png",
+    "level": "UR",
+    "name": "小黑",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_2",
+    "image": "/images/Dec2/1000095483-removebg-preview.png",
+    "level": "R",
+    "name": "阿藍",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_3",
+    "image": "/images/Dec2/1000095484-removebg-preview.png",
+    "level": "SR",
+    "name": "角角",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_4",
+    "image": "/images/Dec2/1000095486-removebg-preview.png",
+    "level": "SR",
+    "name": "夢仔",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_5",
+    "image": "/images/Dec2/1000095487-removebg-preview.png",
+    "level": "SR",
+    "name": "閃電",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_6",
+    "image": "/images/Dec2/1000095488-removebg-preview.png",
+    "level": "SSR",
+    "name": "花狐",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_7",
+    "image": "/images/Dec2/1000095489-removebg-preview.png",
+    "level": "SSR",
+    "name": "夜仔",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_8",
+    "image": "/images/Dec2/1000095491-removebg-preview.png",
+    "level": "R",
+    "name": "小蜥",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_9",
+    "image": "/images/Dec2/1000095493-removebg-preview.png",
+    "level": "SSR",
+    "name": "酷豹",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_11",
+    "image": "/images/Dec2/1000095495-removebg-preview.png",
+    "level": "R",
+    "name": "小鯨",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_12",
+    "image": "/images/Dec2/1000095496-removebg-preview.png",
+    "level": "UR",
+    "name": "月牙",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_13",
+    "image": "/images/Dec2/1000095497-removebg-preview.png",
+    "level": "SSR",
+    "name": "阿熊",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_14",
+    "image": "/images/Dec2/1000095500-removebg-preview.png",
+    "level": "SR",
+    "name": "阿吼",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_15",
+    "image": "/images/Dec2/1000095502-removebg-preview.png",
+    "level": "R",
+    "name": "長尾",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_dec2_16",
+    "image": "/images/Dec2/1000095503-removebg-preview.png",
+    "level": "UR",
+    "name": "龍龍",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_deca3",
+    "image": "/images/Dec2/deca3.png",
+    "level": "SSR",
+    "name": "月兔（中秋限定至10/19）",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_1",
+    "image": "/images/Dec2/decb%20(1).png",
+    "level": "SSR",
+    "name": "大耳",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_2",
+    "image": "/images/Dec2/decb%20(2).png",
+    "level": "SSR",
+    "name": "小吉",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_3",
+    "image": "/images/Dec2/decb%20(3).png",
+    "level": "UR",
+    "name": "喬喬",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_17",
+    "image": "/images/Dec2/decb%20(17).png",
+    "level": "SSR",
+    "name": "小烏",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_4",
+    "image": "/images/Dec2/decb%20(4).png",
+    "level": "SSR",
+    "name": "小八",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_5",
+    "image": "/images/Dec2/decb%20(5).png",
+    "level": "UR",
+    "name": "黑燄",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_6",
+    "image": "/images/Dec2/decb%20(6).png",
+    "level": "SR",
+    "name": "浣浣",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_7",
+    "image": "/images/Dec2/decb%20(7).png",
+    "level": "R",
+    "name": "小綿",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_8",
+    "image": "/images/Dec2/decb%20(8).png",
+    "level": "SR",
+    "name": "狸狸",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_9",
+    "image": "/images/Dec2/decb%20(9).png",
+    "level": "SR",
+    "name": "阿菜",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_10",
+    "image": "/images/Dec2/decb%20(10).png",
+    "level": "SSR",
+    "name": "毛毛",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_11",
+    "image": "/images/Dec2/decb%20(11).png",
+    "level": "SR",
+    "name": "安仔",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_12",
+    "image": "/images/Dec2/decb%20(12).png",
+    "level": "R",
+    "name": "寶龍",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_13",
+    "image": "/images/Dec2/decb%20(13).png",
+    "level": "R",
+    "name": "灰灰",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_14",
+    "image": "/images/Dec2/decb%20(14).png",
+    "level": "SR",
+    "name": "黑金",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_15",
+    "image": "/images/Dec2/decb%20(15).png",
+    "level": "SSR",
+    "name": "天空",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_16",
+    "image": "/images/Dec2/decb%20(16).png",
+    "level": "UR",
+    "name": "阿布",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_pet_event_decb_18",
+    "image": "/images/Dec2/decb%20(18).png",
+    "level": "UR",
+    "name": "裂仔",
+    "price": 300
+  }
+]

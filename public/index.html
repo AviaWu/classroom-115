@@ -808,6 +808,22 @@ async function shareGame(){
 }
 
 // 內建男生服裝：直接使用 public/images/boy/ 的圖片，避免每次載入重複建立商品
+function newFolderProducts(collection){
+    const folders={
+        clothesM:{folder:"boy/boynew1",stem:"boynew1",prefix:"builtin_boy_boynew1",name:"新男生服裝",count:10},
+        clothesF:{folder:"girl/girlnew1",stem:"girlnew1",prefix:"builtin_girl_girlnew1",name:"新女生服裝",count:10},
+        layouts:{folder:"Dec2/decnew1",stem:"decnew1",prefix:"builtin_pet_decnew1",name:"新寵物",count:8}
+    };
+    const config=folders[collection];
+    return Array.from({length:config.count},(_,index)=>({
+        id:`${config.prefix}_${index+1}`,
+        name:`${config.name} ${index+1}`,
+        level:"R",
+        price:priceForLevel("R"),
+        active:true,
+        image:`/images/${config.folder}/${encodeURIComponent(`${config.stem} (${index+1}).png`)}`
+    }));
+}
 function seedBuiltinBoyClothes(persist=true){
     const removedIds = state.clothesM.filter(item=>item.image==="/images/boy/b0.png").map(item=>item.id);
     let changed = removedIds.length>0;
@@ -841,11 +857,12 @@ function seedBuiltinBoyClothes(persist=true){
         {filename:"ba5.png",id:"builtin_boy_event_ba5",name:"男生活動服裝 5",level:"活動贈送"},
         {filename:"ba7.png",id:"builtin_boy_event_ba7",name:"男生活動服裝 7",level:"活動贈送"},
         {filename:"ba8.png",id:"builtin_boy_event_ba8",name:"男生活動服裝 8",level:"活動贈送"},
-        {filename:"ba9.png",id:"builtin_boy_event_ba9",name:"男生活動服裝 9",level:"活動贈送"}
+        {filename:"ba9.png",id:"builtin_boy_event_ba9",name:"男生活動服裝 9",level:"活動贈送"},
+        ...newFolderProducts("clothesM")
     ]);
     products.forEach(product=>{
-        const image = `/images/boy/${encodeURIComponent(product.filename)}`;
-        if(!state.clothesM.some(item=>item.image===image)){
+        const image = product.image || `/images/boy/${encodeURIComponent(product.filename)}`;
+        if(!state.clothesM.some(item=>item.id===product.id||item.image===image)){
             state.clothesM.push({
                 id:product.id,
                 name:product.name,
@@ -872,10 +889,12 @@ function seedBuiltinGirlClothes(persist=true){
         {filename:"ga5.png",id:"builtin_girl_event_ga5",name:"女生活動服裝 5",level:"活動贈送"},
         {filename:"ga6.png",id:"builtin_girl_event_ga6",name:"女生活動服裝 6",level:"活動贈送"}
     ];
-    const allowedImages = new Set(
-        [...filenames,...eventProducts.map(product=>product.filename)]
-            .map(filename=>`/images/girl/${encodeURIComponent(filename)}`)
-    );
+    const newProducts = newFolderProducts("clothesF");
+    const allowedImages = new Set([
+        ...[...filenames,...eventProducts.map(product=>product.filename)]
+            .map(filename=>`/images/girl/${encodeURIComponent(filename)}`),
+        ...newProducts.map(product=>product.image)
+    ]);
     const removedIds = state.clothesF.filter(item=>!allowedImages.has(item.image)).map(item=>item.id);
     let changed = removedIds.length>0;
     if(changed){
@@ -890,10 +909,10 @@ function seedBuiltinGirlClothes(persist=true){
         id:`builtin_girl_${index}`,
         name:`女生服裝 ${index+1}`,
         level:"R"
-    })).concat(eventProducts);
+    })).concat(eventProducts,newProducts);
     products.forEach(product=>{
-        const image = `/images/girl/${encodeURIComponent(product.filename)}`;
-        if(!state.clothesF.some(item=>item.image===image)){
+        const image = product.image || `/images/girl/${encodeURIComponent(product.filename)}`;
+        if(!state.clothesF.some(item=>item.id===product.id||item.image===image)){
             state.clothesF.push({
                 id:product.id,
                 name:product.name,
@@ -939,7 +958,8 @@ function seedBuiltinLayouts(persist=true){
             id:`builtin_pet_event_decb_${number}`,
             name:`十二月活動寵物 ${number}`,
             level:"活動贈送"
-        }))
+        })),
+        ...newFolderProducts("layouts")
     ]);
     const removedItems = state.layouts.filter(item=>
         /^\/images\/dec\//i.test(item.image||"") || item.image===DEFAULT_PET_IMAGE
@@ -954,8 +974,8 @@ function seedBuiltinLayouts(persist=true){
         });
     }
     products.forEach(product=>{
-        const image = `/images/Dec2/${encodeURIComponent(product.filename)}`;
-        if(!state.layouts.some(item=>item.image===image)){
+        const image = product.image || `/images/Dec2/${encodeURIComponent(product.filename)}`;
+        if(!state.layouts.some(item=>item.id===product.id||item.image===image)){
             state.layouts.push({
                 id:product.id,
                 name:product.name,
@@ -2175,6 +2195,7 @@ function missingBuiltinProductChanges(){
             collection:"clothesM",
             hasBuiltIns:list=>list.some(item=>/^\/images\/boy\/b(?:%20| )\(/.test(item.image||"")),
             products:[
+                ...newFolderProducts("clothesM"),
                 {id:"builtin_boy_event_ba1",name:"男生活動服裝 1",level:"活動贈送",price:0,active:true,image:"/images/boy/ba1.png"},
                 {id:"builtin_boy_event_ba2",name:"男生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/boy/ba2.png"},
                 {id:"builtin_boy_event_ba3",name:"男生活動服裝 3",level:"活動贈送",price:0,active:true,image:"/images/boy/ba3.png"},
@@ -2185,6 +2206,7 @@ function missingBuiltinProductChanges(){
             collection:"clothesF",
             hasBuiltIns:list=>list.some(item=>/^\/images\/girl\/g(?:%20| )\(/.test(item.image||"")),
             products:[
+                ...newFolderProducts("clothesF"),
                 {id:"builtin_girl_event_ga1",name:"女生活動服裝 1",level:"活動贈送",price:0,active:true,image:"/images/girl/ga1.png"},
                 {id:"builtin_girl_event_ga2",name:"女生活動服裝 2",level:"活動贈送",price:0,active:true,image:"/images/girl/ga2.png"},
                 {id:"builtin_girl_event_ga3",name:"女生活動服裝 3",level:"活動贈送",price:0,active:true,image:"/images/girl/ga3.png"},
@@ -2195,6 +2217,7 @@ function missingBuiltinProductChanges(){
             collection:"layouts",
             hasBuiltIns:list=>list.some(item=>/^builtin_pet_dec2_\d+$/.test(item.id||"")),
             products:[
+                ...newFolderProducts("layouts"),
                 {id:"builtin_pet_event_deca3",name:"活動寵物 3",level:"活動贈送",price:0,active:true,image:"/images/Dec2/deca3.png"},
                 ...Array.from({length:18},(_,index)=>index+1).map(number=>({
                     id:`builtin_pet_event_decb_${number}`,
@@ -2241,7 +2264,7 @@ async function backend(){
     if(currentUser?.role!=="teacher" || !backendAuthenticated) return;
     const productChanges=missingBuiltinProductChanges();
     if(productChanges.length){
-        await runCommand({type:"edit",changes:productChanges},"seed:builtin-products-v4");
+        await runCommand({type:"edit",changes:productChanges},"seed:builtin-products-v5");
     }
     currentView={type:"backend"};
     const used = getStorageUsage();

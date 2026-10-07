@@ -21,7 +21,7 @@ function page(t){
     w.structuredClone=clone;w.alert=m=>alerts.push(m);w.confirm=()=>true;w.prompt=()=>promptValue;
     w.HTMLCanvasElement.prototype.getContext=function(){return {fillRect(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},closePath(){},drawImage(){},getImageData(){return {data:new Uint8ClampedArray(16)};},putImageData(){}};};
     w.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/jpeg;base64,test';
-    w.eval(scripts[0][2]);
+    w.eval(scripts[0][2]+'\nwindow.getTestState=()=>state;');
     const testPins={teacher:'1127','student-1':'3847','student-28':'9316','student-29':'5487'};
     w.firebaseLogin=(account,pin)=>({then(resolve){
         if(testPins[account]===pin){resolve();return {catch(){}};}
@@ -285,8 +285,41 @@ test('backend synchronizes the new built-in clothing, pet, and background produc
     assert.deepEqual(pngBackground,{id:'builtin_background_bgmnew1_png_1',name:'新背景 1 PNG',level:'R',price:50,active:true,image:'/images/bgm/bgmnew1/bgmnew1%20(1).png'});
     assert.equal(h.cloud.layouts.filter(item=>/^builtin_pet_event_decb_/.test(item.id)).length,18);
     assert.equal(h.cloud.backgrounds.filter(item=>/^builtin_background_bgmnew1_/.test(item.id)).length,66);
+    for(const [collection,folder,stem,prefix,count] of [
+        ['clothesM','boy/boynew1','boynew1','builtin_boy_boynew1',10],
+        ['clothesF','girl/girlnew1','girlnew1','builtin_girl_girlnew1',10],
+        ['layouts','Dec2/decnew1','decnew1','builtin_pet_decnew1',8]
+    ]){
+        const products=h.cloud[collection].filter(item=>item.id.startsWith(`${prefix}_`));
+        assert.equal(products.length,count);
+        const files=fs.readdirSync(new URL(`../public/images/${folder}/`,import.meta.url)).filter(file=>file.endsWith('.png'));
+        assert.equal(files.length,count);
+        for(let number=1;number<=count;number++){
+            const product=products.find(item=>item.id===`${prefix}_${number}`);
+            assert.equal(product.image,`/images/${folder}/${encodeURIComponent(`${stem} (${number}).png`)}`);
+            assert.equal(product.level,'R');assert.equal(product.price,50);assert.equal(product.active,true);
+            assert.ok(files.includes(`${stem} (${number}).png`));
+        }
+    }
     assert.equal(h.writes,1);
     await h.run('backend()');assert.equal(h.writes,1);
+});
+test('new folder initialization is idempotent and preserves new clothing ownership and custom pricing',async t=>{
+    const h=page(t);await h.start();
+    h.w.seedBuiltinBoyClothes(false);h.w.seedBuiltinGirlClothes(false);h.w.seedBuiltinLayouts(false);
+    const seeded=h.w.getTestState();
+    assert.equal(seeded.clothesM.filter(item=>item.id.startsWith('builtin_boy_boynew1_')).length,10);
+    assert.equal(seeded.clothesF.filter(item=>item.id.startsWith('builtin_girl_girlnew1_')).length,10);
+    assert.equal(seeded.layouts.filter(item=>item.id.startsWith('builtin_pet_decnew1_')).length,8);
+    seeded.students[1].ownedClothes=['builtin_girl_girlnew1_1'];
+    seeded.students[1].equippedClothes='builtin_girl_girlnew1_1';
+    seeded.clothesF.find(item=>item.id==='builtin_girl_girlnew1_1').price=75;
+    const before=JSON.stringify(seeded);
+    assert.equal(h.w.seedBuiltinBoyClothes(false),false);
+    assert.equal(h.w.seedBuiltinGirlClothes(false),false);
+    assert.equal(h.w.seedBuiltinLayouts(false),false);
+    assert.equal(JSON.stringify(h.w.getTestState()),before);
+    assert.equal(h.writes,0);
 });
 
 test('event gifts remain free and omit the level wording in shop and closet',async t=>{

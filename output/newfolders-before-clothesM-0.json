@@ -1,0 +1,402 @@
+[
+  {
+    "active": true,
+    "id": "builtin_boy_2",
+    "image": "/images/boy/b%20(2).png",
+    "level": "SSR",
+    "name": "足球少年",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_3",
+    "image": "/images/boy/b%20(3).png",
+    "level": "SSR",
+    "name": "王國騎士",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_4",
+    "image": "/images/boy/b%20(4).png",
+    "level": "SR",
+    "name": "馬戲先生",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_13",
+    "image": "/images/boy/b%20(13).png",
+    "level": "SSR",
+    "name": "莊園青年",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_19",
+    "image": "/images/boy/b%20(20).png",
+    "level": "SSR",
+    "name": "貴族公子",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_5",
+    "image": "/images/boy/b%20(5).png",
+    "level": "SSR",
+    "name": "叢林獵人",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_6",
+    "image": "/images/boy/b%20(6).png",
+    "level": "SSR",
+    "name": "異域商人",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_7",
+    "image": "/images/boy/b%20(7).png",
+    "level": "SSR",
+    "name": "牛仔青年",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_8",
+    "image": "/images/boy/b%20(8).png",
+    "level": "SR",
+    "name": "韓風紳士",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_9",
+    "image": "/images/boy/b%20(9).png",
+    "level": "R",
+    "name": "文青男孩",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_12",
+    "image": "/images/boy/b%20(12).png",
+    "level": "R",
+    "name": "慵懶青年",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_10",
+    "image": "/images/boy/b%20(10).png",
+    "level": "R",
+    "name": "帽T少年",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_11",
+    "image": "/images/boy/b%20(11).png",
+    "level": "SR",
+    "name": "滑板男孩",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_14",
+    "image": "/images/boy/b%20(14).png",
+    "level": "SR",
+    "name": "黑色潮流",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_16",
+    "image": "/images/boy/b%20(16).png",
+    "level": "SSR",
+    "name": "奇航海盜",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_15",
+    "image": "/images/boy/b%20(15).png",
+    "level": "SSR",
+    "name": "吟遊詩人",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_17",
+    "image": "/images/boy/b%20(17).png",
+    "level": "SR",
+    "name": "牛仔小子",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_18",
+    "image": "/images/boy/b%20(18).png",
+    "level": "SR",
+    "name": "武術青年",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_20",
+    "image": "/images/boy/b%20(21).png",
+    "level": "SSR",
+    "name": "冬季來臨",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_21",
+    "image": "/images/boy/b%20(22).png",
+    "level": "SR",
+    "name": "少年廚神",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_22",
+    "image": "/images/boy/b%20(23).png",
+    "level": "R",
+    "name": "白髮少年",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_23",
+    "image": "/images/boy/b%20(24).png",
+    "level": "SR",
+    "name": "暗夜刺客",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_24",
+    "image": "/images/boy/b%20(25).png",
+    "level": "SSR",
+    "name": "海盜船長",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_25",
+    "image": "/images/boy/b%20(26).png",
+    "level": "UR",
+    "name": "魔法學徒",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_26",
+    "image": "/images/boy/b%20(27).png",
+    "level": "R",
+    "name": "工程少年",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_27",
+    "image": "/images/boy/b%20(28).png",
+    "level": "SR",
+    "name": "白衣法師",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_28",
+    "image": "/images/boy/b%20(29).png",
+    "level": "R",
+    "name": "街頭小子",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_29",
+    "image": "/images/boy/b%20(30).png",
+    "level": "SR",
+    "name": "浴衣男孩",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_30",
+    "image": "/images/boy/b%20(31).png",
+    "level": "R",
+    "name": "農村小子",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_1",
+    "image": "/images/boy/b%20(1).png",
+    "level": "R",
+    "name": "潮流男孩",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_31",
+    "image": "/images/boy/b%20(32).png",
+    "level": "UR",
+    "name": "貓耳青年",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_36",
+    "image": "/images/boy/b%20(37).png",
+    "level": "UR",
+    "name": "黑貓男",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_34",
+    "image": "/images/boy/b%20(35).png",
+    "level": "UR",
+    "name": "狼少年",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_33",
+    "image": "/images/boy/b%20(34).png",
+    "level": "UR",
+    "name": "狐狸青年",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_32",
+    "image": "/images/boy/b%20(33).png",
+    "level": "UR",
+    "name": "棕熊旅人",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_35",
+    "image": "/images/boy/b%20(36).png",
+    "level": "UR",
+    "name": "海獺先生",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_37",
+    "image": "/images/boy/b%20(38).png",
+    "level": "SR",
+    "name": "美國學生",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_38",
+    "image": "/images/boy/b%20(39).png",
+    "level": "UR",
+    "name": "紅水管工",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_39",
+    "image": "/images/boy/b%20(40).png",
+    "level": "UR",
+    "name": "綠水管工",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_40",
+    "image": "/images/boy/b%20(41).png",
+    "level": "UR",
+    "name": "機器喵咪",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_42",
+    "image": "/images/boy/b%20(43).png",
+    "level": "R",
+    "name": "英倫男孩",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_41",
+    "image": "/images/boy/b%20(42).png",
+    "level": "R",
+    "name": "黃衣小子",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_43",
+    "image": "/images/boy/b%20(44).png",
+    "level": "UR",
+    "name": "少年偵探",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_event_ba1",
+    "image": "/images/boy/ba1.png",
+    "level": "活動贈送",
+    "name": "附小校服",
+    "price": 0
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_event_ba2",
+    "image": "/images/boy/ba2.png",
+    "level": "活動贈送",
+    "name": "甲霸尚贏",
+    "price": 0
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_event_ba3",
+    "image": "/images/boy/ba3.png",
+    "level": "SSR",
+    "name": "星河望月（中秋限定至10/19）",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_event_ba5",
+    "image": "/images/boy/ba5.png",
+    "level": "UR",
+    "name": "未命名",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_event_ba7",
+    "image": "/images/boy/ba7.png",
+    "level": "UR",
+    "name": "綠髮劍客",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_event_ba8",
+    "image": "/images/boy/ba8.png",
+    "level": "UR",
+    "name": "捲眉廚師",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_boy_event_ba9",
+    "image": "/images/boy/ba9.png",
+    "level": "SSR",
+    "name": "騙人射手",
+    "price": 200
+  }
+]

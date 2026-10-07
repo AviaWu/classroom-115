@@ -1,0 +1,378 @@
+[
+  {
+    "active": true,
+    "id": "builtin_girl_1",
+    "image": "/images/girl/g%20(1).png",
+    "level": "R",
+    "name": "葡萄汽水",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_3",
+    "image": "/images/girl/g%20(3).png",
+    "level": "SSR",
+    "name": "魔法學徒",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_4",
+    "image": "/images/girl/g%20(4).png",
+    "level": "R",
+    "name": "草莓口味",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_5",
+    "image": "/images/girl/g%20(5).png",
+    "level": "SSR",
+    "name": "風鈴少女",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_6",
+    "image": "/images/girl/g%20(6).png",
+    "level": "R",
+    "name": "小熊少女",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_7",
+    "image": "/images/girl/g%20(7).png",
+    "level": "SR",
+    "name": "教堂修女",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_8",
+    "image": "/images/girl/g%20(8).png",
+    "level": "R",
+    "name": "制服女孩",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_9",
+    "image": "/images/girl/g%20(9).png",
+    "level": "R",
+    "name": "溫柔姐姐",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_10",
+    "image": "/images/girl/g%20(10).png",
+    "level": "R",
+    "name": "休閒學生",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_11",
+    "image": "/images/girl/g%20(11).png",
+    "level": "SSR",
+    "name": "吟遊詩人",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_12",
+    "image": "/images/girl/g%20(12).png",
+    "level": "R",
+    "name": "夏日薄荷",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_13",
+    "image": "/images/girl/g%20(13).png",
+    "level": "SR",
+    "name": "農村少女",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_2",
+    "image": "/images/girl/g%20(2).png",
+    "level": "SR",
+    "name": "提燈少女",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_15",
+    "image": "/images/girl/g%20(15).png",
+    "level": "SSR",
+    "name": "海盜船長",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_31",
+    "image": "/images/girl/g%20(31).png",
+    "level": "R",
+    "name": "制服姐姐",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_14",
+    "image": "/images/girl/g%20(14).png",
+    "level": "SR",
+    "name": "電音潮流",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_19",
+    "image": "/images/girl/g%20(19).png",
+    "level": "SR",
+    "name": "黑衣刺客",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_20",
+    "image": "/images/girl/g%20(20).png",
+    "level": "UR",
+    "name": "迷幻精靈",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_21",
+    "image": "/images/girl/g%20(21).png",
+    "level": "UR",
+    "name": "遠洋人魚",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_22",
+    "image": "/images/girl/g%20(22).png",
+    "level": "UR",
+    "name": "魔法少女",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_34",
+    "image": "/images/girl/g%20(34).png",
+    "level": "SR",
+    "name": "奇航海盜",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_35",
+    "image": "/images/girl/g%20(35).png",
+    "level": "UR",
+    "name": "珊瑚王女",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_32",
+    "image": "/images/girl/g%20(32).png",
+    "level": "R",
+    "name": "弓箭獵手",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_23",
+    "image": "/images/girl/g%20(23).png",
+    "level": "SR",
+    "name": "公主騎士",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_24",
+    "image": "/images/girl/g%20(24).png",
+    "level": "SSR",
+    "name": "鹿角少女",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_26",
+    "image": "/images/girl/g%20(26).png",
+    "level": "UR",
+    "name": "狐狸女孩",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_27",
+    "image": "/images/girl/g%20(27).png",
+    "level": "SR",
+    "name": "浣熊妹妹",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_25",
+    "image": "/images/girl/g%20(25).png",
+    "level": "SR",
+    "name": "英倫女孩",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_28",
+    "image": "/images/girl/g%20(28).png",
+    "level": "SSR",
+    "name": "糖果女孩",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_29",
+    "image": "/images/girl/g%20(29).png",
+    "level": "SSR",
+    "name": "金髮公主",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_33",
+    "image": "/images/girl/g%20(33).png",
+    "level": "SR",
+    "name": "黑色玫瑰",
+    "price": 100
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_30",
+    "image": "/images/girl/g%20(30).png",
+    "level": "R",
+    "name": "淘氣王女",
+    "price": 50
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_17",
+    "image": "/images/girl/g%20(17).png",
+    "level": "UR",
+    "name": "星月天使",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_38",
+    "image": "/images/girl/g%20(38).png",
+    "level": "SSR",
+    "name": "貓耳萌妹",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_36",
+    "image": "/images/girl/g%20(36).png",
+    "level": "SSR",
+    "name": "異國少女",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_37",
+    "image": "/images/girl/g%20(37).png",
+    "level": "UR",
+    "name": "草原少女",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_18",
+    "image": "/images/girl/g%20(18).png",
+    "level": "UR",
+    "name": "紫色惡魔",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_40",
+    "image": "/images/girl/g%20(40).png",
+    "level": "SSR",
+    "name": "彩虹仙子",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_39",
+    "image": "/images/girl/g%20(39).png",
+    "level": "SSR",
+    "name": "星月法師",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_16",
+    "image": "/images/girl/g%20(16).png",
+    "level": "UR",
+    "name": "鍊金術師",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_41",
+    "image": "/images/girl/g%20(41).png",
+    "level": "UR",
+    "name": "漢服少女",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_42",
+    "image": "/images/girl/g%20(42).png",
+    "level": "UR",
+    "name": "王國公主",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_event_ga1",
+    "image": "/images/girl/ga1.png",
+    "level": "活動贈送",
+    "name": "附小校服",
+    "price": 0
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_event_ga2",
+    "image": "/images/girl/ga2.png",
+    "level": "活動贈送",
+    "name": "未命名",
+    "price": 0
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_event_ga3",
+    "image": "/images/girl/ga3.png",
+    "level": "SSR",
+    "name": "星河望月（中秋限定至10/19）",
+    "price": 200
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_event_ga5",
+    "image": "/images/girl/ga5.png",
+    "level": "UR",
+    "name": "航海行家",
+    "price": 300
+  },
+  {
+    "active": true,
+    "id": "builtin_girl_event_ga6",
+    "image": "/images/girl/ga6.png",
+    "level": "UR",
+    "name": "歷史學者",
+    "price": 300
+  }
+]

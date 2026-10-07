@@ -1,0 +1,232 @@
+{
+  "clothesM": [
+    {
+      "id": "builtin_boy_boynew1_1",
+      "name": "新男生服裝 1",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(1).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_2",
+      "name": "新男生服裝 2",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(2).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_3",
+      "name": "新男生服裝 3",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(3).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_4",
+      "name": "新男生服裝 4",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(4).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_5",
+      "name": "新男生服裝 5",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(5).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_6",
+      "name": "新男生服裝 6",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(6).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_7",
+      "name": "新男生服裝 7",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(7).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_8",
+      "name": "新男生服裝 8",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(8).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_9",
+      "name": "新男生服裝 9",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(9).png"
+    },
+    {
+      "id": "builtin_boy_boynew1_10",
+      "name": "新男生服裝 10",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/boy/boynew1/boynew1%20(10).png"
+    }
+  ],
+  "clothesF": [
+    {
+      "id": "builtin_girl_girlnew1_1",
+      "name": "新女生服裝 1",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(1).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_2",
+      "name": "新女生服裝 2",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(2).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_3",
+      "name": "新女生服裝 3",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(3).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_4",
+      "name": "新女生服裝 4",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(4).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_5",
+      "name": "新女生服裝 5",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(5).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_6",
+      "name": "新女生服裝 6",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(6).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_7",
+      "name": "新女生服裝 7",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(7).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_8",
+      "name": "新女生服裝 8",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(8).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_9",
+      "name": "新女生服裝 9",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(9).png"
+    },
+    {
+      "id": "builtin_girl_girlnew1_10",
+      "name": "新女生服裝 10",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/girl/girlnew1/girlnew1%20(10).png"
+    }
+  ],
+  "layouts": [
+    {
+      "id": "builtin_pet_decnew1_1",
+      "name": "新寵物 1",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(1).png"
+    },
+    {
+      "id": "builtin_pet_decnew1_2",
+      "name": "新寵物 2",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(2).png"
+    },
+    {
+      "id": "builtin_pet_decnew1_3",
+      "name": "新寵物 3",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(3).png"
+    },
+    {
+      "id": "builtin_pet_decnew1_4",
+      "name": "新寵物 4",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(4).png"
+    },
+    {
+      "id": "builtin_pet_decnew1_5",
+      "name": "新寵物 5",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(5).png"
+    },
+    {
+      "id": "builtin_pet_decnew1_6",
+      "name": "新寵物 6",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(6).png"
+    },
+    {
+      "id": "builtin_pet_decnew1_7",
+      "name": "新寵物 7",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(7).png"
+    },
+    {
+      "id": "builtin_pet_decnew1_8",
+      "name": "新寵物 8",
+      "level": "R",
+      "price": 50,
+      "active": true,
+      "image": "/images/Dec2/decnew1/decnew1%20(8).png"
+    }
+  ]
+}
