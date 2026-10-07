@@ -217,7 +217,7 @@ test('student sees only their pet view on a blank page and cannot open teacher f
     assert.equal(h.alerts.filter(message=>message==='點錯啦!這不是你的人物喔!').length,1);
     h.w.openBackend();assert.equal(h.w.document.getElementById('backendPw'),null);
 });
-test('scheduled tasks run only for the teacher session',async t=>{
+test('scheduled tasks run only for the teacher session and skip no-op queue entries',async t=>{
     const h=page(t),commands=[];
     h.w.firebaseGameStore={canEdit:()=>true,perform:async command=>{commands.push(command);return {ok:true};}};
     h.signIn('student-28','9316');
@@ -225,6 +225,10 @@ test('scheduled tasks run only for the teacher session',async t=>{
     assert.deepEqual(commands,[]);
     assert.deepEqual(h.alerts,[]);
     h.w.applyAuthenticatedSession({role:'teacher',studentId:null});
+    await h.w.syncScheduledTasks();
+    assert.deepEqual(commands,[]);
+    h.cloud={...h.cloud,dailyTaskTemplates:[{id:'due-template',title:'到期任務',reward:1,appearTime:'00:00',dueTime:'23:59',enabled:true}]};
+    h.w.applyCloudState(h.cloud);
     await h.w.syncScheduledTasks();
     assert.equal(commands.length,1);
     assert.equal(commands[0].type,'schedule');

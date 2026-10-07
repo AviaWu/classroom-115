@@ -1741,7 +1741,11 @@ function generateScheduledCoopTasks(now=new Date()){
     return changed;
 }
 function syncScheduledTasks(){
-    if(currentUser?.role!=="teacher" || !window.firebaseGameStore.canEdit()) return Promise.resolve(false);
+    if(currentUser?.role!=="teacher" || !window.firebaseGameStore.canEdit() || !state?.students?.length) return Promise.resolve(false);
+    // The timer runs frequently, but most checks are no-ops. Avoid putting those
+    // checks into the same serialized network queue as purchases and task clicks.
+    const preview=window.GameOperations.applyOperation(state,{type:"schedule"},Date.now());
+    if(!preview.changed) return Promise.resolve(false);
     return runCommand({type:"schedule"},"schedule");
 }
 function syncDailyTasks(){
